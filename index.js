@@ -17,7 +17,7 @@ const { getMode } = require('./utils/mode');
 const { handleGameMessage } = require('./utils/gameManager');
 
 // ============================================================
-// EXPRESS HEALTH SERVER
+// CLOUD PORT SERVER
 // ============================================================
 
 const PORT = process.env.PORT;
@@ -40,8 +40,7 @@ function startExpressServer() {
 }
 
 // ============================================================
-// HARD-CODED CREATOR SIGNATURE & SECURITY
-// DO NOT REMOVE OR TAMPER
+// CREATOR SIGNATURE & SECURITY
 // ============================================================
 
 const CREATOR_NAME = "QUEEN VIDA";
@@ -59,6 +58,7 @@ function verifyCreatorIntegrity() {
         console.error(
             "❌ CRITICAL ERROR: Creator identity signature has been altered or tampered with!"
         );
+
         process.exit(1);
     }
 }
@@ -90,7 +90,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // ============================================================
-// GLOBAL VARIABLES
+// SPAM TRACKER
 // ============================================================
 
 const spamTracker = {};
@@ -105,7 +105,7 @@ function getGlobalSettings() {
     if (fs.existsSync(settingsPath)) {
         try {
             const data = JSON.parse(
-                fs.readFileSync(settingsPath, 'utf8')
+                fs.readFileSync(settingsPath)
             );
 
             return {
@@ -147,9 +147,7 @@ function getContextEmoji(text = '') {
     const lower = text.toLowerCase();
 
     if (
-        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i.test(
-            lower
-        )
+        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i.test(lower)
     ) {
         return '😂';
     }
@@ -187,9 +185,7 @@ function getContextEmoji(text = '') {
     }
 
     if (
-        /(money|cash|rich|wealth|naira|dollar|lagos)/i.test(
-            lower
-        )
+        /(money|cash|rich|wealth|naira|dollar|lagos)/i.test(lower)
     ) {
         return '💰';
     }
@@ -209,355 +205,6 @@ function getContextEmoji(text = '') {
 }
 
 // ============================================================
-// WELCOME / GOODBYE SETTINGS
-// Uses existing welcome.json
-// ============================================================
-
-function getWelcomeSettings() {
-    const settingsPath = path.join(
-        __dirname,
-        'welcome.json'
-    );
-
-    if (!fs.existsSync(settingsPath)) {
-        return {};
-    }
-
-    try {
-        const data = JSON.parse(
-            fs.readFileSync(settingsPath, 'utf8')
-        );
-
-        return data && typeof data === 'object'
-            ? data
-            : {};
-    } catch (error) {
-        console.error(
-            '🔥 [WELCOME SETTINGS ERROR] Failed to read welcome.json:',
-            error
-        );
-
-        return {};
-    }
-}
-
-// ============================================================
-// NORMALIZE PARTICIPANT
-// ============================================================
-
-function normalizeParticipant(participant) {
-    if (!participant) return null;
-
-    if (typeof participant === 'string') {
-        return participant;
-    }
-
-    if (participant.id) {
-        return participant.id;
-    }
-
-    if (participant.jid) {
-        return participant.jid;
-    }
-
-    return null;
-}
-
-// ============================================================
-// GET DISPLAY NAME
-// ============================================================
-
-async function getParticipantDisplayName(
-    sock,
-    participant,
-    metadata
-) {
-    const jid = normalizeParticipant(participant);
-
-    if (!jid) {
-        return 'User';
-    }
-
-    const number = jid
-        .split('@')[0]
-        .replace(/[^0-9]/g, '');
-
-    // Try group participant name first
-    try {
-        const found = metadata?.participants?.find(
-            (p) => p.id === jid
-        );
-
-        if (found) {
-            if (found.name) return found.name;
-            if (found.notify) return found.notify;
-            if (found.pushName) return found.pushName;
-        }
-    } catch (error) {}
-
-    // Try contact/business profile
-    try {
-        if (typeof sock.getBusinessProfile === 'function') {
-            const profile =
-                await sock.getBusinessProfile(jid);
-
-            if (profile?.name) {
-                return profile.name;
-            }
-        }
-    } catch (error) {}
-
-    return number || 'User';
-}
-
-// ============================================================
-// PROCESS WELCOME MESSAGE
-// ============================================================
-
-function buildWelcomeMessage(
-    customMessage,
-    displayName,
-    jid,
-    groupName,
-    memberCount
-) {
-    const mention = `@${jid.split('@')[0]}`;
-
-    let message =
-        customMessage ||
-        `╭━━━〔 👋 WELCOME 〕━━━╮
-┃ 🎉 Welcome ${mention}!
-┃ 👑 You are now part of *${groupName}*
-┃ 👥 Members: ${memberCount}
-╰━━━━━━━━━━━━━━━━━━╯
-
-Enjoy yourself and have fun! ❤️`;
-
-    message = message
-        .replace(/\{user\}/gi, mention)
-        .replace(/@user/gi, mention)
-        .replace(/\{group\}/gi, groupName)
-        .replace(/\{count\}/gi, String(memberCount));
-
-    return message;
-}
-
-// ============================================================
-// PROCESS GOODBYE MESSAGE
-// ============================================================
-
-function buildGoodbyeMessage(
-    customMessage,
-    displayName,
-    jid,
-    groupName,
-    memberCount
-) {
-    const mention = `@${jid.split('@')[0]}`;
-
-    let message =
-        customMessage ||
-        `╭━━━〔 👋 GOODBYE 〕━━━╮
-┃ 😢 ${mention} has left the group.
-┃ 👥 Members left: ${memberCount}
-╰━━━━━━━━━━━━━━━━━━╯
-
-We wish you all the best! 👋`;
-
-    message = message
-        .replace(/\{user\}/gi, mention)
-        .replace(/@user/gi, mention)
-        .replace(/\{group\}/gi, groupName)
-        .replace(/\{count\}/gi, String(memberCount));
-
-    return message;
-}
-
-// ============================================================
-// AUTOMATIC WELCOME
-// ============================================================
-
-async function handleWelcomeEvent(
-    sock,
-    groupJid,
-    participants
-) {
-    try {
-        if (!groupJid || !groupJid.endsWith('@g.us')) {
-            return;
-        }
-
-        const allSettings = getWelcomeSettings();
-        const groupSettings = allSettings[groupJid];
-
-        if (!groupSettings) {
-            return;
-        }
-
-        if (groupSettings.welcome !== true) {
-            return;
-        }
-
-        let metadata;
-
-        try {
-            metadata = await sock.groupMetadata(groupJid);
-        } catch (metadataError) {
-            console.error(
-                '🔥 [WELCOME] Failed to fetch group metadata:',
-                metadataError
-            );
-            return;
-        }
-
-        const groupName =
-            metadata?.subject || 'this group';
-
-        const memberCount =
-            metadata?.participants?.length || 0;
-
-        const participantList = Array.isArray(participants)
-            ? participants
-            : [participants];
-
-        for (const participant of participantList) {
-            const jid = normalizeParticipant(participant);
-
-            if (!jid) continue;
-
-            try {
-                const displayName =
-                    await getParticipantDisplayName(
-                        sock,
-                        jid,
-                        metadata
-                    );
-
-                const finalMessage =
-                    buildWelcomeMessage(
-                        groupSettings.welcomeMessage,
-                        displayName,
-                        jid,
-                        groupName,
-                        memberCount
-                    );
-
-                await sock.sendMessage(groupJid, {
-                    text: finalMessage,
-                    mentions: [jid]
-                });
-
-                console.log(
-                    `👋 [WELCOME] Sent welcome message for ${jid} in ${groupName}`
-                );
-            } catch (participantError) {
-                console.error(
-                    `🔥 [WELCOME] Failed for participant ${jid}:`,
-                    participantError
-                );
-            }
-        }
-    } catch (error) {
-        console.error(
-            '🔥 [WELCOME EVENT ERROR]:',
-            error
-        );
-    }
-}
-
-// ============================================================
-// AUTOMATIC GOODBYE
-// ============================================================
-
-async function handleGoodbyeEvent(
-    sock,
-    groupJid,
-    participants
-) {
-    try {
-        if (!groupJid || !groupJid.endsWith('@g.us')) {
-            return;
-        }
-
-        const allSettings = getWelcomeSettings();
-        const groupSettings = allSettings[groupJid];
-
-        if (!groupSettings) {
-            return;
-        }
-
-        if (groupSettings.goodbye !== true) {
-            return;
-        }
-
-        let metadata;
-
-        try {
-            metadata = await sock.groupMetadata(groupJid);
-        } catch (metadataError) {
-            console.error(
-                '🔥 [GOODBYE] Failed to fetch group metadata:',
-                metadataError
-            );
-            return;
-        }
-
-        const groupName =
-            metadata?.subject || 'this group';
-
-        const memberCount =
-            metadata?.participants?.length || 0;
-
-        const participantList = Array.isArray(participants)
-            ? participants
-            : [participants];
-
-        for (const participant of participantList) {
-            const jid = normalizeParticipant(participant);
-
-            if (!jid) continue;
-
-            try {
-                const displayName =
-                    await getParticipantDisplayName(
-                        sock,
-                        jid,
-                        metadata
-                    );
-
-                const finalMessage =
-                    buildGoodbyeMessage(
-                        groupSettings.goodbyeMessage,
-                        displayName,
-                        jid,
-                        groupName,
-                        memberCount
-                    );
-
-                await sock.sendMessage(groupJid, {
-                    text: finalMessage,
-                    mentions: [jid]
-                });
-
-                console.log(
-                    `👋 [GOODBYE] Sent goodbye message for ${jid} in ${groupName}`
-                );
-            } catch (participantError) {
-                console.error(
-                    `🔥 [GOODBYE] Failed for participant ${jid}:`,
-                    participantError
-                );
-            }
-        }
-    } catch (error) {
-        console.error(
-            '🔥 [GOODBYE EVENT ERROR]:',
-            error
-        );
-    }
-}
-
-// ============================================================
 // START QUEEN VIDA
 // ============================================================
 
@@ -568,19 +215,12 @@ async function startQueenVida() {
         '🔄 Initializing Queen Vida-V3 Socket Connection...'
     );
 
-    // --------------------------------------------------------
-    // AUTH
-    // --------------------------------------------------------
+    // ========================================================
+    // AUTH CLEANUP
+    // ========================================================
 
-    const authPath = path.join(
-        __dirname,
-        'auth_info'
-    );
-
-    const credsPath = path.join(
-        authPath,
-        'creds.json'
-    );
+    const authPath = path.join(__dirname, 'auth_info');
+    const credsPath = path.join(authPath, 'creds.json');
 
     if (
         fs.existsSync(authPath) &&
@@ -588,15 +228,12 @@ async function startQueenVida() {
     ) {
         try {
             const creds = JSON.parse(
-                fs.readFileSync(
-                    credsPath,
-                    'utf8'
-                )
+                fs.readFileSync(credsPath)
             );
 
             if (!creds.registered) {
                 console.log(
-                    '⚠️ Detected an incomplete pairing session. Cleaning up auth_info...'
+                    "⚠️ Detected an incomplete pairing session. Cleaning up auth_info..."
                 );
 
                 fs.rmSync(authPath, {
@@ -604,10 +241,10 @@ async function startQueenVida() {
                     force: true
                 });
             }
-        } catch (error) {
+        } catch (e) {
             console.error(
                 '🔥 [AUTH ERROR] Failed reading creds.json:',
-                error
+                e
             );
 
             fs.rmSync(authPath, {
@@ -617,16 +254,18 @@ async function startQueenVida() {
         }
     }
 
+    // ========================================================
+    // AUTH STATE
+    // ========================================================
+
     const {
         state,
         saveCreds
-    } = await useMultiFileAuthState(
-        'auth_info'
-    );
+    } = await useMultiFileAuthState('auth_info');
 
-    // --------------------------------------------------------
+    // ========================================================
     // WHATSAPP SOCKET
-    // --------------------------------------------------------
+    // ========================================================
 
     const sock = makeWASocket({
         logger: pino({
@@ -644,9 +283,9 @@ async function startQueenVida() {
         markOnlineOnConnect: true
     });
 
-    // --------------------------------------------------------
+    // ========================================================
     // COMMAND LOADER
-    // --------------------------------------------------------
+    // ========================================================
 
     sock.commands = new Map();
 
@@ -657,63 +296,38 @@ async function startQueenVida() {
 
     if (fs.existsSync(commandPath)) {
         try {
-            const commandFiles =
-                fs.readdirSync(commandPath)
-                    .filter(
-                        (file) =>
-                            file.endsWith('.js')
-                    );
+            const commandFiles = fs
+                .readdirSync(commandPath)
+                .filter(file => file.endsWith('.js'));
 
             for (const file of commandFiles) {
                 try {
-                    const filePath =
-                        path.join(
-                            commandPath,
-                            file
-                        );
+                    const filePath = path.join(
+                        commandPath,
+                        file
+                    );
 
                     delete require.cache[
                         require.resolve(filePath)
                     ];
 
-                    const required =
-                        require(filePath);
+                    const required = require(filePath);
 
-                    // New command format:
-                    // module.exports = {
-                    //   name: 'example',
-                    //   execute: async (...) => {}
-                    // }
-
-                    if (
-                        Array.isArray(
-                            required
-                        )
-                    ) {
-                        for (
-                            const cmd
-                            of required
-                        ) {
-                            if (
-                                cmd &&
-                                cmd.name &&
-                                typeof cmd.execute ===
-                                    'function'
-                            ) {
+                    if (Array.isArray(required)) {
+                        for (const cmd of required) {
+                            if (cmd.name) {
                                 sock.commands.set(
-                                    cmd.name.toLowerCase(),
+                                    cmd.name,
                                     cmd
                                 );
                             }
                         }
                     } else if (
                         required &&
-                        required.name &&
-                        typeof required.execute ===
-                            'function'
+                        required.name
                     ) {
                         sock.commands.set(
-                            required.name.toLowerCase(),
+                            required.name,
                             required
                         );
                     }
@@ -736,72 +350,187 @@ async function startQueenVida() {
         }
     }
 
-    // --------------------------------------------------------
-    // PAIRING CODE
-    // --------------------------------------------------------
+    // ========================================================
+    // PAIRING CODE SYSTEM
+    // ========================================================
 
-    if (!sock.authState.creds.registered) {
+    let pairingCodeRequested = false;
+
+    async function requestQueenPairingCode() {
+        if (pairingCodeRequested) return;
+
+        if (sock.authState.creds.registered) {
+            console.log(
+                '✅ WhatsApp session is already registered.'
+            );
+            return;
+        }
+
         const phoneNumber =
             process.env.PHONE_NUMBER ||
             DISPLAY_CREATOR_NUMBER;
 
         if (!phoneNumber) {
-            console.log(
-                "❌ [ERROR]: PHONE_NUMBER environment variable is not set!"
+            console.error(
+                '❌ [PAIRING ERROR] PHONE_NUMBER is not set.'
             );
 
-            console.log(
-                "👉 Please add 'PHONE_NUMBER' with your full WhatsApp number in your panel's Environment/Startup variables tab."
+            console.error(
+                '👉 Add PHONE_NUMBER in your Katabump environment variables.'
             );
 
             return;
         }
 
+        const cleanNumber = phoneNumber
+            .trim()
+            .replace(/[^0-9]/g, '');
+
+        if (!cleanNumber) {
+            console.error(
+                '❌ [PAIRING ERROR] Invalid phone number.'
+            );
+
+            return;
+        }
+
+        console.log('');
         console.log(
-            `⏳ Automatically requesting pairing code for ${phoneNumber}...`
+            '╔══════════════════════════════════════╗'
+        );
+        console.log(
+            '║     👑 QUEEN VIDA-V3 PAIRING 👑     ║'
+        );
+        console.log(
+            '╚══════════════════════════════════════╝'
         );
 
-        setTimeout(
-            async () => {
-                try {
-                    const cleanNumber =
-                        phoneNumber
-                            .trim()
-                            .replace(
-                                /[^0-9]/g,
-                                ''
-                            );
+        console.log(
+            `📱 Number: ${cleanNumber}`
+        );
 
-                    const code =
-                        await sock.requestPairingCode(
-                            cleanNumber
+        console.log(
+            '⏳ Waiting for WhatsApp connection...'
+        );
+
+        try {
+            /*
+             * Give the WhatsApp socket enough time to initialize
+             * before requesting the pairing code.
+             */
+            await new Promise(resolve =>
+                setTimeout(resolve, 5000)
+            );
+
+            if (sock.authState.creds.registered) {
+                console.log(
+                    '✅ WhatsApp became registered before pairing code request.'
+                );
+
+                return;
+            }
+
+            console.log(
+                '🔐 Requesting a fresh WhatsApp pairing code...'
+            );
+
+            const code =
+                await sock.requestPairingCode(
+                    cleanNumber
+                );
+
+            pairingCodeRequested = true;
+
+            console.log('');
+            console.log(
+                '╔══════════════════════════════════════╗'
+            );
+
+            console.log(
+                `║     🔑 PAIRING CODE: ${code}     ║`
+            );
+
+            console.log(
+                '╚══════════════════════════════════════╝'
+            );
+
+            console.log('');
+
+            console.log(
+                '📲 On WhatsApp:'
+            );
+
+            console.log(
+                'Settings → Linked Devices → Link a Device'
+            );
+
+            console.log(
+                '→ Link with phone number instead'
+            );
+
+            console.log('');
+
+            console.log(
+                '⚠️ Enter the code immediately.'
+            );
+
+            console.log(
+                '⚠️ Do not use an old pairing code.'
+            );
+
+            console.log('');
+
+        } catch (pairErr) {
+            console.error('');
+            console.error(
+                '🔥 [PAIRING ERROR] Could not generate pairing code.'
+            );
+
+            console.error(
+                'Reason:',
+                pairErr?.message || pairErr
+            );
+
+            console.error('');
+
+            /*
+             * Allow another attempt after a short delay.
+             */
+            pairingCodeRequested = false;
+
+            console.log(
+                '🔄 Retrying pairing code request in 10 seconds...'
+            );
+
+            setTimeout(() => {
+                requestQueenPairingCode().catch(
+                    error => {
+                        console.error(
+                            '🔥 [PAIRING RETRY ERROR]:',
+                            error?.message || error
                         );
-
-                    console.log(
-                        `✨ ======================================== ✨`
-                    );
-
-                    console.log(
-                        `✨ YOUR WHATSAPP PAIRING CODE: ${code} ✨`
-                    );
-
-                    console.log(
-                        `✨ ======================================== ✨`
-                    );
-                } catch (pairErr) {
-                    console.error(
-                        '🔥 [PAIRING ERROR] Failed to generate pairing code:',
-                        pairErr
-                    );
-                }
-            },
-            3000
-        );
+                    }
+                );
+            }, 10000);
+        }
     }
 
-    // --------------------------------------------------------
-    // CONNECTION
-    // --------------------------------------------------------
+    // ========================================================
+    // START PAIRING
+    // ========================================================
+
+    if (!sock.authState.creds.registered) {
+        requestQueenPairingCode().catch(err => {
+            console.error(
+                '🔥 [PAIRING START ERROR]:',
+                err?.message || err
+            );
+        });
+    }
+
+    // ========================================================
+    // CONNECTION STATE
+    // ========================================================
 
     let isStartupBannerSent = false;
 
@@ -819,6 +548,10 @@ async function startQueenVida() {
                 );
             }
 
+            // ====================================================
+            // CONNECTION OPEN
+            // ====================================================
+
             if (connection === 'open') {
                 console.log(
                     `--- QUEEN VIDA-V3 CONNECTED [Creator: ${CREATOR_NAME}] ---`
@@ -829,8 +562,7 @@ async function startQueenVida() {
 
                     try {
                         const botJid =
-                            sock.user.id
-                                .split(':')[0] +
+                            sock.user.id.split(':')[0] +
                             '@s.whatsapp.net';
 
                         const serverTime =
@@ -846,7 +578,8 @@ async function startQueenVida() {
 ┃ 👨‍💻 *Developer Contact:* https://wa.me/${DISPLAY_CREATOR_NUMBER}
 ┃ ⏱️ *Server Time:* ${serverTime}
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛
-> _👑 *QUEEN VIDA-V3* 👑 successfully launched_${CHANNEL_TEXT_LINK}`;
+> _👑 *QUEEN VIDA-V3* 👑 successfully launched_` +
+                            CHANNEL_TEXT_LINK;
 
                         const bannerImagePath =
                             path.join(
@@ -867,21 +600,19 @@ async function startQueenVida() {
                             await sock.sendMessage(
                                 botJid,
                                 {
-                                    image:
-                                        imageBuffer,
-                                    caption:
-                                        activeBanner
+                                    image: imageBuffer,
+                                    caption: activeBanner
                                 }
                             );
                         } else {
                             await sock.sendMessage(
                                 botJid,
                                 {
-                                    text:
-                                        activeBanner
+                                    text: activeBanner
                                 }
                             );
                         }
+
                     } catch (bannerErr) {
                         console.error(
                             '🔥 [BANNER ERROR] Failed sending startup banner:',
@@ -891,13 +622,11 @@ async function startQueenVida() {
                 }
             }
 
-            // ------------------------------------------------
+            // ====================================================
             // CONNECTION CLOSED
-            // ------------------------------------------------
+            // ====================================================
 
-            else if (
-                connection === 'close'
-            ) {
+            else if (connection === 'close') {
                 const statusCode =
                     new Boom(
                         lastDisconnect?.error
@@ -906,7 +635,7 @@ async function startQueenVida() {
                 console.error(
                     `🔥 [CONNECTION CLOSED] Status Code: ${statusCode}`,
                     lastDisconnect?.error ||
-                        'Unknown disconnect reason'
+                    'Unknown disconnect reason'
                 );
 
                 if (
@@ -922,8 +651,7 @@ async function startQueenVida() {
                     );
 
                     setTimeout(
-                        () =>
-                            startQueenVida(),
+                        () => startQueenVida(),
                         3000
                     );
                 }
@@ -931,82 +659,13 @@ async function startQueenVida() {
         }
     );
 
-    // --------------------------------------------------------
-    // SAVE AUTH CREDENTIALS
-    // --------------------------------------------------------
+    // ========================================================
+    // SAVE CREDENTIALS
+    // ========================================================
 
     sock.ev.on(
         'creds.update',
         saveCreds
-    );
-
-    // ========================================================
-    // GROUP PARTICIPANT EVENTS
-    // ========================================================
-
-    sock.ev.on(
-        'group-participants.update',
-        async (update) => {
-            try {
-                const {
-                    id,
-                    participants,
-                    action
-                } = update;
-
-                if (
-                    !id ||
-                    !id.endsWith('@g.us')
-                ) {
-                    return;
-                }
-
-                if (
-                    !Array.isArray(
-                        participants
-                    ) ||
-                    participants.length === 0
-                ) {
-                    return;
-                }
-
-                console.log(
-                    `👥 [GROUP EVENT] ${action} in ${id}:`,
-                    participants
-                );
-
-                // -------------------------------
-                // NEW MEMBERS
-                // -------------------------------
-
-                if (action === 'add') {
-                    await handleWelcomeEvent(
-                        sock,
-                        id,
-                        participants
-                    );
-                }
-
-                // -------------------------------
-                // MEMBERS LEAVING
-                // -------------------------------
-
-                if (
-                    action === 'remove'
-                ) {
-                    await handleGoodbyeEvent(
-                        sock,
-                        id,
-                        participants
-                    );
-                }
-            } catch (groupEventError) {
-                console.error(
-                    '🔥 [GROUP PARTICIPANT EVENT ERROR]:',
-                    groupEventError
-                );
-            }
-        }
     );
 
     // ========================================================
@@ -1017,500 +676,675 @@ async function startQueenVida() {
         'messages.upsert',
         async ({ messages }) => {
             try {
+                const m = messages[0];
+
+                if (!m.message) return;
+
+                const from =
+                    m.key.remoteJid;
+
+                const settings =
+                    getGlobalSettings();
+
+                // ==================================================
+                // STATUS HANDLER
+                // ==================================================
+
                 if (
-                    !Array.isArray(
-                        messages
-                    ) ||
-                    messages.length === 0
+                    from ===
+                    'status@broadcast'
                 ) {
+                    if (
+                        settings.autoViewStatus ===
+                        'on'
+                    ) {
+                        (async () => {
+                            try {
+                                if (
+                                    m.key &&
+                                    m.key.remoteJid
+                                ) {
+                                    await sock.readMessages(
+                                        [m.key]
+                                    );
+                                }
+
+                                if (
+                                    settings.statusReaction ===
+                                    'on' &&
+                                    m.message
+                                ) {
+                                    const targetParticipant =
+                                        m.key.participant ||
+                                        m.participant;
+
+                                    /*
+                                     * Skip reacting if it uses an @lid
+                                     * or lacks a normal WhatsApp JID.
+                                     */
+                                    if (
+                                        !targetParticipant ||
+                                        !targetParticipant.endsWith(
+                                            '@s.whatsapp.net'
+                                        )
+                                    ) {
+                                        return;
+                                    }
+
+                                    const statusText =
+                                        m.message
+                                            .conversation ||
+
+                                        m.message
+                                            .extendedTextMessage
+                                            ?.text ||
+
+                                        m.message
+                                            .imageMessage
+                                            ?.caption ||
+
+                                        m.message
+                                            .videoMessage
+                                            ?.caption ||
+
+                                        '';
+
+                                    const emoji =
+                                        getContextEmoji(
+                                            statusText
+                                        );
+
+                                    try {
+                                        await sock.sendMessage(
+                                            'status@broadcast',
+                                            {
+                                                react: {
+                                                    text: emoji,
+                                                    key: m.key
+                                                }
+                                            },
+                                            {
+                                                statusJidList:
+                                                    [
+                                                        targetParticipant
+                                                    ],
+                                                broadcast:
+                                                    true
+                                            }
+                                        );
+                                    } catch (
+                                        statusReactErr
+                                    ) {
+                                        // Silenced status reaction errors
+                                    }
+                                }
+                            } catch (
+                                statusHandlerErr
+                            ) {
+                                // Silenced status handler errors
+                            }
+                        })();
+                    }
+
                     return;
                 }
 
-                // Process all messages instead of only messages[0]
-                for (const m of messages) {
+                // ==================================================
+                // SENDER
+                // ==================================================
+
+                const sender =
+                    m.key.participant ||
+                    m.key.remoteJid;
+
+                const senderNumber =
+                    sender
+                        ? sender.replace(
+                            /[^0-9]/g,
+                            ''
+                        )
+                        : '';
+
+                const isOwner =
+                    CREATOR_NUMBERS.includes(
+                        senderNumber
+                    ) ||
+                    m.key.fromMe;
+
+                // ==================================================
+                // ACTIVITY TRACKER
+                // ==================================================
+
+                if (
+                    from.endsWith('@g.us') &&
+                    sender
+                ) {
                     try {
-                        if (!m || !m.message) {
-                            continue;
-                        }
-
-                        const from =
-                            m.key.remoteJid;
-
-                        if (!from) {
-                            continue;
-                        }
-
-                        const settings =
-                            getGlobalSettings();
-
-                        // =================================================
-                        // STATUS HANDLER
-                        // =================================================
-
-                        if (
-                            from ===
-                            'status@broadcast'
-                        ) {
-                            if (
-                                settings.autoViewStatus ===
-                                'on'
-                            ) {
-                                (async () => {
-                                    try {
-                                        if (
-                                            m.key &&
-                                            m.key.remoteJid
-                                        ) {
-                                            await sock.readMessages(
-                                                [m.key]
-                                            );
-                                        }
-
-                                        if (
-                                            settings.statusReaction ===
-                                                'on' &&
-                                            m.message
-                                        ) {
-                                            const targetParticipant =
-                                                m.key.participant ||
-                                                m.participant;
-
-                                            if (
-                                                !targetParticipant ||
-                                                !targetParticipant.endsWith(
-                                                    '@s.whatsapp.net'
-                                                )
-                                            ) {
-                                                return;
-                                            }
-
-                                            const statusText =
-                                                m.message
-                                                    .conversation ||
-                                                m.message
-                                                    .extendedTextMessage
-                                                    ?.text ||
-                                                m.message
-                                                    .imageMessage
-                                                    ?.caption ||
-                                                m.message
-                                                    .videoMessage
-                                                    ?.caption ||
-                                                '';
-
-                                            const emoji =
-                                                getContextEmoji(
-                                                    statusText
-                                                );
-
-                                            try {
-                                                await sock.sendMessage(
-                                                    'status@broadcast',
-                                                    {
-                                                        react: {
-                                                            text: emoji,
-                                                            key: m.key
-                                                        }
-                                                    },
-                                                    {
-                                                        statusJidList:
-                                                            [
-                                                                targetParticipant
-                                                            ],
-                                                        broadcast:
-                                                            true
-                                                    }
-                                                );
-                                            } catch (
-                                                statusReactErr
-                                            ) {
-                                                // Keep silent
-                                            }
-                                        }
-                                    } catch (
-                                        statusHandlerErr
-                                    ) {
-                                        // Keep silent
-                                    }
-                                })();
-                            }
-
-                            continue;
-                        }
-
-                        // =================================================
-                        // SENDER
-                        // =================================================
-
-                        const sender =
-                            m.key.participant ||
-                            m.key.remoteJid;
-
-                        const senderNumber =
-                            sender
-                                ? sender.replace(
-                                      /[^0-9]/g,
-                                      ''
-                                  )
-                                : '';
-
-                        const isOwner =
-                            CREATOR_NUMBERS.includes(
-                                senderNumber
-                            ) ||
-                            m.key.fromMe;
-
-                        // =================================================
-                        // CHAT TYPE
-                        // =================================================
-
-                        const isGroup =
-                            from.endsWith(
-                                '@g.us'
-                            );
-
-                        const isChannel =
-                            from.endsWith(
-                                '@newsletter'
-                            );
-
-                        // =================================================
-                        // ACTIVITY TRACKER
-                        // =================================================
-
-                        if (
-                            isGroup &&
-                            sender
-                        ) {
-                            try {
-                                const activityPath =
-                                    path.join(
-                                        __dirname,
+                        let act =
+                            fs.existsSync(
+                                'activity.json'
+                            )
+                                ? JSON.parse(
+                                    fs.readFileSync(
                                         'activity.json'
-                                    );
-
-                                let act = {};
-
-                                if (
-                                    fs.existsSync(
-                                        activityPath
                                     )
-                                ) {
-                                    try {
-                                        act =
-                                            JSON.parse(
-                                                fs.readFileSync(
-                                                    activityPath,
-                                                    'utf8'
-                                                )
-                                            );
-                                    } catch {
-                                        act = {};
-                                    }
-                                }
+                                )
+                                : {};
 
-                                if (
-                                    !act[from]
-                                ) {
-                                    act[from] =
-                                        {};
-                                }
+                        if (!act[from]) {
+                            act[from] = {};
+                        }
 
-                                if (
-                                    !act[from][
-                                        sender
-                                    ]
-                                ) {
-                                    act[from][
-                                        sender
-                                    ] = 0;
-                                }
+                        if (!act[from][sender]) {
+                            act[from][sender] = 0;
+                        }
 
-                                act[from][
+                        act[from][sender] += 1;
+
+                        fs.writeFileSync(
+                            'activity.json',
+                            JSON.stringify(act)
+                        );
+                    } catch (
+                        actErr
+                    ) {
+                        console.error(
+                            '🔥 [ACTIVITY TRACKER ERROR]:',
+                            actErr
+                        );
+                    }
+                }
+
+                // ==================================================
+                // MESSAGE BODY
+                // ==================================================
+
+                const body =
+                    m.message
+                        .conversation ||
+
+                    m.message
+                        .extendedTextMessage
+                        ?.text ||
+
+                    '';
+
+                const isGroup =
+                    from.endsWith('@g.us');
+
+                const isChannel =
+                    from.endsWith('@newsletter');
+
+                // ==================================================
+                // NORMAL AUTO REACTION
+                // ==================================================
+
+                if (
+                    settings.autoReaction ===
+                        'on' &&
+                    !m.key.fromMe &&
+                    (isGroup || isChannel)
+                ) {
+                    try {
+                        const reactionEmoji =
+                            getContextEmoji(
+                                body
+                            );
+
+                        await sock.sendMessage(
+                            from,
+                            {
+                                react: {
+                                    text: reactionEmoji,
+                                    key: m.key
+                                }
+                            }
+                        );
+                    } catch (
+                        autoReactErr
+                    ) {
+                        console.error(
+                            '🔥 [NORMAL AUTO-REACTION ERROR]:',
+                            autoReactErr.message
+                        );
+                    }
+                }
+
+                if (!body) return;
+
+                // ==================================================
+                // GROUP SECURITY
+                // ==================================================
+
+                if (
+                    isGroup &&
+                    !isOwner
+                ) {
+                    try {
+                        const groupMetadata =
+                            await sock.groupMetadata(
+                                from
+                            );
+
+                        const participants =
+                            groupMetadata.participants;
+
+                        const senderParticipant =
+                            participants.find(
+                                p =>
+                                    p.id ===
                                     sender
-                                ] += 1;
+                            );
 
-                                fs.writeFileSync(
-                                    activityPath,
-                                    JSON.stringify(
-                                        act
+                        const isAdmin =
+                            senderParticipant &&
+                            (
+                                senderParticipant.admin ===
+                                    'admin' ||
+                                senderParticipant.admin ===
+                                    'superadmin'
+                            );
+
+                        if (!isAdmin) {
+                            let groupSettings =
+                                fs.existsSync(
+                                    'settings.json'
+                                )
+                                    ? JSON.parse(
+                                        fs.readFileSync(
+                                            'settings.json'
+                                        )
                                     )
-                                );
-                            } catch (
-                                actErr
-                            ) {
-                                console.error(
-                                    '🔥 [ACTIVITY TRACKER ERROR]:',
-                                    actErr
-                                );
-                            }
-                        }
+                                    : {};
 
-                        // =================================================
-                        // MESSAGE BODY
-                        // =================================================
+                            // ======================================
+                            // ANTI SPAM
+                            // ======================================
 
-                        const body =
-                            m.message
-                                .conversation ||
-                            m.message
-                                .extendedTextMessage
-                                ?.text ||
-                            m.message
-                                .imageMessage
-                                ?.caption ||
-                            m.message
-                                .videoMessage
-                                ?.caption ||
-                            '';
+                            const isAntiSpamOn =
+                                groupSettings
+                                    .antispam?.[from] ===
+                                'on';
 
-                        // =================================================
-                        // NORMAL AUTO REACTION
-                        // =================================================
-
-                        if (
-                            settings.autoReaction ===
-                                'on' &&
-                            !m.key.fromMe &&
-                            (isGroup ||
-                                isChannel)
-                        ) {
-                            try {
-                                const reactionEmoji =
-                                    getContextEmoji(
-                                        body
-                                    );
-
-                                await sock.sendMessage(
-                                    from,
-                                    {
-                                        react: {
-                                            text:
-                                                reactionEmoji,
-                                            key:
-                                                m.key
-                                        }
-                                    }
-                                );
-                            } catch (
-                                autoReactErr
-                            ) {
-                                console.error(
-                                    '🔥 [NORMAL AUTO-REACTION ERROR]:',
-                                    autoReactErr.message
-                                );
-                            }
-                        }
-
-                        // =================================================
-                        // IGNORE NON-TEXT MESSAGES
-                        // =================================================
-
-                        if (!body) {
-                            continue;
-                        }
-
-                        // =================================================
-                        // GROUP SECURITY
-                        // =================================================
-
-                        if (
-                            isGroup &&
-                            !isOwner
-                        ) {
-                            try {
-                                const groupMetadata =
-                                    await sock.groupMetadata(
-                                        from
-                                    );
-
-                                const participants =
-                                    groupMetadata.participants ||
-                                    [];
-
-                                const senderParticipant =
-                                    participants.find(
-                                        (p) =>
-                                            p.id ===
-                                            sender
-                                    );
-
-                                const isAdmin =
-                                    senderParticipant &&
-                                    (
-                                        senderParticipant.admin ===
-                                            'admin' ||
-                                        senderParticipant.admin ===
-                                            'superadmin'
-                                    );
+                            if (isAntiSpamOn) {
+                                const now =
+                                    Date.now();
 
                                 if (
-                                    !isAdmin
+                                    !spamTracker[from]
                                 ) {
-                                    const settingsPath =
-                                        path.join(
-                                            __dirname,
-                                            'settings.json'
+                                    spamTracker[from] = {};
+                                }
+
+                                if (
+                                    !spamTracker[from][sender]
+                                ) {
+                                    spamTracker[from][
+                                        sender
+                                    ] = {
+                                        count: 0,
+                                        lastTime: now
+                                    };
+                                }
+
+                                const userSpam =
+                                    spamTracker[from][
+                                        sender
+                                    ];
+
+                                if (
+                                    now -
+                                        userSpam.lastTime <
+                                    3000
+                                ) {
+                                    userSpam.count +=
+                                        1;
+                                } else {
+                                    userSpam.count =
+                                        1;
+                                }
+
+                                userSpam.lastTime =
+                                    now;
+
+                                if (
+                                    userSpam.count >=
+                                    5
+                                ) {
+                                    userSpam.count =
+                                        0;
+
+                                    try {
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                delete:
+                                                    m.key
+                                            }
+                                        );
+                                    } catch (e) {}
+
+                                    if (
+                                        !groupSettings.spamWarns
+                                    ) {
+                                        groupSettings.spamWarns =
+                                            {};
+                                    }
+
+                                    if (
+                                        !groupSettings
+                                            .spamWarns[
+                                            from
+                                        ]
+                                    ) {
+                                        groupSettings.spamWarns[
+                                            from
+                                        ] = {};
+                                    }
+
+                                    if (
+                                        !groupSettings
+                                            .spamWarns[
+                                            from
+                                        ][sender]
+                                    ) {
+                                        groupSettings.spamWarns[
+                                            from
+                                        ][sender] =
+                                            0;
+                                    }
+
+                                    groupSettings
+                                        .spamWarns[
+                                        from
+                                    ][sender] += 1;
+
+                                    const spamWarnCount =
+                                        groupSettings
+                                            .spamWarns[
+                                            from
+                                        ][sender];
+
+                                    fs.writeFileSync(
+                                        'settings.json',
+                                        JSON.stringify(
+                                            groupSettings,
+                                            null,
+                                            2
+                                        )
+                                    );
+
+                                    if (
+                                        spamWarnCount ===
+                                        1
+                                    ) {
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                text:
+                                                    `⚠️ *@${senderNumber}*, stop spamming! This is your 1st warning. Next time you will be kicked.`,
+                                                mentions:
+                                                    [sender]
+                                            }
+                                        );
+                                    } else {
+                                        groupSettings
+                                            .spamWarns[
+                                            from
+                                        ][sender] =
+                                            0;
+
+                                        fs.writeFileSync(
+                                            'settings.json',
+                                            JSON.stringify(
+                                                groupSettings,
+                                                null,
+                                                2
+                                            )
                                         );
 
-                                    let groupSettings =
-                                        {};
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                text:
+                                                    `🚨 *@${senderNumber}* continued spamming after warning and has been kicked!`,
+                                                mentions:
+                                                    [sender]
+                                            }
+                                        );
 
-                                    if (
-                                        fs.existsSync(
-                                            settingsPath
-                                        )
-                                    ) {
                                         try {
-                                            groupSettings =
-                                                JSON.parse(
-                                                    fs.readFileSync(
-                                                        settingsPath,
-                                                        'utf8'
-                                                    )
-                                                );
-                                        } catch {
-                                            groupSettings =
-                                                {};
-                                        }
+                                            await sock.groupParticipantsUpdate(
+                                                from,
+                                                [sender],
+                                                'remove'
+                                            );
+                                        } catch (
+                                            e
+                                        ) {}
                                     }
 
-                                    // -----------------------------------------
-                                    // ANTI SPAM
-                                    // -----------------------------------------
+                                    return;
+                                }
+                            }
 
-                                    const isAntiSpamOn =
-                                        groupSettings
-                                            .antispam
-                                            ?.[
-                                                from
-                                            ] ===
-                                        'on';
+                            // ======================================
+                            // BADWORDS FILTER
+                            // ======================================
+
+                            const badWordsConfig =
+                                groupSettings
+                                    .badwords?.[
+                                    from
+                                ];
+
+                            if (
+                                badWordsConfig &&
+                                badWordsConfig.status ===
+                                    'on' &&
+                                Array.isArray(
+                                    badWordsConfig.list
+                                )
+                            ) {
+                                const lowerBody =
+                                    body.toLowerCase();
+
+                                const containsBadWord =
+                                    badWordsConfig.list.some(
+                                        word =>
+                                            lowerBody.includes(
+                                                word.toLowerCase()
+                                            )
+                                    );
+
+                                if (
+                                    containsBadWord
+                                ) {
+                                    try {
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                delete:
+                                                    m.key
+                                            }
+                                        );
+                                    } catch (e) {}
+
+                                    await sock.sendMessage(
+                                        from,
+                                        {
+                                            text:
+                                                `⚠️ *@${senderNumber}*, watch your language! Profanity is strictly prohibited in this group.`,
+                                            mentions:
+                                                [sender]
+                                        }
+                                    );
+
+                                    return;
+                                }
+                            }
+
+                            // ======================================
+                            // ANTILINK
+                            // ======================================
+
+                            const antiLinkConfig =
+                                groupSettings
+                                    .antilink?.[
+                                    from
+                                ];
+
+                            if (
+                                antiLinkConfig &&
+                                (
+                                    antiLinkConfig.warn ===
+                                        'on' ||
+                                    antiLinkConfig.instant ===
+                                        'on'
+                                )
+                            ) {
+                                const linkRegex =
+                                    /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][-a-zA-Z0-9]{0,62}\.)+[a-zA-Z]{2,}(\/[^\s]*)?/gi;
+
+                                const messageContent =
+                                    body ||
+
+                                    m.message
+                                        .extendedTextMessage
+                                        ?.text ||
+
+                                    m.message
+                                        .imageMessage
+                                        ?.caption ||
+
+                                    '';
+
+                                if (
+                                    linkRegex.test(
+                                        messageContent
+                                    )
+                                ) {
+                                    try {
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                delete:
+                                                    m.key
+                                            }
+                                        );
+                                    } catch (e) {}
+
+                                    // ==================================
+                                    // INSTANT REMOVE
+                                    // ==================================
 
                                     if (
-                                        isAntiSpamOn
+                                        antiLinkConfig.instant ===
+                                        'on'
                                     ) {
-                                        const now =
-                                            Date.now();
+                                        await sock.sendMessage(
+                                            from,
+                                            {
+                                                text:
+                                                    `🚨 *@${senderNumber}*, links are strictly prohibited in this group! You have been removed.`,
+                                                mentions:
+                                                    [sender]
+                                            }
+                                        );
+
+                                        try {
+                                            await sock.groupParticipantsUpdate(
+                                                from,
+                                                [sender],
+                                                'remove'
+                                            );
+                                        } catch (
+                                            e
+                                        ) {}
+
+                                        return;
+                                    }
+
+                                    // ==================================
+                                    // LINK WARNINGS
+                                    // ==================================
+
+                                    if (
+                                        antiLinkConfig.warn ===
+                                        'on'
+                                    ) {
+                                        if (
+                                            !groupSettings.linkWarns
+                                        ) {
+                                            groupSettings.linkWarns =
+                                                {};
+                                        }
 
                                         if (
-                                            !spamTracker[
+                                            !groupSettings
+                                                .linkWarns[
                                                 from
                                             ]
                                         ) {
-                                            spamTracker[
+                                            groupSettings.linkWarns[
                                                 from
                                             ] = {};
                                         }
 
                                         if (
-                                            !spamTracker[
+                                            !groupSettings
+                                                .linkWarns[
                                                 from
-                                            ][
-                                                sender
-                                            ]
+                                            ][sender]
                                         ) {
-                                            spamTracker[
+                                            groupSettings.linkWarns[
                                                 from
-                                            ][
-                                                sender
-                                            ] = {
-                                                count: 0,
-                                                lastTime:
-                                                    now
-                                            };
+                                            ][sender] =
+                                                0;
                                         }
 
-                                        const userSpam =
-                                            spamTracker[
+                                        groupSettings
+                                            .linkWarns[
+                                            from
+                                        ][sender] += 1;
+
+                                        const warnCount =
+                                            groupSettings
+                                                .linkWarns[
                                                 from
-                                            ][
-                                                sender
-                                            ];
+                                            ][sender];
+
+                                        fs.writeFileSync(
+                                            'settings.json',
+                                            JSON.stringify(
+                                                groupSettings,
+                                                null,
+                                                2
+                                            )
+                                        );
 
                                         if (
-                                            now -
-                                                userSpam.lastTime <
-                                            3000
+                                            warnCount <
+                                            3
                                         ) {
-                                            userSpam.count +=
-                                                1;
+                                            await sock.sendMessage(
+                                                from,
+                                                {
+                                                    text:
+                                                        `⚠️ *@${senderNumber}*, links are not allowed here! Warning *(${warnCount}/3)*.`,
+                                                    mentions:
+                                                        [sender]
+                                                }
+                                            );
                                         } else {
-                                            userSpam.count =
-                                                1;
-                                        }
-
-                                        userSpam.lastTime =
-                                            now;
-
-                                        if (
-                                            userSpam.count >=
-                                            5
-                                        ) {
-                                            userSpam.count =
+                                            groupSettings
+                                                .linkWarns[
+                                                from
+                                            ][sender] =
                                                 0;
 
-                                            try {
-                                                await sock.sendMessage(
-                                                    from,
-                                                    {
-                                                        delete:
-                                                            m.key
-                                                    }
-                                                );
-                                            } catch (
-                                                deleteError
-                                            ) {}
-
-                                            if (
-                                                !groupSettings.spamWarns
-                                            ) {
-                                                groupSettings.spamWarns =
-                                                    {};
-                                            }
-
-                                            if (
-                                                !groupSettings
-                                                    .spamWarns[
-                                                    from
-                                                ]
-                                            ) {
-                                                groupSettings.spamWarns[
-                                                    from
-                                                ] = {};
-                                            }
-
-                                            if (
-                                                !groupSettings
-                                                    .spamWarns[
-                                                    from
-                                                ][
-                                                    sender
-                                                ]
-                                            ) {
-                                                groupSettings.spamWarns[
-                                                    from
-                                                ][
-                                                    sender
-                                                ] = 0;
-                                            }
-
-                                            groupSettings.spamWarns[
-                                                from
-                                            ][
-                                                sender
-                                            ] += 1;
-
-                                            const spamWarnCount =
-                                                groupSettings
-                                                    .spamWarns[
-                                                    from
-                                                ][
-                                                    sender
-                                                ];
-
                                             fs.writeFileSync(
-                                                settingsPath,
+                                                'settings.json',
                                                 JSON.stringify(
                                                     groupSettings,
                                                     null,
@@ -1518,455 +1352,132 @@ async function startQueenVida() {
                                                 )
                                             );
 
-                                            if (
-                                                spamWarnCount ===
-                                                1
-                                            ) {
-                                                await sock.sendMessage(
-                                                    from,
-                                                    {
-                                                        text:
-                                                            `⚠️ *@${senderNumber}*, stop spamming! This is your 1st warning. Next time you will be kicked.`,
-                                                        mentions:
-                                                            [
-                                                                sender
-                                                            ]
-                                                    }
-                                                );
-                                            } else {
-                                                groupSettings.spamWarns[
-                                                    from
-                                                ][
-                                                    sender
-                                                ] = 0;
-
-                                                fs.writeFileSync(
-                                                    settingsPath,
-                                                    JSON.stringify(
-                                                        groupSettings,
-                                                        null,
-                                                        2
-                                                    )
-                                                );
-
-                                                await sock.sendMessage(
-                                                    from,
-                                                    {
-                                                        text:
-                                                            `🚨 *@${senderNumber}* continued spamming after warning and has been kicked!`,
-                                                        mentions:
-                                                            [
-                                                                sender
-                                                            ]
-                                                    }
-                                                );
-
-                                                try {
-                                                    await sock.groupParticipantsUpdate(
-                                                        from,
-                                                        [
-                                                            sender
-                                                        ],
-                                                        'remove'
-                                                    );
-                                                } catch (
-                                                    kickError
-                                                ) {}
-                                            }
-
-                                            continue;
-                                        }
-                                    }
-
-                                    // -----------------------------------------
-                                    // BAD WORDS
-                                    // -----------------------------------------
-
-                                    const badWordsConfig =
-                                        groupSettings
-                                            .badwords
-                                            ?.[
-                                                from
-                                            ];
-
-                                    if (
-                                        badWordsConfig &&
-                                        badWordsConfig.status ===
-                                            'on' &&
-                                        Array.isArray(
-                                            badWordsConfig.list
-                                        )
-                                    ) {
-                                        const lowerBody =
-                                            body.toLowerCase();
-
-                                        const containsBadWord =
-                                            badWordsConfig.list.some(
-                                                (word) =>
-                                                    lowerBody.includes(
-                                                        word.toLowerCase()
-                                                    )
-                                            );
-
-                                        if (
-                                            containsBadWord
-                                        ) {
-                                            try {
-                                                await sock.sendMessage(
-                                                    from,
-                                                    {
-                                                        delete:
-                                                            m.key
-                                                    }
-                                                );
-                                            } catch (
-                                                deleteError
-                                            ) {}
-
                                             await sock.sendMessage(
                                                 from,
                                                 {
                                                     text:
-                                                        `⚠️ *@${senderNumber}*, watch your language! Profanity is strictly prohibited in this group.`,
+                                                        `🚨 *@${senderNumber}* reached 3 link warnings and has been kicked from the group!`,
                                                     mentions:
-                                                        [
-                                                            sender
-                                                        ]
+                                                        [sender]
                                                 }
                                             );
 
-                                            continue;
-                                        }
-                                    }
-
-                                    // -----------------------------------------
-                                    // ANTI LINK
-                                    // -----------------------------------------
-
-                                    const antiLinkConfig =
-                                        groupSettings
-                                            .antilink
-                                            ?.[
-                                                from
-                                            ];
-
-                                    if (
-                                        antiLinkConfig &&
-                                        (
-                                            antiLinkConfig.warn ===
-                                                'on' ||
-                                            antiLinkConfig.instant ===
-                                                'on'
-                                        )
-                                    ) {
-                                        const linkRegex =
-                                            /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][-a-zA-Z0-9]{0,62}\.)+[a-zA-Z]{2,}(\/[^\s]*)?/gi;
-
-                                        const messageContent =
-                                            body ||
-                                            m.message
-                                                .extendedTextMessage
-                                                ?.text ||
-                                            m.message
-                                                .imageMessage
-                                                ?.caption ||
-                                            m.message
-                                                .videoMessage
-                                                ?.caption ||
-                                            '';
-
-                                        if (
-                                            linkRegex.test(
-                                                messageContent
-                                            )
-                                        ) {
                                             try {
-                                                await sock.sendMessage(
+                                                await sock.groupParticipantsUpdate(
                                                     from,
-                                                    {
-                                                        delete:
-                                                            m.key
-                                                    }
+                                                    [sender],
+                                                    'remove'
                                                 );
                                             } catch (
-                                                deleteError
+                                                e
                                             ) {}
-
-                                            if (
-                                                antiLinkConfig.instant ===
-                                                'on'
-                                            ) {
-                                                await sock.sendMessage(
-                                                    from,
-                                                    {
-                                                        text:
-                                                            `🚨 *@${senderNumber}*, links are strictly prohibited in this group! You have been removed.`,
-                                                        mentions:
-                                                            [
-                                                                sender
-                                                            ]
-                                                    }
-                                                );
-
-                                                try {
-                                                    await sock.groupParticipantsUpdate(
-                                                        from,
-                                                        [
-                                                            sender
-                                                        ],
-                                                        'remove'
-                                                    );
-                                                } catch (
-                                                    kickError
-                                                ) {}
-
-                                                continue;
-                                            }
-
-                                            if (
-                                                antiLinkConfig.warn ===
-                                                'on'
-                                            ) {
-                                                if (
-                                                    !groupSettings.linkWarns
-                                                ) {
-                                                    groupSettings.linkWarns =
-                                                        {};
-                                                }
-
-                                                if (
-                                                    !groupSettings
-                                                        .linkWarns[
-                                                        from
-                                                    ]
-                                                ) {
-                                                    groupSettings.linkWarns[
-                                                        from
-                                                    ] = {};
-                                                }
-
-                                                if (
-                                                    !groupSettings
-                                                        .linkWarns[
-                                                        from
-                                                    ][
-                                                        sender
-                                                    ]
-                                                ) {
-                                                    groupSettings.linkWarns[
-                                                        from
-                                                    ][
-                                                        sender
-                                                    ] = 0;
-                                                }
-
-                                                groupSettings.linkWarns[
-                                                    from
-                                                ][
-                                                    sender
-                                                ] += 1;
-
-                                                const warnCount =
-                                                    groupSettings
-                                                        .linkWarns[
-                                                        from
-                                                    ][
-                                                        sender
-                                                    ];
-
-                                                fs.writeFileSync(
-                                                    settingsPath,
-                                                    JSON.stringify(
-                                                        groupSettings,
-                                                        null,
-                                                        2
-                                                    )
-                                                );
-
-                                                if (
-                                                    warnCount <
-                                                    3
-                                                ) {
-                                                    await sock.sendMessage(
-                                                        from,
-                                                        {
-                                                            text:
-                                                                `⚠️ *@${senderNumber}*, links are not allowed here! Warning *(${warnCount}/3)*.`,
-                                                            mentions:
-                                                                [
-                                                                    sender
-                                                                ]
-                                                        }
-                                                    );
-                                                } else {
-                                                    groupSettings.linkWarns[
-                                                        from
-                                                    ][
-                                                        sender
-                                                    ] = 0;
-
-                                                    fs.writeFileSync(
-                                                        settingsPath,
-                                                        JSON.stringify(
-                                                            groupSettings,
-                                                            null,
-                                                            2
-                                                        )
-                                                    );
-
-                                                    await sock.sendMessage(
-                                                        from,
-                                                        {
-                                                            text:
-                                                                `🚨 *@${senderNumber}* reached 3 link warnings and has been kicked from the group!`,
-                                                            mentions:
-                                                                [
-                                                                    sender
-                                                                ]
-                                                        }
-                                                    );
-
-                                                    try {
-                                                        await sock.groupParticipantsUpdate(
-                                                            from,
-                                                            [
-                                                                sender
-                                                            ],
-                                                            'remove'
-                                                        );
-                                                    } catch (
-                                                        kickError
-                                                    ) {}
-                                                }
-
-                                                continue;
-                                            }
                                         }
+
+                                        return;
                                     }
                                 }
-                            } catch (
-                                groupSecErr
-                            ) {
-                                console.error(
-                                    '🔥 [GROUP SECURITY ERROR]:',
-                                    groupSecErr
-                                );
-                            }
-                        }
-
-                        // =================================================
-                        // GAME HANDLER
-                        // =================================================
-
-                        try {
-                            const isGameHandled =
-                                await handleGameMessage(
-                                    sock,
-                                    m,
-                                    from,
-                                    body
-                                );
-
-                            if (
-                                isGameHandled
-                            ) {
-                                continue;
-                            }
-                        } catch (
-                            gameError
-                        ) {
-                            console.error(
-                                '🔥 [GAME HANDLER ERROR]:',
-                                gameError
-                            );
-                        }
-
-                        // =================================================
-                        // COMMAND PREFIX
-                        // =================================================
-
-                        if (
-                            !body.startsWith('!')
-                        ) {
-                            continue;
-                        }
-
-                        const currentMode =
-                            getMode();
-
-                        if (
-                            currentMode ===
-                                'private' &&
-                            !isOwner
-                        ) {
-                            continue;
-                        }
-
-                        const args =
-                            body
-                                .slice(1)
-                                .trim()
-                                .split(/ +/);
-
-                        const commandName =
-                            args
-                                .shift()
-                                ?.toLowerCase();
-
-                        if (
-                            !commandName
-                        ) {
-                            continue;
-                        }
-
-                        const command =
-                            sock.commands.get(
-                                commandName
-                            );
-
-                        if (
-                            command &&
-                            typeof command.execute ===
-                                'function'
-                        ) {
-                            try {
-                                await command.execute(
-                                    sock,
-                                    m,
-                                    m.key.remoteJid,
-                                    args,
-                                    isOwner
-                                );
-                            } catch (
-                                cmdExecErr
-                            ) {
-                                console.error(
-                                    `🔥 [COMMAND EXECUTION CRASH] [!${commandName}]:`,
-                                    cmdExecErr
-                                );
-
-                                try {
-                                    await sock.sendMessage(
-                                        from,
-                                        {
-                                            text:
-                                                `❌ An error occurred while executing command *!${commandName}*.\n_Details:_ ${cmdExecErr.message}`
-                                        }
-                                    );
-                                } catch (
-                                    sendError
-                                ) {}
                             }
                         }
                     } catch (
-                        singleMessageError
+                        groupSecErr
                     ) {
                         console.error(
-                            '🔥 [SINGLE MESSAGE ERROR]:',
-                            singleMessageError
+                            '🔥 [GROUP SECURITY ERROR]:',
+                            groupSecErr
                         );
                     }
                 }
+
+                // ==================================================
+                // GAME HANDLER
+                // ==================================================
+
+                const isGameHandled =
+                    await handleGameMessage(
+                        sock,
+                        m,
+                        from,
+                        body
+                    );
+
+                if (isGameHandled) return;
+
+                // ==================================================
+                // PREFIX
+                // ==================================================
+
+                if (!body.startsWith('!')) {
+                    return;
+                }
+
+                // ==================================================
+                // BOT MODE
+                // ==================================================
+
+                const currentMode =
+                    getMode();
+
+                if (
+                    currentMode ===
+                        'private' &&
+                    !isOwner
+                ) {
+                    return;
+                }
+
+                // ==================================================
+                // COMMAND PARSER
+                // ==================================================
+
+                const args =
+                    body
+                        .slice(1)
+                        .trim()
+                        .split(/ +/);
+
+                const commandName =
+                    args
+                        .shift()
+                        .toLowerCase();
+
+                const command =
+                    sock.commands.get(
+                        commandName
+                    );
+
+                // ==================================================
+                // COMMAND EXECUTION
+                // ==================================================
+
+                if (command) {
+                    try {
+                        await command.execute(
+                            sock,
+                            m,
+                            m.key.remoteJid,
+                            args,
+                            isOwner
+                        );
+                    } catch (
+                        cmdExecErr
+                    ) {
+                        console.error(
+                            `🔥 [COMMAND EXECUTION CRASH] [!${commandName}]:`,
+                            cmdExecErr
+                        );
+
+                        await sock.sendMessage(
+                            from,
+                            {
+                                text:
+                                    `❌ An error occurred while executing command *!${commandName}*.\n_Details:_ ${cmdExecErr.message}`
+                            }
+                        ).catch(
+                            () => {}
+                        );
+                    }
+                }
+
             } catch (
                 upsertErr
             ) {
