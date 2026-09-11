@@ -3,7 +3,7 @@ const { getPrefix } = require('../utils/prefix');
 
 const CREATOR_NAME = 'QUEEN VIDA';
 const VERSION = '3.0.0';
-const PLAN = 'PREMIUM;
+const PLAN = 'PREMIUM';
 
 const CHANNEL_TEXT_LINK =
     '\n\n📢 *Join QUEEN VIDA Channel:*\n' +
