@@ -74,6 +74,31 @@ function commandLine(prefix, command, description = '') {
     return `┃ • *${prefix}${command}*\n`;
 }
 
+// Every command name that already appears somewhere in the
+// hardcoded sections above. Used so newly added command files
+// automatically show up under "NEWLY ADDED" instead of staying
+// invisible until someone remembers to edit this file again.
+const LISTED_COMMANDS = new Set([
+    'menu', 'owner', 'gcstatus', 'prefix', 'ping', 'botcreator',
+    'ai',
+    'add', 'agm', 'antilink', 'antispam', 'antisticker', 'badwords',
+    'clearwarnings', 'del', 'demote', 'groupinfo', 'kick', 'mute',
+    'poll', 'promote', 'reaction', 'tagadmins', 'tagall', 'unmute',
+    'vcf', 'warn', 'warnings', 'admins', 'approve', 'requests',
+    'revoke', 'rules', 'link', 'members', 'groupstats', 'hidetag',
+    'afk', 'setpp', 'getpp', 'setgroupname', 'setgroupdesc', 'active',
+    'define', 'welcome', 'setwelcome', 'goodbye', 'setgoodbye',
+    'block', 'broadcast', 'changebio', 'changename', 'changeprofile',
+    'creategroup', 'join', 'leave', 'mode', 'statusreactions',
+    'unblock', 'update', 'viewstatus',
+    'calc', 'game', 'quote', 'hug', 'kiss', 'slap', 'ship', 'match',
+    'roast', 'rate', 'compliment', 'flirt', 'truth', 'dare',
+    'tik', 'music', 'save', 'downloadviewonce', 'downloadviewonceprivate',
+    'sticker',
+    'tts', 'lyrics',
+    'weather', 'repo', 'individual', 'profile', 'runtime', 'topmembers'
+]);
+
 module.exports = {
     name: 'menu',
 
@@ -181,6 +206,26 @@ ${commandLine(PREFIX, 'unmute', 'Unlock group')}
 ${commandLine(PREFIX, 'vcf', 'Export contacts')}
 ${commandLine(PREFIX, 'warn', 'Warn member')}
 ${commandLine(PREFIX, 'warnings', 'Check warnings')}
+${commandLine(PREFIX, 'admins', 'Show group administrators')}
+${commandLine(PREFIX, 'approve', 'Approve a pending join request')}
+${commandLine(PREFIX, 'requests', 'Show pending join requests')}
+${commandLine(PREFIX, 'revoke', 'Revoke the group invite link')}
+${commandLine(PREFIX, 'rules', 'Show or set group rules')}
+${commandLine(PREFIX, 'link', 'Get the group invite link')}
+${commandLine(PREFIX, 'members', 'Show group member count')}
+${commandLine(PREFIX, 'groupstats', 'Basic group statistics')}
+${commandLine(PREFIX, 'hidetag <msg>', 'Hidden tag to all members')}
+${commandLine(PREFIX, 'afk <reason>', 'Set yourself as AFK')}
+${commandLine(PREFIX, 'setpp', 'Change group profile picture')}
+${commandLine(PREFIX, 'getpp @user', "Fetch a user's profile picture")}
+${commandLine(PREFIX, 'setgroupname <name>', 'Change group title')}
+${commandLine(PREFIX, 'setgroupdesc <text>', 'Change group description')}
+${commandLine(PREFIX, 'active', 'Most active members leaderboard')}
+${commandLine(PREFIX, 'define <word>', 'Dictionary definition of a word')}
+${commandLine(PREFIX, 'welcome on/off', 'Toggle welcome messages')}
+${commandLine(PREFIX, 'setwelcome <text>', 'Set custom welcome message')}
+${commandLine(PREFIX, 'goodbye on/off', 'Toggle goodbye messages')}
+${commandLine(PREFIX, 'setgoodbye <text>', 'Set custom goodbye message')}
 ╰━━━━━━━━━━━━━━━━━━━━╯
 
 `;
@@ -217,6 +262,17 @@ ${commandLine(PREFIX, 'viewstatus on/off', 'Automatic status viewing')}
 ${commandLine(PREFIX, 'calc <expression>', 'Calculate')}
 ${commandLine(PREFIX, 'game', 'Open games')}
 ${commandLine(PREFIX, 'quote', 'Random quote')}
+${commandLine(PREFIX, 'hug @user', 'Hug someone')}
+${commandLine(PREFIX, 'kiss @user', 'Kiss someone')}
+${commandLine(PREFIX, 'slap @user', 'Slap someone')}
+${commandLine(PREFIX, 'ship @user1 @user2', 'Ship two group members')}
+${commandLine(PREFIX, 'match @user1 @user2', 'Match two people')}
+${commandLine(PREFIX, 'roast @user', 'Roast someone')}
+${commandLine(PREFIX, 'rate @user', 'Rate someone')}
+${commandLine(PREFIX, 'compliment @user', 'Compliment someone')}
+${commandLine(PREFIX, 'flirt', 'Send a random flirty line')}
+${commandLine(PREFIX, 'truth', 'Random truth question')}
+${commandLine(PREFIX, 'dare', 'Random dare')}
 ╰━━━━━━━━━━━━━━━━━━━╯
 
 `;
@@ -283,6 +339,9 @@ ${commandLine(PREFIX, 'weather <city>', 'Weather information')}
 ${commandLine(PREFIX, 'lyrics <song>', 'Search lyrics')}
 ${commandLine(PREFIX, 'repo', 'Bot repository')}
 ${commandLine(PREFIX, 'individual', 'Private utilities')}
+${commandLine(PREFIX, 'profile @user', 'Show a member profile')}
+${commandLine(PREFIX, 'runtime', 'Show how long the bot has been online')}
+${commandLine(PREFIX, 'topmembers', 'Alias for active leaderboard')}
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
 `;
@@ -341,6 +400,39 @@ ${commandLine(PREFIX, 'individual', 'Private utilities')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
 `;
+
+        // ==============================
+        // NEWLY ADDED (auto-detected)
+        // ==============================
+        // Safety net: any command registered in sock.commands that
+        // isn't in LISTED_COMMANDS above shows up here automatically,
+        // so a new command file is never silently missing from /menu.
+
+        if (sock.commands && sock.commands.size) {
+            const unlisted = [...sock.commands.keys()]
+                .filter(name => !LISTED_COMMANDS.has(name))
+                .sort();
+
+            if (unlisted.length) {
+                menuText +=
+`╭━━━〔 🆕 *NEWLY ADDED* 〕━━━╮
+┃
+`;
+                for (const name of unlisted) {
+                    const cmd = sock.commands.get(name);
+                    menuText += commandLine(
+                        PREFIX,
+                        name,
+                        (cmd && cmd.description) || ''
+                    );
+                }
+                menuText +=
+`┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+            }
+        }
 
         // ==============================
         // FOOTER
