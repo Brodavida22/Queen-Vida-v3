@@ -8,7 +8,9 @@ const VALID_PREFIXES = ['.', '!', '#', '/'];
 function getPrefix() {
     try {
         if (fs.existsSync(PREFIX_FILE)) {
-            const data = JSON.parse(fs.readFileSync(PREFIX_FILE, 'utf8'));
+            const data = JSON.parse(
+                fs.readFileSync(PREFIX_FILE, 'utf8')
+            );
 
             if (VALID_PREFIXES.includes(data.prefix)) {
                 return data.prefix;
@@ -18,7 +20,6 @@ function getPrefix() {
         console.error('❌ Prefix file error:', error.message);
     }
 
-    // Default prefix
     return '!';
 }
 
@@ -30,13 +31,7 @@ function setPrefix(prefix) {
     try {
         fs.writeFileSync(
             PREFIX_FILE,
-            JSON.stringify(
-                {
-                    prefix: prefix
-                },
-                null,
-                2
-            )
+            JSON.stringify({ prefix }, null, 2)
         );
 
         return true;
@@ -54,9 +49,15 @@ function getValidPrefixes() {
     return [...VALID_PREFIXES];
 }
 
+// Compatibility with index.js
+function getAllowedPrefixes() {
+    return [...VALID_PREFIXES];
+}
+
 module.exports = {
     getPrefix,
     setPrefix,
     isValidPrefix,
-    getValidPrefixes
+    getValidPrefixes,
+    getAllowedPrefixes
 };
