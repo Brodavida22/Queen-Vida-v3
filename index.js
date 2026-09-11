@@ -14,6 +14,7 @@ const pino = require('pino');
 const express = require('express');
 
 const { getMode } = require('./utils/mode');
+const { getPrefix } = require('./utils/prefix');
 const { handleGameMessage } = require('./utils/gameManager');
 
 // --- CONDITIONAL CLOUD PORT SERVER CONFIGURATION ---
@@ -1281,8 +1282,10 @@ async function startQueenVida() {
                 // COMMAND SYSTEM
                 // =================================================
 
+                const PREFIX = getPrefix();
+
                 if (
-                    !body.startsWith('!')
+                    !body.startsWith(PREFIX)
                 ) {
                     return;
                 }
@@ -1300,7 +1303,7 @@ async function startQueenVida() {
 
                 const args =
                     body
-                        .slice(1)
+                        .slice(PREFIX.length)
                         .trim()
                         .split(/ +/);
 
