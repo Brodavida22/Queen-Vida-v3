@@ -112,7 +112,7 @@ async function startQueenVida() {
         logger: pino({ level: 'silent' }),
         auth: state,
         printQRInTerminal: false,
-        browser: Browsers.macOS('Desktop'),
+        browser: Browsers.macOS('Chrome'),
         syncFullHistory: false,
         markOnlineOnConnect: true
     });
