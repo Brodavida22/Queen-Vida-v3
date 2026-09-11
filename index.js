@@ -23,7 +23,7 @@ const { handleGameMessage } = require('./utils/gameManager');
 
 
 // ============================================================
-// CLOUD PORT / HEALTH CHECK SERVER
+// EXPRESS / CLOUD SERVER
 // ============================================================
 
 const PORT = process.env.PORT;
@@ -47,29 +47,24 @@ function startExpressServer() {
 
 
 // ============================================================
-// CREATOR IDENTITY / SECURITY
+// CREATOR INFORMATION
 // ============================================================
 
-const CREATOR_NAME = "QUEEN VIDA";
-
-const DISPLAY_CREATOR_NUMBER = "2348138558590";
-
-const CREATOR_NUMBERS = [
-    "2348138558590"
-];
+const CREATOR_NAME = 'QUEEN VIDA';
+const DISPLAY_CREATOR_NUMBER = '2348138558590';
+const CREATOR_NUMBERS = ['2348138558590'];
 
 const CHANNEL_TEXT_LINK =
-    '\n\n📢 *Join QUEEN VIDA Channel:*\n' +
-    'https://whatsapp.com/channel/0029Vb8hHHs30LKXQEb4xe38';
+    '\n\n📢 *Join QUEEN VIDA Channel:*\nhttps://whatsapp.com/channel/0029Vb8hHHs30LKXQEb4xe38';
 
 
 function verifyCreatorIntegrity() {
     if (
-        !CREATOR_NUMBERS.includes("2348138558590") ||
-        CREATOR_NAME !== "QUEEN VIDA"
+        !CREATOR_NUMBERS.includes('2348138558590') ||
+        CREATOR_NAME !== 'QUEEN VIDA'
     ) {
         console.error(
-            "❌ CRITICAL ERROR: Creator identity signature has been altered or tampered with!"
+            '❌ CRITICAL ERROR: Creator identity signature has been altered or tampered with!'
         );
 
         process.exit(1);
@@ -80,7 +75,7 @@ verifyCreatorIntegrity();
 
 
 // ============================================================
-// GLOBAL ERROR HANDLERS
+// ERROR HANDLERS
 // ============================================================
 
 process.on('uncaughtException', (err) => {
@@ -112,7 +107,7 @@ const spamTracker = {};
 
 
 // ============================================================
-// GLOBAL SETTINGS
+// SETTINGS
 // ============================================================
 
 function getGlobalSettings() {
@@ -144,7 +139,7 @@ function getGlobalSettings() {
         } catch (e) {
             console.error(
                 '🔥 [SETTINGS ERROR] Failed to parse settings.json:',
-                e
+                e.message
             );
         }
     }
@@ -158,57 +153,50 @@ function getGlobalSettings() {
 
 
 // ============================================================
-// CONTEXT EMOJI SYSTEM
+// CONTEXT EMOJI
 // ============================================================
 
 function getContextEmoji(text = '') {
     const lower = text.toLowerCase();
 
     if (
-        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i
-            .test(lower)
+        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i.test(lower)
     ) {
         return '😂';
     }
 
     if (
-        /(congrats|congratulations|welldone|bravo|party|🎉|🎈|win|victory|success)/i
-            .test(lower)
+        /(congrats|congratulations|welldone|bravo|party|🎉|🎈|win|victory|success)/i.test(lower)
     ) {
         return '🥳';
     }
 
     if (
-        /(sad|sorry|rip|pain|crying|😭|😢|pity)/i
-            .test(lower)
+        /(sad|sorry|rip|pain|crying|😭|😢|pity)/i.test(lower)
     ) {
         return '😢';
     }
 
     if (
-        /(love|heart|babe|sweet|❤️|😍|kiss)/i
-            .test(lower)
+        /(love|heart|babe|sweet|❤️|😍|kiss)/i.test(lower)
     ) {
         return '❤️';
     }
 
     if (
-        /(fire|lit|amazing|cool|🔥|awesome|best)/i
-            .test(lower)
+        /(fire|lit|amazing|cool|🔥|awesome|best)/i.test(lower)
     ) {
         return '🔥';
     }
 
     if (
-        /(wow|omg|shock|damn|surprised|😮)/i
-            .test(lower)
+        /(wow|omg|shock|damn|surprised|😮)/i.test(lower)
     ) {
         return '😮';
     }
 
     if (
-        /(money|cash|rich|wealth|naira|dollar|lagos)/i
-            .test(lower)
+        /(money|cash|rich|wealth|naira|dollar|lagos)/i.test(lower)
     ) {
         return '💰';
     }
@@ -229,7 +217,7 @@ function getContextEmoji(text = '') {
 
 
 // ============================================================
-// START QUEEN VIDA
+// START BOT
 // ============================================================
 
 async function startQueenVida() {
@@ -242,38 +230,26 @@ async function startQueenVida() {
 
 
     // ========================================================
-    // AUTHENTICATION
+    // AUTH
     // ========================================================
 
-    const authPath = path.join(
-        __dirname,
-        'auth_info'
-    );
-
-    const credsPath = path.join(
-        authPath,
-        'creds.json'
-    );
-
+    const authPath = path.join(__dirname, 'auth_info');
+    const credsPath = path.join(authPath, 'creds.json');
 
     if (
         fs.existsSync(authPath) &&
         fs.existsSync(credsPath)
     ) {
-
         try {
 
             const creds = JSON.parse(
-                fs.readFileSync(
-                    credsPath,
-                    'utf8'
-                )
+                fs.readFileSync(credsPath, 'utf8')
             );
 
             if (!creds.registered) {
 
                 console.log(
-                    "⚠️ Detected an incomplete pairing session. Cleaning up auth_info..."
+                    '⚠️ Detected an incomplete pairing session. Cleaning up auth_info...'
                 );
 
                 fs.rmSync(
@@ -289,7 +265,7 @@ async function startQueenVida() {
 
             console.error(
                 '🔥 [AUTH ERROR] Failed reading creds.json:',
-                e
+                e.message
             );
 
             fs.rmSync(
@@ -306,9 +282,7 @@ async function startQueenVida() {
     const {
         state,
         saveCreds
-    } = await useMultiFileAuthState(
-        'auth_info'
-    );
+    } = await useMultiFileAuthState('auth_info');
 
 
     // ========================================================
@@ -325,7 +299,7 @@ async function startQueenVida() {
 
         printQRInTerminal: false,
 
-        // ⭐ PAIRING BROWSER SET TO CHROME
+        // Chrome browser identity
         browser: Browsers.macOS('Chrome'),
 
         syncFullHistory: false,
@@ -352,10 +326,7 @@ async function startQueenVida() {
 
             const commandFiles =
                 fs.readdirSync(commandPath)
-                    .filter(
-                        file =>
-                            file.endsWith('.js')
-                    );
+                    .filter(file => file.endsWith('.js'));
 
 
             for (const file of commandFiles) {
@@ -363,11 +334,7 @@ async function startQueenVida() {
                 try {
 
                     const filePath =
-                        path.join(
-                            commandPath,
-                            file
-                        );
-
+                        path.join(commandPath, file);
 
                     delete require.cache[
                         require.resolve(filePath)
@@ -382,10 +349,10 @@ async function startQueenVida() {
 
                         for (const cmd of required) {
 
-                            if (cmd.name) {
+                            if (cmd && cmd.name) {
 
                                 sock.commands.set(
-                                    cmd.name,
+                                    cmd.name.toLowerCase(),
                                     cmd
                                 );
                             }
@@ -397,7 +364,7 @@ async function startQueenVida() {
                     ) {
 
                         sock.commands.set(
-                            required.name,
+                            required.name.toLowerCase(),
                             required
                         );
                     }
@@ -426,9 +393,9 @@ async function startQueenVida() {
     }
 
 
-    // ========================================================
-    // PAIRING CODE
-    // ========================================================
+// ========================================================
+// PAIRING CODE
+// ========================================================
 
     if (!sock.authState.creds.registered) {
 
@@ -439,11 +406,7 @@ async function startQueenVida() {
         if (!phoneNumber) {
 
             console.log(
-                "❌ [ERROR]: PHONE_NUMBER environment variable is not set!"
-            );
-
-            console.log(
-                "👉 Please add your full WhatsApp number in your panel's Environment/Startup variables tab."
+                '❌ [ERROR]: PHONE_NUMBER environment variable is not set!'
             );
 
             return;
@@ -455,45 +418,43 @@ async function startQueenVida() {
         );
 
 
-        setTimeout(
-            async () => {
+        setTimeout(async () => {
 
-                try {
+            try {
 
-                    const code =
-                        await sock.requestPairingCode(
-                            phoneNumber
-                                .trim()
-                                .replace(
-                                    /[^0-9]/g,
-                                    ''
-                                )
-                        );
+                const cleanNumber =
+                    phoneNumber
+                        .trim()
+                        .replace(/[^0-9]/g, '');
 
 
-                    console.log(
-                        `✨ ======================================== ✨`
+                const code =
+                    await sock.requestPairingCode(
+                        cleanNumber
                     );
 
-                    console.log(
-                        `✨ YOUR WHATSAPP PAIRING CODE: ${code} ✨`
-                    );
 
-                    console.log(
-                        `✨ ======================================== ✨`
-                    );
+                console.log(
+                    '✨ ======================================== ✨'
+                );
 
-                } catch (pairErr) {
+                console.log(
+                    `✨ YOUR WHATSAPP PAIRING CODE: ${code} ✨`
+                );
 
-                    console.error(
-                        '🔥 [PAIRING ERROR] Failed to generate pairing code:',
-                        pairErr
-                    );
-                }
+                console.log(
+                    '✨ ======================================== ✨'
+                );
 
-            },
-            3000
-        );
+            } catch (pairErr) {
+
+                console.error(
+                    '🔥 [PAIRING ERROR] Failed to generate pairing code:',
+                    pairErr
+                );
+            }
+
+        }, 3000);
     }
 
 
@@ -503,10 +464,6 @@ async function startQueenVida() {
 
     let isStartupBannerSent = false;
 
-
-    // ========================================================
-    // CONNECTION UPDATE
-    // ========================================================
 
     sock.ev.on(
         'connection.update',
@@ -526,9 +483,9 @@ async function startQueenVida() {
             }
 
 
-            // ==================================================
+            // ------------------------------------------------
             // CONNECTED
-            // ==================================================
+            // ------------------------------------------------
 
             if (connection === 'open') {
 
@@ -554,7 +511,6 @@ async function startQueenVida() {
 
 
                         const activeBanner =
-
 `┏━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┓
 ┃ Status: *V3 ONLINE & ACTIVE* ✅
 ┣━━━━━━━━━━━━━━━━━━━━━━━
@@ -564,7 +520,9 @@ async function startQueenVida() {
 ┃ 👨‍💻 *Developer Contact:* https://wa.me/${DISPLAY_CREATOR_NUMBER}
 ┃ ⏱️ *Server Time:* ${serverTime}
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛
-> _👑 *QUEEN VIDA-V3* 👑 successfully launched_${CHANNEL_TEXT_LINK}`;
+> _👑 *QUEEN VIDA-V3* 👑 successfully launched_`
++
+CHANNEL_TEXT_LINK;
 
 
                         const bannerImagePath =
@@ -589,11 +547,8 @@ async function startQueenVida() {
                             await sock.sendMessage(
                                 botJid,
                                 {
-                                    image:
-                                        imageBuffer,
-
-                                    caption:
-                                        activeBanner
+                                    image: imageBuffer,
+                                    caption: activeBanner
                                 }
                             );
 
@@ -602,8 +557,7 @@ async function startQueenVida() {
                             await sock.sendMessage(
                                 botJid,
                                 {
-                                    text:
-                                        activeBanner
+                                    text: activeBanner
                                 }
                             );
                         }
@@ -616,22 +570,21 @@ async function startQueenVida() {
                         );
                     }
                 }
+            }
 
 
-            // ==================================================
+            // ------------------------------------------------
             // CONNECTION CLOSED
-            // ==================================================
+            // ------------------------------------------------
 
-            } else if (
+            else if (
                 connection === 'close'
             ) {
 
                 const statusCode =
                     new Boom(
                         lastDisconnect?.error
-                    )
-                        ?.output
-                        ?.statusCode;
+                    )?.output?.statusCode;
 
 
                 console.error(
@@ -689,20 +642,28 @@ async function startQueenVida() {
 
                 const m = messages[0];
 
-                if (!m.message) return;
+
+                if (!m || !m.message) {
+                    return;
+                }
 
 
                 const from =
                     m.key.remoteJid;
 
 
+                if (!from) {
+                    return;
+                }
+
+
                 const settings =
                     getGlobalSettings();
 
 
-                // ==================================================
+                // ====================================================
                 // STATUS HANDLER
-                // ==================================================
+                // ====================================================
 
                 if (
                     from ===
@@ -710,8 +671,7 @@ async function startQueenVida() {
                 ) {
 
                     if (
-                        settings.autoViewStatus ===
-                        'on'
+                        settings.autoViewStatus === 'on'
                     ) {
 
                         (async () => {
@@ -723,15 +683,14 @@ async function startQueenVida() {
                                     m.key.remoteJid
                                 ) {
 
-                                    await sock.readMessages(
-                                        [m.key]
-                                    );
+                                    await sock.readMessages([
+                                        m.key
+                                    ]);
                                 }
 
 
                                 if (
-                                    settings.statusReaction ===
-                                        'on' &&
+                                    settings.statusReaction === 'on' &&
                                     m.message
                                 ) {
 
@@ -746,28 +705,15 @@ async function startQueenVida() {
                                             '@s.whatsapp.net'
                                         )
                                     ) {
-
                                         return;
                                     }
 
 
                                     const statusText =
-
-                                        m.message
-                                            .conversation ||
-
-                                        m.message
-                                            .extendedTextMessage
-                                            ?.text ||
-
-                                        m.message
-                                            .imageMessage
-                                            ?.caption ||
-
-                                        m.message
-                                            .videoMessage
-                                            ?.caption ||
-
+                                        m.message.conversation ||
+                                        m.message.extendedTextMessage?.text ||
+                                        m.message.imageMessage?.caption ||
+                                        m.message.videoMessage?.caption ||
                                         '';
 
 
@@ -783,47 +729,38 @@ async function startQueenVida() {
                                             'status@broadcast',
                                             {
                                                 react: {
-                                                    text:
-                                                        emoji,
-
-                                                    key:
-                                                        m.key
+                                                    text: emoji,
+                                                    key: m.key
                                                 }
                                             },
                                             {
-                                                statusJidList:
-                                                    [
-                                                        targetParticipant
-                                                    ],
-
-                                                broadcast:
-                                                    true
+                                                statusJidList: [
+                                                    targetParticipant
+                                                ],
+                                                broadcast: true
                                             }
                                         );
 
-                                    } catch (
-                                        statusReactErr
-                                    ) {
-                                        // Silenced
+                                    } catch (statusReactErr) {
+                                        // Silent
                                     }
                                 }
 
-                            } catch (
-                                statusHandlerErr
-                            ) {
-                                // Silenced
+                            } catch (statusHandlerErr) {
+                                // Silent
                             }
 
                         })();
                     }
 
+
                     return;
                 }
 
 
-                // ==================================================
+                // ====================================================
                 // SENDER
-                // ==================================================
+                // ====================================================
 
                 const sender =
                     m.key.participant ||
@@ -846,12 +783,20 @@ async function startQueenVida() {
                     m.key.fromMe;
 
 
-                // ==================================================
-                // GROUP ACTIVITY TRACKER
-                // ==================================================
+                const isGroup =
+                    from.endsWith('@g.us');
+
+
+                const isChannel =
+                    from.endsWith('@newsletter');
+
+
+                // ====================================================
+                // ACTIVITY TRACKER
+                // ====================================================
 
                 if (
-                    from.endsWith('@g.us') &&
+                    isGroup &&
                     sender
                 ) {
 
@@ -885,76 +830,61 @@ async function startQueenVida() {
 
                         fs.writeFileSync(
                             'activity.json',
-                            JSON.stringify(act)
+                            JSON.stringify(
+                                act,
+                                null,
+                                2
+                            )
                         );
 
                     } catch (actErr) {
 
                         console.error(
                             '🔥 [ACTIVITY TRACKER ERROR]:',
-                            actErr
+                            actErr.message
                         );
                     }
                 }
 
 
-                // ==================================================
+                // ====================================================
                 // MESSAGE BODY
-                // ==================================================
+                // ====================================================
 
                 const body =
                     m.message.conversation ||
-                    m.message.extendedTextMessage
-                        ?.text ||
+                    m.message.extendedTextMessage?.text ||
                     '';
 
 
-                const isGroup =
-                    from.endsWith('@g.us');
-
-
-                const isChannel =
-                    from.endsWith('@newsletter');
-
-
-                // ==================================================
+                // ====================================================
                 // AUTO REACTION
-                // ==================================================
+                // ====================================================
 
                 if (
-                    settings.autoReaction ===
-                        'on' &&
+                    settings.autoReaction === 'on' &&
                     !m.key.fromMe &&
-                    (
-                        isGroup ||
-                        isChannel
-                    )
+                    (isGroup || isChannel) &&
+                    body
                 ) {
 
                     try {
 
                         const reactionEmoji =
-                            getContextEmoji(
-                                body
-                            );
+                            getContextEmoji(body);
 
 
                         await sock.sendMessage(
                             from,
                             {
                                 react: {
-                                    text:
-                                        reactionEmoji,
-
-                                    key:
-                                        m.key
+                                    text: reactionEmoji,
+                                    key: m.key
                                 }
                             }
                         );
 
-                    } catch (
-                        autoReactErr
-                    ) {
+                    } catch (autoReactErr) {
 
                         console.error(
                             '🔥 [NORMAL AUTO-REACTION ERROR]:',
@@ -964,17 +894,11 @@ async function startQueenVida() {
                 }
 
 
-                if (!body) return;
-
-
-                // ==================================================
+                // ====================================================
                 // GROUP SECURITY
-                // ==================================================
+                // ====================================================
 
-                if (
-                    isGroup &&
-                    !isOwner
-                ) {
+                if (isGroup) {
 
                     try {
 
@@ -985,50 +909,109 @@ async function startQueenVida() {
 
 
                         const participants =
-                            groupMetadata.participants;
+                            groupMetadata.participants ||
+                            [];
 
 
                         const senderParticipant =
                             participants.find(
-                                p =>
-                                    p.id === sender
+                                p => p.id === sender
                             );
 
 
                         const isAdmin =
                             senderParticipant &&
                             (
-                                senderParticipant.admin ===
-                                    'admin' ||
-                                senderParticipant.admin ===
-                                    'superadmin'
+                                senderParticipant.admin === 'admin' ||
+                                senderParticipant.admin === 'superadmin'
                             );
 
 
-                        if (!isAdmin) {
+                        // ------------------------------------------------
+                        // LOAD GROUP SETTINGS
+                        // ------------------------------------------------
 
-                            let groupSettings =
-                                fs.existsSync(
-                                    'settings.json'
-                                )
-                                    ? JSON.parse(
-                                        fs.readFileSync(
-                                            'settings.json',
-                                            'utf8'
-                                        )
+                        let groupSettings =
+                            fs.existsSync(
+                                'settings.json'
+                            )
+                                ? JSON.parse(
+                                    fs.readFileSync(
+                                        'settings.json',
+                                        'utf8'
                                     )
-                                    : {};
+                                )
+                                : {};
 
 
-                            // ==================================================
-                            // ANTI-SPAM
-                            // ==================================================
+                        // ====================================================
+                        // ANTISTICKER
+                        // ====================================================
+
+                        const antiStickerEnabled =
+                            groupSettings.antisticker?.[from] === 'on';
+
+
+                        const isSticker =
+                            Boolean(
+                                m.message.stickerMessage
+                            );
+
+
+                        /*
+                         * Only normal members are affected.
+                         * Owner and group admins are ignored.
+                         */
+
+                        if (
+                            antiStickerEnabled &&
+                            isSticker &&
+                            !isOwner &&
+                            !isAdmin
+                        ) {
+
+                            try {
+
+                                await sock.sendMessage(
+                                    from,
+                                    {
+                                        delete: m.key
+                                    }
+                                );
+
+
+                                console.log(
+                                    `🧹 [ANTISTICKER] Deleted sticker from ${senderNumber}`
+                                );
+
+                            } catch (deleteErr) {
+
+                                console.error(
+                                    '🔥 [ANTISTICKER DELETE ERROR]:',
+                                    deleteErr.message
+                                );
+                            }
+
+
+                            return;
+                        }
+
+
+                        // ====================================================
+                        // NORMAL MEMBER SECURITY
+                        // ====================================================
+
+                        if (
+                            !isOwner &&
+                            !isAdmin
+                        ) {
+
+                            // ------------------------------------------------
+                            // ANTISPAM
+                            // ------------------------------------------------
 
                             const isAntiSpamOn =
-                                groupSettings
-                                    .antispam
-                                    ?. [from] ===
-                                'on';
+                                groupSettings.antispam?.[from] === 'on';
 
 
                             if (isAntiSpamOn) {
@@ -1037,9 +1020,7 @@ async function startQueenVida() {
                                     Date.now();
 
 
-                                if (
-                                    !spamTracker[from]
-                                ) {
+                                if (!spamTracker[from]) {
                                     spamTracker[from] = {};
                                 }
 
@@ -1061,7 +1042,7 @@ async function startQueenVida() {
 
                                 if (
                                     now -
-                                        userSpam.lastTime <
+                                    userSpam.lastTime <
                                     3000
                                 ) {
 
@@ -1078,8 +1059,7 @@ async function startQueenVida() {
 
 
                                 if (
-                                    userSpam.count >=
-                                    5
+                                    userSpam.count >= 5
                                 ) {
 
                                     userSpam.count = 0;
@@ -1090,8 +1070,7 @@ async function startQueenVida() {
                                         await sock.sendMessage(
                                             from,
                                             {
-                                                delete:
-                                                    m.key
+                                                delete: m.key
                                             }
                                         );
 
@@ -1115,17 +1094,16 @@ async function startQueenVida() {
                                     if (
                                         !groupSettings.spamWarns[from][sender]
                                     ) {
+
                                         groupSettings.spamWarns[from][sender] = 0;
                                     }
 
 
-                                    groupSettings
-                                        .spamWarns[from][sender] += 1;
+                                    groupSettings.spamWarns[from][sender] += 1;
 
 
                                     const spamWarnCount =
-                                        groupSettings
-                                            .spamWarns[from][sender];
+                                        groupSettings.spamWarns[from][sender];
 
 
                                     fs.writeFileSync(
@@ -1139,8 +1117,7 @@ async function startQueenVida() {
 
 
                                     if (
-                                        spamWarnCount ===
-                                        1
+                                        spamWarnCount === 1
                                     ) {
 
                                         await sock.sendMessage(
@@ -1148,16 +1125,15 @@ async function startQueenVida() {
                                             {
                                                 text:
                                                     `⚠️ *@${senderNumber}*, stop spamming! This is your 1st warning. Next time you will be kicked.`,
-
-                                                mentions:
-                                                    [sender]
+                                                mentions: [
+                                                    sender
+                                                ]
                                             }
                                         );
 
                                     } else {
 
-                                        groupSettings
-                                            .spamWarns[from][sender] = 0;
+                                        groupSettings.spamWarns[from][sender] = 0;
 
 
                                         fs.writeFileSync(
@@ -1175,9 +1151,9 @@ async function startQueenVida() {
                                             {
                                                 text:
                                                     `🚨 *@${senderNumber}* continued spamming after warning and has been kicked!`,
-
-                                                mentions:
-                                                    [sender]
+                                                mentions: [
+                                                    sender
+                                                ]
                                             }
                                         );
 
@@ -1199,20 +1175,18 @@ async function startQueenVida() {
                             }
 
 
-                            // ==================================================
-                            // BAD WORDS
-                            // ==================================================
+                            // ====================================================
+                            // BADWORDS
+                            // ====================================================
 
                             const badWordsConfig =
-                                groupSettings
-                                    .badwords
-                                    ?. [from];
+                                groupSettings.badwords?.[from];
 
 
                             if (
+                                body &&
                                 badWordsConfig &&
-                                badWordsConfig.status ===
-                                    'on' &&
+                                badWordsConfig.status === 'on' &&
                                 Array.isArray(
                                     badWordsConfig.list
                                 )
@@ -1231,17 +1205,14 @@ async function startQueenVida() {
                                     );
 
 
-                                if (
-                                    containsBadWord
-                                ) {
+                                if (containsBadWord) {
 
                                     try {
 
                                         await sock.sendMessage(
                                             from,
                                             {
-                                                delete:
-                                                    m.key
+                                                delete: m.key
                                             }
                                         );
 
@@ -1253,9 +1224,9 @@ async function startQueenVida() {
                                         {
                                             text:
                                                 `⚠️ *@${senderNumber}*, watch your language! Profanity is strictly prohibited in this group.`,
-
-                                            mentions:
-                                                [sender]
+                                            mentions: [
+                                                sender
+                                            ]
                                         }
                                     );
 
@@ -1265,23 +1236,19 @@ async function startQueenVida() {
                             }
 
 
-                            // ==================================================
-                            // ANTI-LINK
-                            // ==================================================
+                            // ====================================================
+                            // ANTILINK
+                            // ====================================================
 
                             const antiLinkConfig =
-                                groupSettings
-                                    .antilink
-                                    ?. [from];
+                                groupSettings.antilink?.[from];
 
 
                             if (
                                 antiLinkConfig &&
                                 (
-                                    antiLinkConfig.warn ===
-                                        'on' ||
-                                    antiLinkConfig.instant ===
-                                        'on'
+                                    antiLinkConfig.warn === 'on' ||
+                                    antiLinkConfig.instant === 'on'
                                 )
                             ) {
 
@@ -1291,16 +1258,14 @@ async function startQueenVida() {
 
                                 const messageContent =
                                     body ||
-                                    m.message
-                                        .extendedTextMessage
-                                        ?.text ||
-                                    m.message
-                                        .imageMessage
-                                        ?.caption ||
+                                    m.message.extendedTextMessage?.text ||
+                                    m.message.imageMessage?.caption ||
+                                    m.message.videoMessage?.caption ||
                                     '';
 
 
                                 if (
+                                    messageContent &&
                                     linkRegex.test(
                                         messageContent
                                     )
@@ -1311,21 +1276,15 @@ async function startQueenVida() {
                                         await sock.sendMessage(
                                             from,
                                             {
-                                                delete:
-                                                    m.key
+                                                delete: m.key
                                             }
                                         );
 
                                     } catch (e) {}
 
 
-                                    // ==============================================
-                                    // INSTANT KICK
-                                    // ==============================================
-
                                     if (
-                                        antiLinkConfig.instant ===
-                                        'on'
+                                        antiLinkConfig.instant === 'on'
                                     ) {
 
                                         await sock.sendMessage(
@@ -1333,9 +1292,9 @@ async function startQueenVida() {
                                             {
                                                 text:
                                                     `🚨 *@${senderNumber}*, links are strictly prohibited in this group! You have been removed.`,
-
-                                                mentions:
-                                                    [sender]
+                                                mentions: [
+                                                    sender
+                                                ]
                                             }
                                         );
 
@@ -1355,13 +1314,8 @@ async function startQueenVida() {
                                     }
 
 
-                                    // ==============================================
-                                    // WARNING MODE
-                                    // ==============================================
-
                                     if (
-                                        antiLinkConfig.warn ===
-                                        'on'
+                                        antiLinkConfig.warn === 'on'
                                     ) {
 
                                         if (
@@ -1385,13 +1339,11 @@ async function startQueenVida() {
                                         }
 
 
-                                        groupSettings
-                                            .linkWarns[from][sender] += 1;
+                                        groupSettings.linkWarns[from][sender] += 1;
 
 
                                         const warnCount =
-                                            groupSettings
-                                                .linkWarns[from][sender];
+                                            groupSettings.linkWarns[from][sender];
 
 
                                         fs.writeFileSync(
@@ -1413,16 +1365,15 @@ async function startQueenVida() {
                                                 {
                                                     text:
                                                         `⚠️ *@${senderNumber}*, links are not allowed here! Warning *(${warnCount}/3)*.`,
-
-                                                    mentions:
-                                                        [sender]
+                                                    mentions: [
+                                                        sender
+                                                    ]
                                                 }
                                             );
 
                                         } else {
 
-                                            groupSettings
-                                                .linkWarns[from][sender] = 0;
+                                            groupSettings.linkWarns[from][sender] = 0;
 
 
                                             fs.writeFileSync(
@@ -1440,9 +1391,9 @@ async function startQueenVida() {
                                                 {
                                                     text:
                                                         `🚨 *@${senderNumber}* reached 3 link warnings and has been kicked from the group!`,
-
-                                                    mentions:
-                                                        [sender]
+                                                    mentions: [
+                                                        sender
+                                                    ]
                                                 }
                                             );
 
@@ -1465,9 +1416,7 @@ async function startQueenVida() {
                             }
                         }
 
-                    } catch (
-                        groupSecErr
-                    ) {
+                    } catch (groupSecErr) {
 
                         console.error(
                             '🔥 [GROUP SECURITY ERROR]:',
@@ -1477,9 +1426,23 @@ async function startQueenVida() {
                 }
 
 
-                // ==================================================
+                // ====================================================
+                // EMPTY MESSAGE CHECK
+                // ====================================================
+
+                /*
+                 * This comes AFTER AntiSticker so stickers can be
+                 * detected even though they don't contain text.
+                 */
+
+                if (!body) {
+                    return;
+                }
+
+
+                // ====================================================
                 // GAME HANDLER
-                // ==================================================
+                // ====================================================
 
                 const isGameHandled =
                     await handleGameMessage(
@@ -1495,9 +1458,9 @@ async function startQueenVida() {
                 }
 
 
-                // ==================================================
-                // PREFIX / COMMAND SYSTEM
-                // ==================================================
+                // ====================================================
+                // PREFIX SYSTEM
+                // ====================================================
 
                 const currentPrefix =
                     getPrefix();
@@ -1510,9 +1473,7 @@ async function startQueenVida() {
                 const messagePrefix =
                     supportedPrefixes.find(
                         prefix =>
-                            body.startsWith(
-                                prefix
-                            )
+                            body.startsWith(prefix)
                     );
 
 
@@ -1521,13 +1482,19 @@ async function startQueenVida() {
                 }
 
 
-                const commandParts =
+                const commandText =
                     body
-                        .slice(
-                            messagePrefix.length
-                        )
-                        .trim()
-                        .split(/ +/);
+                        .slice(messagePrefix.length)
+                        .trim();
+
+
+                if (!commandText) {
+                    return;
+                }
+
+
+                const commandParts =
+                    commandText.split(/\s+/);
 
 
                 const commandName =
@@ -1536,31 +1503,16 @@ async function startQueenVida() {
                         .toLowerCase();
 
 
-                // ==================================================
-                // PREFIX COMMAND SPECIAL CASE
-                // ==================================================
+                // ====================================================
+                // PREFIX COMMAND EXCEPTION
+                // ====================================================
 
-                // Normal commands must use the selected prefix.
-                //
-                // Example:
-                //
-                // Current prefix = .
-                //
-                // .menu       ✅
-                // !menu       ❌
-                // #menu       ❌
-                // /menu       ❌
-                //
-                // But the prefix command works with any
-                // supported prefix so the owner can always
-                // change the prefix.
-                //
-                // !prefix .
-                // #prefix !
-                // /prefix #
-                // .prefix /
-                //
-                // ==================================================
+                /*
+                 * Normally commands must use the current prefix.
+                 *
+                 * The "prefix" command can use any supported prefix
+                 * so the creator can recover/change the prefix.
+                 */
 
                 if (
                     messagePrefix !== currentPrefix &&
@@ -1570,9 +1522,9 @@ async function startQueenVida() {
                 }
 
 
-                // ==================================================
-                // PRIVATE MODE
-                // ==================================================
+                // ====================================================
+                // BOT MODE
+                // ====================================================
 
                 const currentMode =
                     getMode();
@@ -1586,10 +1538,6 @@ async function startQueenVida() {
                 }
 
 
-                // ==================================================
-                // COMMAND ARGUMENTS
-                // ==================================================
-
                 const args =
                     commandParts;
 
@@ -1600,9 +1548,9 @@ async function startQueenVida() {
                     );
 
 
-                // ==================================================
+                // ====================================================
                 // EXECUTE COMMAND
-                // ==================================================
+                // ====================================================
 
                 if (command) {
 
@@ -1611,17 +1559,15 @@ async function startQueenVida() {
                         await command.execute(
                             sock,
                             m,
-                            m.key.remoteJid,
+                            from,
                             args,
                             isOwner
                         );
 
-                    } catch (
-                        cmdExecErr
-                    ) {
+                    } catch (cmdExecErr) {
 
                         console.error(
-                            `🔥 [COMMAND EXECUTION CRASH] [${currentPrefix}${commandName}]:`,
+                            `🔥 [COMMAND EXECUTION CRASH] [${messagePrefix}${commandName}]:`,
                             cmdExecErr
                         );
 
@@ -1630,17 +1576,13 @@ async function startQueenVida() {
                             from,
                             {
                                 text:
-                                    `❌ An error occurred while executing command *${currentPrefix}${commandName}*.\n_Details:_ ${cmdExecErr.message}`
+                                    `❌ An error occurred while executing command *${messagePrefix}${commandName}*.\n_Details:_ ${cmdExecErr.message}`
                             }
-                        ).catch(
-                            () => {}
-                        );
+                        ).catch(() => {});
                     }
                 }
 
-            } catch (
-                upsertErr
-            ) {
+            } catch (upsertErr) {
 
                 console.error(
                     '🔥 [CRITICAL MESSAGES UPSERT ERROR]:',
