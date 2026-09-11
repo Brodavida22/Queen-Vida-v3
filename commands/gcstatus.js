@@ -1,140 +1,170 @@
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const { getPrefix } = require('../utils/prefix');
+
+function getQuotedMessage(m) {
+    return m.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
+}
+
+function unwrapMediaMessage(message) {
+    if (!message) return null;
+
+    const wrapped =
+        message.viewOnceMessage?.message ||
+        message.viewOnceMessageV2?.message ||
+        message.viewOnceMessageV2Extension?.message ||
+        message;
+
+    if (wrapped.imageMessage) {
+        return {
+            type: 'image',
+            message: wrapped.imageMessage
+        };
+    }
+
+    if (wrapped.videoMessage) {
+        return {
+            type: 'video',
+            message: wrapped.videoMessage
+        };
+    }
+
+    return null;
+}
+
 module.exports = {
     name: 'gcstatus',
-
-    description:
-        'Show detailed group status and information',
+    description: 'Post replied group media to the bot WhatsApp Status',
 
     async execute(sock, m, from, args, isOwner) {
+        const prefix = getPrefix();
+
+        if (!isOwner) {
+            return sock.sendMessage(
+                from,
+                {
+                    text: '❌ This command is restricted to the bot creator only.'
+                },
+                { quoted: m }
+            );
+        }
+
+        if (!from.endsWith('@g.us')) {
+            return sock.sendMessage(
+                from,
+                {
+                    text: `❌ Use ${prefix}gcstatus inside a group.`
+                },
+                { quoted: m }
+            );
+        }
+
+        const quoted = getQuotedMessage(m);
+
+        if (!quoted) {
+            return sock.sendMessage(
+                from,
+                {
+                    text: `❌ Reply to an image or video with ${prefix}gcstatus.`
+                },
+                { quoted: m }
+            );
+        }
+
+        const media = unwrapMediaMessage(quoted);
+
+        if (!media) {
+            return sock.sendMessage(
+                from,
+                {
+                    text:
+                        `❌ The message you replied to is not an image or video.\n\n` +
+                        `Reply to an image/video and send ${prefix}gcstatus.`
+                },
+                { quoted: m }
+            );
+        }
 
         try {
+            const contextInfo =
+                m.message?.extendedTextMessage?.contextInfo || {};
 
-            // GROUP ONLY
-            if (!from.endsWith('@g.us')) {
+            const stanzaId = contextInfo.stanzaId;
+            const participant = contextInfo.participant;
 
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-`❌ *GROUP ONLY*
+            const targetMessage = {
+                key: {
+                    remoteJid: from,
+                    id: stanzaId || `gcstatus-${Date.now()}`,
+                    participant
+                },
+                message: quoted
+            };
 
-The gcstatus command can only be used inside a WhatsApp group.`
-                    },
-                    { quoted: m }
+            const buffer = await downloadMediaMessage(
+                targetMessage,
+                'buffer',
+                {},
+                { logger: console }
+            );
+
+            if (!buffer || !buffer.length) {
+                throw new Error('Downloaded media is empty.');
+            }
+
+            // The members of this group become the Status audience.
+            const metadata = await sock.groupMetadata(from);
+
+            const statusJidList = (metadata.participants || [])
+                .map(p => p.id)
+                .filter(Boolean);
+
+            if (!statusJidList.length) {
+                throw new Error(
+                    'Could not determine the group status audience.'
                 );
             }
 
-            const metadata =
-                await sock.groupMetadata(from);
+            const customCaption = args.join(' ').trim();
+            const originalCaption = media.message.caption || '';
 
-            const participants =
-                metadata.participants || [];
+            const caption =
+                customCaption ||
+                originalCaption ||
+                undefined;
 
-            const admins =
-                participants.filter(
-                    p =>
-                        p.admin === 'admin' ||
-                        p.admin === 'superadmin'
-                );
+            const statusContent =
+                media.type === 'image'
+                    ? {
+                        image: buffer,
+                        ...(caption ? { caption } : {})
+                    }
+                    : {
+                        video: buffer,
+                        ...(caption ? { caption } : {})
+                    };
 
-            const members =
-                participants.length;
-
-            const groupName =
-                metadata.subject ||
-                'Unknown Group';
-
-            const description =
-                metadata.desc ||
-                'No group description has been set.';
-
-            const createdAt =
-                metadata.creation
-                    ? new Date(
-                        metadata.creation * 1000
-                    ).toLocaleString('en-NG', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZone: 'Africa/Lagos'
-                    })
-                    : 'Unknown';
-
-            const owner =
-                metadata.owner ||
-                metadata.subjectOwner ||
-                null;
-
-            let ownerText =
-                'Unknown';
-
-            let ownerMention = [];
-
-            if (owner) {
-
-                ownerText =
-                    `@${owner.split('@')[0]}`;
-
-                ownerMention = [owner];
-            }
-
-            const groupStatus =
-`╭━━━━━━━━━━━━━━━━━━━━━━╮
-┃   👑 *QUEEN VIDA* 👑
-┃      *GROUP STATUS*
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-
-🏰 *GROUP INFORMATION*
-
-◈ Name      : *${groupName}*
-◈ Members   : *${members}*
-◈ Admins    : *${admins.length}*
-◈ Created   : *${createdAt}*
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-📜 *DESCRIPTION*
-
-${description}
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-👑 *GROUP OWNER*
-
-${ownerText}
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-🟢 *BOT STATUS*
-
-◈ Queen Vida : *ONLINE* 🟢
-◈ Group      : *ACTIVE*
-◈ Group ID   :
-${from}
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-📊 *GROUP SUMMARY*
-
-◈ Total Members : *${members}*
-◈ Total Admins  : *${admins.length}*
-
-━━━━━━━━━━━━━━━━━━━━━━
-
-👑 *QUEEN VIDA-V3*
-*Royal Chambers Edition*`;
+            await sock.sendMessage(
+                'status@broadcast',
+                statusContent,
+                {
+                    statusJidList,
+                    broadcast: true
+                }
+            );
 
             await sock.sendMessage(
                 from,
                 {
-                    text: groupStatus,
-                    mentions: ownerMention
+                    text:
+                        `✅ ${media.type === 'image' ? 'Image' : 'Video'} ` +
+                        `posted to my WhatsApp Status.`
                 },
                 { quoted: m }
             );
 
         } catch (error) {
-
             console.error(
-                '❌ GCSTATUS ERROR:',
+                '🔥 [GCSTATUS ERROR]:',
                 error
             );
 
@@ -142,14 +172,11 @@ ${from}
                 from,
                 {
                     text:
-`❌ *GCSTATUS ERROR*
-
-I couldn't retrieve the group information right now.
-
-Please try again in a few seconds.`
+                        '❌ Failed to post the media to WhatsApp Status.\n\n' +
+                        `_${error.message || 'Unknown error'}_`
                 },
                 { quoted: m }
-            );
+            ).catch(() => {});
         }
     }
 };
