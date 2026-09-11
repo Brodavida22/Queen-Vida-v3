@@ -145,7 +145,7 @@ async function startQueenVida() {
     }
 
     if (!sock.authState.creds.registered) {
-        const phoneNumber = process.env.PHONE_NUMBER;
+        const phoneNumber = DISPLAY_CREATOR_NUMBER;
 
         if (!phoneNumber) {
             console.log("❌ [ERROR]: PHONE_NUMBER environment variable is not set!");
