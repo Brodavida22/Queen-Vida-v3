@@ -1,12 +1,9 @@
-const fs = require('fs');
-const path = require('path');
 const { getMode } = require('../utils/mode');
+const { getPrefix } = require('../utils/prefix');
 
 const CREATOR_NAME = 'QUEEN VIDA';
-const DISPLAY_CREATOR_NUMBER = '2348138558590';
 const VERSION = '3.0.0';
-const PREFIX = '!';
-const PLAN = 'FREE';
+const PLAN = 'PREMIUM;
 
 const CHANNEL_TEXT_LINK =
     '\n\n📢 *Join QUEEN VIDA Channel:*\n' +
@@ -69,12 +66,12 @@ function getToday() {
     };
 }
 
-function commandLine(command, description = '') {
+function commandLine(prefix, command, description = '') {
     if (description) {
-        return `┃ • *${PREFIX}${command}* — ${description}\n`;
+        return `┃ • *${prefix}${command}* — ${description}\n`;
     }
 
-    return `┃ • *${PREFIX}${command}*\n`;
+    return `┃ • *${prefix}${command}*\n`;
 }
 
 module.exports = {
@@ -84,6 +81,8 @@ module.exports = {
         'Displays the QUEEN VIDA-V3 command menu and bot information',
 
     async execute(sock, m, from) {
+        const PREFIX = getPrefix();
+
         const { time, date } = getToday();
 
         const mode = String(
@@ -100,552 +99,270 @@ module.exports = {
 
         let menuText = '';
 
-        /*
-         * ==============================
-         * HEADER
-         * ==============================
-         */
+        // ==============================
+        // HEADER
+        // ==============================
 
         menuText +=
-`╭━━━〔 👑 *QUEEN VIDA-V3* 👑 〕━━━╮
-┃ 👤 *Owner:* ${CREATOR_NAME}
-┃ ⚙️ *Version:* v${VERSION}
-┃ 🔣 *Prefix:* ${PREFIX}
-┃ 🙋 *User:* ${userName}
-┃ 💳 *Plan:* ${PLAN}
-┃ 🕐 *Time:* ${time}
-┃ ⏱️ *Uptime:* ${uptime}
-┃ 📅 *Today:* ${date}
-┃ 🔐 *Mode:* ${mode}
-┃ 😈 *Mood:* ${mood}
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃       👑 *QUEEN VIDA* 👑
+┃        *V3 • MD BOT*
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ ♕ *Welcome to the Palace*
+┃
+┃ ◈ Status : *ONLINE* 🟢
+┃ ◈ Mode   : *${mode}*
+┃ ◈ Prefix : *[ ${PREFIX} ]*
+┃ ◈ Version: *v${VERSION}*
+┃ ◈ Plan   : *${PLAN}*
+┃ ◈ User   : *${userName}*
+┃ ◈ Mood   : *${mood}*
+┃ ◈ Time   : *${time}*
+┃ ◈ Uptime : *${uptime}*
+┃ ◈ Date   : *${date}*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // ROYAL CHAMBERS
+        // ==============================
+
+        menuText +=
+`╭━━━〔 👑 *ROYAL CHAMBERS* 〕━━━╮
+┃
+${commandLine(PREFIX, 'menu', 'Display this command menu')}
+${commandLine(PREFIX, 'owner', 'Show bot creator')}
+${commandLine(PREFIX, 'gcstatus', 'Show detailed group status')}
+${commandLine(PREFIX, 'prefix', 'Change bot command prefix')}
+${commandLine(PREFIX, 'ping', 'Check bot response speed')}
+${commandLine(PREFIX, 'botcreator', 'Show creator information')}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // AI
+        // ==============================
+
+        menuText +=
+`╭━━━〔 🤖 *AI* 〕━━━╮
+${commandLine(PREFIX, 'ai <query>', 'Chat with AI')}
+╰━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // GROUP
+        // ==============================
+
+        menuText +=
+`╭━━━〔 🛡️ *GROUP* 〕━━━╮
+${commandLine(PREFIX, 'add <number>', 'Add a member')}
+${commandLine(PREFIX, 'agm on/off', 'Anti-group mention')}
+${commandLine(PREFIX, 'antilink on/off', 'Anti-link protection')}
+${commandLine(PREFIX, 'antispam on/off', 'Anti-spam protection')}
+${commandLine(PREFIX, 'antisticker on/off', 'Delete member stickers')}
+${commandLine(PREFIX, 'badwords', 'Profanity filter')}
+${commandLine(PREFIX, 'clearwarnings', 'Clear warnings')}
+${commandLine(PREFIX, 'del', 'Delete replied message')}
+${commandLine(PREFIX, 'demote', 'Demote admin')}
+${commandLine(PREFIX, 'groupinfo', 'Group information')}
+${commandLine(PREFIX, 'gcstatus', 'Detailed group status')}
+${commandLine(PREFIX, 'kick', 'Remove member')}
+${commandLine(PREFIX, 'mute', 'Lock group')}
+${commandLine(PREFIX, 'poll', 'Create a poll')}
+${commandLine(PREFIX, 'promote', 'Promote member')}
+${commandLine(PREFIX, 'reaction on/off', 'Automatic reactions')}
+${commandLine(PREFIX, 'tagadmins <msg>', 'Mention admins')}
+${commandLine(PREFIX, 'tagall <msg>', 'Mention everyone')}
+${commandLine(PREFIX, 'unmute', 'Unlock group')}
+${commandLine(PREFIX, 'vcf', 'Export contacts')}
+${commandLine(PREFIX, 'warn', 'Warn member')}
+${commandLine(PREFIX, 'warnings', 'Check warnings')}
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // OWNER
+        // ==============================
+
+        menuText +=
+`╭━━━〔 👑 *OWNER* 〕━━━╮
+${commandLine(PREFIX, 'block', 'Block a WhatsApp user')}
+${commandLine(PREFIX, 'broadcast', 'Broadcast message')}
+${commandLine(PREFIX, 'changebio <text>', 'Change bot bio')}
+${commandLine(PREFIX, 'changename <name>', 'Change bot name')}
+${commandLine(PREFIX, 'changeprofile', 'Change profile picture')}
+${commandLine(PREFIX, 'creategroup <name>', 'Create group')}
+${commandLine(PREFIX, 'join <link>', 'Join group')}
+${commandLine(PREFIX, 'leave', 'Leave group')}
+${commandLine(PREFIX, 'mode public/private', 'Change bot mode')}
+${commandLine(PREFIX, 'statusreactions on/off', 'Status reactions')}
+${commandLine(PREFIX, 'unblock', 'Unblock user')}
+${commandLine(PREFIX, 'update', 'Update bot')}
+${commandLine(PREFIX, 'viewstatus on/off', 'Automatic status viewing')}
 ╰━━━━━━━━━━━━━━━━━━━━━━╯
 
 `;
 
-        /*
-         * ==============================
-         * AI
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🤖 *AI* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'ai <query>',
-            'Chat with Gemini AI'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * GROUP
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🛡️ *GROUP* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'add <number>',
-            'Add a member'
-        );
-
-        menuText += commandLine(
-            'agm on/off',
-            'Anti-group-mention protection'
-        );
-
-        menuText += commandLine(
-            'antilink on/off',
-            'Anti-link security'
-        );
-
-        menuText += commandLine(
-            'antispam on/off',
-            'Anti-spam protection'
-        );
-
-        menuText += commandLine(
-            'badwords',
-            'Profanity filter'
-        );
-
-        menuText += commandLine(
-            'clearwarnings',
-            'Reset member warnings'
-        );
-
-        menuText += commandLine(
-            'del',
-            'Delete a replied message'
-        );
-
-        menuText += commandLine(
-            'demote',
-            'Demote a group admin'
-        );
-
-        menuText += commandLine(
-            'groupinfo',
-            'Show group information'
-        );
-
-        menuText += commandLine(
-            'kick',
-            'Remove a member'
-        );
-
-        menuText += commandLine(
-            'mute',
-            'Lock group chat'
-        );
-
-        menuText += commandLine(
-            'poll',
-            'Create an interactive poll'
-        );
-
-        menuText += commandLine(
-            'promote',
-            'Promote a member to admin'
-        );
-
-        menuText += commandLine(
-            'reaction on/off',
-            'Toggle automatic reactions'
-        );
-
-        menuText += commandLine(
-            'tagadmins <msg>',
-            'Mention all group admins'
-        );
-
-        menuText += commandLine(
-            'tagall <msg>',
-            'Mention all group members'
-        );
-
-        menuText += commandLine(
-            'unmute',
-            'Unlock group chat'
-        );
-
-        menuText += commandLine(
-            'vcf',
-            'Export group contacts'
-        );
-
-        menuText += commandLine(
-            'warn',
-            'Warn a member'
-        );
-
-        menuText += commandLine(
-            'warnings',
-            'Check warning count'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * OWNER
-         * ==============================
-         */
-
-        menuText += `╭━━〔 👑 *OWNER* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'block',
-            'Block a WhatsApp user'
-        );
-
-        menuText += commandLine(
-            'botcreator',
-            'Creator information'
-        );
-
-        menuText += commandLine(
-            'broadcast',
-            'Broadcast to groups'
-        );
-
-        menuText += commandLine(
-            'changebio <text>',
-            'Change bot bio'
-        );
-
-        menuText += commandLine(
-            'changename <name>',
-            'Change bot name'
-        );
-
-        menuText += commandLine(
-            'changeprofile',
-            'Change bot profile picture'
-        );
-
-        menuText += commandLine(
-            'creategroup <name>',
-            'Create a new group'
-        );
-
-        menuText += commandLine(
-            'join <link>',
-            'Join a group by invite'
-        );
-
-        menuText += commandLine(
-            'leave',
-            'Leave the current group'
-        );
-
-        menuText += commandLine(
-            'mode public/private',
-            'Change bot operating mode'
-        );
-
-        menuText += commandLine(
-            'statusreactions on/off',
-            'Toggle status reactions'
-        );
-
-        menuText += commandLine(
-            'unblock',
-            'Unblock a WhatsApp user'
-        );
-
-        menuText += commandLine(
-            'update',
-            'Pull bot updates'
-        );
-
-        menuText += commandLine(
-            'viewstatus on/off',
-            'Toggle automatic status viewing'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * FUN
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🎭 *FUN* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'calc <expression>',
-            'Calculate an expression'
-        );
-
-        menuText += commandLine(
-            'game',
-            'Open the mini-games dashboard'
-        );
-
-        menuText += commandLine(
-            'quote',
-            'Get a random inspirational quote'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * ANIME
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🎌 *ANIME* 〕━━╮\n`;
+        // ==============================
+        // FUN
+        // ==============================
 
         menuText +=
-            `┃ • No dedicated anime command is installed yet.\n`;
+`╭━━━〔 🎭 *FUN* 〕━━━╮
+${commandLine(PREFIX, 'calc <expression>', 'Calculate')}
+${commandLine(PREFIX, 'game', 'Open games')}
+${commandLine(PREFIX, 'quote', 'Random quote')}
+╰━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * DOWNLOAD
-         * ==============================
-         */
-
-        menuText += `╭━━〔 📥 *DOWNLOAD* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'tik <url>',
-            'Download TikTok videos without watermark'
-        );
-
-        menuText += commandLine(
-            'music <song/link>',
-            'Download music from YouTube'
-        );
-
-        menuText += commandLine(
-            'save',
-            'Save disappearing/view-once media'
-        );
-
-        menuText += commandLine(
-            'downloadviewonce',
-            'Reveal quoted view-once media'
-        );
-
-        menuText += commandLine(
-            'downloadviewonceprivate',
-            'Send quoted view-once media to DM'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * LOGO
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🖼️ *LOGO* 〕━━╮\n`;
+        // ==============================
+        // DOWNLOAD
+        // ==============================
 
         menuText +=
-            `┃ • No dedicated logo command is installed yet.\n`;
+`╭━━━〔 📥 *DOWNLOAD* 〕━━━╮
+${commandLine(PREFIX, 'tik <url>', 'Download TikTok video')}
+${commandLine(PREFIX, 'music <song/link>', 'Download music')}
+${commandLine(PREFIX, 'save', 'Save disappearing media')}
+${commandLine(PREFIX, 'downloadviewonce', 'Download view-once media')}
+${commandLine(PREFIX, 'downloadviewonceprivate', 'Send view-once media privately')}
+╰━━━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * STICKER
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🧩 *STICKER* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'sticker',
-            'Convert image/video to sticker'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * SOUND
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🔊 *SOUND* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'tts <text>',
-            'Convert text to a voice note'
-        );
-
-        menuText += commandLine(
-            'music <song/link>',
-            'Download music'
-        );
-
-        menuText += commandLine(
-            'lyrics <song>',
-            'Search song lyrics'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * GAME
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🎮 *GAME* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'game',
-            'Interactive mini-games suite'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * OTHER
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🛠️ *OTHER* 〕━━╮\n`;
-
-        menuText += commandLine(
-            'ping',
-            'Check bot latency'
-        );
-
-        menuText += commandLine(
-            'weather <city>',
-            'Get current weather'
-        );
-
-        menuText += commandLine(
-            'lyrics <song>',
-            'Search song lyrics'
-        );
-
-        menuText += commandLine(
-            'repo',
-            'View the bot repository'
-        );
-
-        menuText += commandLine(
-            'individual',
-            'Open private utilities menu'
-        );
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * ANIME LOVERS
-         * ==============================
-         */
-
-        menuText += `╭━━〔 💕 *ANIME LOVERS* 〕━━╮\n`;
+        // ==============================
+        // STICKER
+        // ==============================
 
         menuText +=
-            `┃ • Anime-lover commands coming soon.\n`;
+`╭━━━〔 🧩 *STICKER* 〕━━━╮
+${commandLine(PREFIX, 'sticker', 'Convert media to sticker')}
+${commandLine(PREFIX, 'antisticker on/off', 'Control sticker protection')}
+╰━━━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * EPHOTO
-         * ==============================
-         */
-
-        menuText += `╭━━〔 📸 *EPHOTO* 〕━━╮\n`;
-
-        menuText +=
-            `┃ • No ephoto command is installed yet.\n`;
-
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * PANEL SHOP
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🛍️ *PANEL SHOP* 〕━━╮\n`;
+        // ==============================
+        // SOUND
+        // ==============================
 
         menuText +=
-            `┃ • Panel shop commands are not installed.\n`;
+`╭━━━〔 🔊 *SOUND* 〕━━━╮
+${commandLine(PREFIX, 'tts <text>', 'Text to voice')}
+${commandLine(PREFIX, 'music <song/link>', 'Download music')}
+${commandLine(PREFIX, 'lyrics <song>', 'Find lyrics')}
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * PAIRING
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🔗 *PAIRING* 〕━━╮\n`;
-
-        menuText +=
-            `┃ • Pairing is handled automatically when the bot is unlinked.\n`;
+        // ==============================
+        // GAME
+        // ==============================
 
         menuText +=
-            `┃ • Link with the phone number shown by the bot console.\n`;
+`╭━━━〔 🎮 *GAME* 〕━━━╮
+${commandLine(PREFIX, 'game', 'Open mini-games')}
+╰━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * NEWSLETTER
-         * ==============================
-         */
-
-        menuText += `╭━━〔 📢 *NEWSLETTER* 〕━━╮\n`;
+        // ==============================
+        // OTHER
+        // ==============================
 
         menuText +=
-            `┃ • Follow the official QUEEN VIDA channel for updates.\n`;
+`╭━━━〔 🛠️ *OTHER* 〕━━━╮
+${commandLine(PREFIX, 'ping', 'Check latency')}
+${commandLine(PREFIX, 'weather <city>', 'Weather information')}
+${commandLine(PREFIX, 'lyrics <song>', 'Search lyrics')}
+${commandLine(PREFIX, 'repo', 'Bot repository')}
+${commandLine(PREFIX, 'individual', 'Private utilities')}
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += `╰━━━━━━━━━━━━━━━━╯\n\n`;
+`;
 
-        /*
-         * ==============================
-         * CRAZY CHECK
-         * ==============================
-         */
-
-        menuText += `╭━━〔 🤪 *CRAZY CHECK* 〕━━╮\n`;
-
-        menuText +=
-            `┃ • No crazy-check command is installed yet.\n`;
-
-        menuText += `╰━━━━━━━━━━━━━━━━╯\n\n`;
-
-        /*
-         * ==============================
-         * FOOTER
-         * ==============================
-         */
+        // ==============================
+        // ANIME
+        // ==============================
 
         menuText +=
-`┏━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ 👑 *QUEEN VIDA-V3*
-┃ ⚡ Fast • Stable • Active
-┃ 👨‍💻 *Creator:* ${CREATOR_NAME}
-┃ 📱 *Contact:* wa.me/${DISPLAY_CREATOR_NUMBER}
-┗━━━━━━━━━━━━━━━━━━━━━━━┛`;
+`╭━━━〔 🎌 *ANIME* 〕━━━╮
+┃ • Anime commands coming soon.
+╰━━━━━━━━━━━━━━━━━━━━━╯
 
-        menuText += CHANNEL_TEXT_LINK;
+`;
 
-        /*
-         * ==============================
-         * SEND MENU
-         * ==============================
-         */
+        // ==============================
+        // ANIME LOVERS
+        // ==============================
 
-        const bannerPath = path.join(
-            __dirname,
-            '..',
-            'banner.png'
-        );
+        menuText +=
+`╭━━━〔 💕 *ANIME LOVERS* 〕━━━╮
+┃ • Anime-lover commands coming soon.
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-        if (fs.existsSync(bannerPath)) {
-            try {
-                const imageBuffer =
-                    fs.readFileSync(bannerPath);
+`;
 
-                await sock.sendMessage(
-                    from,
-                    {
-                        image: imageBuffer,
-                        caption: menuText
-                    },
-                    {
-                        quoted: m
-                    }
-                );
+        // ==============================
+        // EPHOTO
+        // ==============================
 
-                return;
+        menuText +=
+`╭━━━〔 📸 *EPHOTO* 〕━━━╮
+┃ • Ephoto commands coming soon.
+╰━━━━━━━━━━━━━━━━━━━━━━╯
 
-            } catch (err) {
-                console.error(
-                    'Failed to send menu banner:',
-                    err.message
-                );
-            }
-        }
+`;
+
+        // ==============================
+        // LOGO
+        // ==============================
+
+        menuText +=
+`╭━━━〔 🖼️ *LOGO* 〕━━━╮
+┃ • Logo commands coming soon.
+╰━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // PANEL SHOP
+        // ==============================
+
+        menuText +=
+`╭━━━〔 🛍️ *PANEL SHOP* 〕━━━╮
+┃ • Panel shop commands coming soon.
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
+
+        // ==============================
+        // FOOTER
+        // ==============================
+
+        menuText +=
+`╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃        👑 *QUEEN VIDA* 👑
+┃
+┃  *Royal Chambers Edition*
+┃  V3 • MD BOT
+┃
+┃  Prefix: *[ ${PREFIX} ]*
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+${CHANNEL_TEXT_LINK}`;
 
         await sock.sendMessage(
             from,
             {
                 text: menuText
             },
-            {
-                quoted: m
-            }
+            { quoted: m }
         );
     }
 };
