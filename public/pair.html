@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Queen Vida Pairing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; background: #111; color: #fff; text-align: center; padding: 40px 20px; }
+    input { padding: 12px; width: 80%; max-width: 300px; border-radius: 8px; border: none; margin-bottom: 12px; }
+    button { padding: 12px 24px; border-radius: 8px; border: none; background: #7c3aed; color: #fff; font-weight: bold; }
+    #result { margin-top: 20px; font-size: 24px; letter-spacing: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Queen Vida Pairing</h1>
+  <p>Enter your WhatsApp number (with country code, no + sign)</p>
+  <input id="number" placeholder="e.g. 2348012345678" />
+  <br>
+  <button onclick="getCode()">Get Pair Code</button>
+  <div id="result"></div>
+  <script>
+    async function getCode() {
+      const number = document.getElementById('number').value.trim();
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = 'Requesting code...';
+      try {
+        const res = await fetch('/api/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number })
+        });
+        const data = await res.json();
+        if (data.code) {
+          resultDiv.textContent = 'Your code: ' + data.code;
+        } else {
+          resultDiv.textContent = 'Error: ' + (data.error || 'Unknown error');
+        }
+      } catch (e) {
+        resultDiv.textContent = 'Request failed. Try again.';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -21,8 +21,8 @@
     "node": ">=18.0.0"
   },
   "allowScripts": {
-    "@whiskeysockets/baileys@6.7.24": true,
     "@google/genai@2.16.0": true,
-    "protobufjs@7.6.5": true
+    "protobufjs@7.6.5": true,
+    "@whiskeysockets/baileys@7.0.0-rc14": true
   }
 }

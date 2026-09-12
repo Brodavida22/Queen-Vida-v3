@@ -13,22 +13,71 @@ const {
 const sessionManager = require('./bot/sessionManager');
 
 // --- CONDITIONAL CLOUD PORT SERVER CONFIGURATION ---
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 let isExpressRunning = false;
 
-function startExpressServer() {
-    if (!PORT) return;
+function startExpressServer(commandsMap) {
     if (isExpressRunning) return;
 
     const app = express();
+    app.use(express.json());
+    app.use(express.static(path.join(__dirname, 'public')));
 
     app.get('/', (req, res) => {
         res.send('Queen Vida-V3 Bot is Running Active!');
     });
 
+    app.post('/api/pair', async (req, res) => {
+        const rawNumber = req.body && req.body.number;
+
+        if (!rawNumber) {
+            return res.status(400).json({ error: 'Phone number is required.' });
+        }
+
+        const cleanNumber = String(rawNumber).trim().replace(/[^0-9]/g, '');
+
+        if (!cleanNumber) {
+            return res.status(400).json({ error: 'Invalid phone number.' });
+        }
+
+        const sessionId = `web-${cleanNumber}`;
+        let responded = false;
+
+        try {
+            await sessionManager.startSession({
+                sessionId,
+                ownerNumber: cleanNumber,
+                isMain: false,
+                commandsMap,
+                onPairingCode: (code, errMsg) => {
+                    if (responded) return;
+                    responded = true;
+
+                    if (code) {
+                        res.json({ code });
+                    } else {
+                        res.status(500).json({ error: errMsg || 'Pairing failed.' });
+                    }
+                }
+            });
+        } catch (err) {
+            if (!responded) {
+                responded = true;
+                res.status(500).json({ error: err.message || 'Failed to start session.' });
+            }
+        }
+
+        setTimeout(() => {
+            if (!responded) {
+                responded = true;
+                res.status(504).json({ error: 'Timed out waiting for pairing code.' });
+            }
+        }, 20000);
+    });
+
     app.listen(PORT, () => {
         isExpressRunning = true;
-        console.log(`🌐 Express health-check server listening on port ${PORT}`);
+        console.log(`🌐 Express server (site + health-check) listening on port ${PORT}`);
     });
 }
 
@@ -47,7 +96,6 @@ function verifyCreatorIntegrity() {
 
 verifyCreatorIntegrity();
 
-// --- GLOBAL ERROR HANDLERS ---
 process.on('uncaughtException', (err) => {
     console.error('🔥 [CRASH REPORT - UNCAUGHT EXCEPTION]:', err);
 
@@ -65,7 +113,6 @@ process.on('unhandledRejection', (reason, promise) => {
     );
 });
 
-// --- COMMAND LOADER (shared by every session) ---
 function loadCommands() {
     const commandsMap = new Map();
     const commandPath = path.join(__dirname, 'commands');
@@ -112,7 +159,6 @@ function loadCommands() {
     return commandsMap;
 }
 
-// --- BOOTSTRAP ---
 async function bootstrap() {
     verifyCreatorIntegrity();
 
@@ -120,7 +166,8 @@ async function bootstrap() {
 
     const commandsMap = loadCommands();
 
-    // Main session — the original bot number (from PHONE_NUMBER env var)
+    startExpressServer(commandsMap);
+
     const mainPhoneNumber = DISPLAY_CREATOR_NUMBER;
 
     await sessionManager.startSession({
@@ -130,16 +177,8 @@ async function bootstrap() {
         commandsMap
     });
 
-    // Restore every previously deployed user session so they
-    // reconnect automatically after a server restart.
     await sessionManager.restoreSessions(commandsMap);
 }
-
-// =====================================================
-// START BOT
-// =====================================================
-
-startExpressServer();
 
 bootstrap().catch(err => {
     console.error('🔥 [BOOTSTRAP ERROR]:', err);

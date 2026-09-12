@@ -1,0 +1,6 @@
+node_modules/
+auth_info/
+sessions.json
+activity.json
+index.js.backup
+.env
