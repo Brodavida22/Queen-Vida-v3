@@ -13,9 +13,9 @@ module.exports = {
 `┃ 📥 *MEDIA & SAVERS*\n` +
 `┃ • *${PREFIX}save* (Reply to status or view-once media)\n` +
 `┃   _Description: Downloads and saves disappearing content._\n` +
-`┃ • *${PREFIX}downloadviewonce*\n` +
+`┃ • *${PREFIX}vv*\n` +
 `┃   _Description: Reveals quoted view-once media in current chat._\n` +
-`┃ • *${PREFIX}downloadviewonceprivate*\n` +
+`┃ • *${PREFIX}vv2*\n` +
 `┃   _Description: Sends quoted view-once media directly to your DM._\n` +
 `┃ • *${PREFIX}viewstatus on/off*\n` +
 `┃   _Description: Toggle automatic WhatsApp status viewing (Creator Only)._\n` +
