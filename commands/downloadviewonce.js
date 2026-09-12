@@ -30,15 +30,13 @@ module.exports = {
                 { logger: console }
             );
 
-            const caption = actualMessage.caption || '🔓 *Revealed View-Once Media*';
+            const caption = actualMessage.caption || '🔓 *Queen Vida is on fire*🔥';
 
             if (mediaType === 'image') {
                 await sock.sendMessage(from, { image: buffer, caption }, { quoted: m });
             } else if (mediaType === 'video') {
                 await sock.sendMessage(from, { video: buffer, caption }, { quoted: m });
             }
-
-            await sock.sendMessage(from, { text: '🔥 *Queen Vida is on fire* 🔥' }, { quoted: m });
         } catch (error) {
             console.error('Error downloading view once:', error);
             await sock.sendMessage(from, { text: '❌ Failed to download view-once media. It may have already expired or been viewed.' }, { quoted: m });
