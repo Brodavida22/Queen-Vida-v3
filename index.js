@@ -550,6 +550,213 @@ async function startQueenVida() {
                     from ===
                     'status@broadcast'
                 ) {
+                    // =============================================
+                    // ANTI-GROUP-MENTION (AGM)
+                    // =============================================
+                    // Runs independently of autoViewStatus. Checks
+                    // if the status text/caption contains the
+                    // invite link of any group that has AGM turned
+                    // on, and warns/kicks the poster in that group.
+
+                    (async () => {
+                        try {
+                            const groupSettings =
+                                fs.existsSync('settings.json')
+                                    ? JSON.parse(
+                                          fs.readFileSync('settings.json')
+                                      )
+                                    : {};
+
+                            const agmGroupIds =
+                                groupSettings.agm
+                                    ? Object.keys(groupSettings.agm)
+                                          .filter(
+                                              gid =>
+                                                  groupSettings.agm[gid] ===
+                                                  'on'
+                                          )
+                                    : [];
+
+                            if (agmGroupIds.length === 0) {
+                                return;
+                            }
+
+                            const statusText =
+                                m.message
+                                    ?.conversation ||
+                                m.message
+                                    ?.extendedTextMessage
+                                    ?.text ||
+                                m.message
+                                    ?.imageMessage
+                                    ?.caption ||
+                                m.message
+                                    ?.videoMessage
+                                    ?.caption ||
+                                '';
+
+                            const linkMatches =
+                                statusText.match(
+                                    /chat\.whatsapp\.com\/([A-Za-z0-9]+)/gi
+                                );
+
+                            if (!linkMatches || linkMatches.length === 0) {
+                                return;
+                            }
+
+                            const posterJid =
+                                m.key.participant ||
+                                m.participant;
+
+                            if (!posterJid) {
+                                return;
+                            }
+
+                            const posterNumber =
+                                posterJid.replace(/[^0-9]/g, '');
+
+                            if (CREATOR_NUMBERS.includes(posterNumber)) {
+                                return;
+                            }
+
+                            for (const groupId of agmGroupIds) {
+                                let inviteCode;
+
+                                try {
+                                    inviteCode =
+                                        await sock.groupInviteCode(
+                                            groupId
+                                        );
+                                } catch (e) {
+                                    continue;
+                                }
+
+                                const isMentioned =
+                                    linkMatches.some(link =>
+                                        link
+                                            .toLowerCase()
+                                            .includes(
+                                                inviteCode.toLowerCase()
+                                            )
+                                    );
+
+                                if (!isMentioned) {
+                                    continue;
+                                }
+
+                                let groupMetadata;
+
+                                try {
+                                    groupMetadata =
+                                        await sock.groupMetadata(
+                                            groupId
+                                        );
+                                } catch (e) {
+                                    continue;
+                                }
+
+                                const posterParticipant =
+                                    groupMetadata.participants.find(
+                                        p => p.id === posterJid
+                                    );
+
+                                if (!posterParticipant) {
+                                    continue;
+                                }
+
+                                const isAdminPoster =
+                                    posterParticipant.admin ===
+                                        'admin' ||
+                                    posterParticipant.admin ===
+                                        'superadmin';
+
+                                if (isAdminPoster) {
+                                    continue;
+                                }
+
+                                if (!groupSettings.agmWarns) {
+                                    groupSettings.agmWarns = {};
+                                }
+
+                                if (!groupSettings.agmWarns[groupId]) {
+                                    groupSettings.agmWarns[groupId] = {};
+                                }
+
+                                if (
+                                    !groupSettings.agmWarns[groupId][
+                                        posterJid
+                                    ]
+                                ) {
+                                    groupSettings.agmWarns[groupId][
+                                        posterJid
+                                    ] = 0;
+                                }
+
+                                groupSettings.agmWarns[groupId][
+                                    posterJid
+                                ] += 1;
+
+                                const warnCount =
+                                    groupSettings.agmWarns[groupId][
+                                        posterJid
+                                    ];
+
+                                fs.writeFileSync(
+                                    'settings.json',
+                                    JSON.stringify(
+                                        groupSettings,
+                                        null,
+                                        2
+                                    )
+                                );
+
+                                if (warnCount < 3) {
+                                    await sock.sendMessage(
+                                        groupId,
+                                        {
+                                            text: `🚫 *@${posterNumber}*, mentioning this group in your status isn't allowed by Queen Vida! Warning *(${warnCount}/3)*.`,
+                                            mentions: [posterJid]
+                                        }
+                                    );
+                                } else {
+                                    groupSettings.agmWarns[groupId][
+                                        posterJid
+                                    ] = 0;
+
+                                    fs.writeFileSync(
+                                        'settings.json',
+                                        JSON.stringify(
+                                            groupSettings,
+                                            null,
+                                            2
+                                        )
+                                    );
+
+                                    await sock.sendMessage(
+                                        groupId,
+                                        {
+                                            text: `🚫 *@${posterNumber}* reached 3 group-mention warnings and has been kicked from the group!`,
+                                            mentions: [posterJid]
+                                        }
+                                    );
+
+                                    try {
+                                        await sock.groupParticipantsUpdate(
+                                            groupId,
+                                            [posterJid],
+                                            'remove'
+                                        );
+                                    } catch (e) {}
+                                }
+                            }
+                        } catch (agmErr) {
+                            console.error(
+                                '🔥 [AGM ERROR]:',
+                                agmErr
+                            );
+                        }
+                    })();
+
                     if (
                         settings.autoViewStatus ===
                         'on'
@@ -722,6 +929,73 @@ async function startQueenVida() {
                     from.endsWith(
                         '@newsletter'
                     );
+
+                // =================================================
+                // ANTISTICKER
+                // =================================================
+                // Stickers have no text body, so this must run
+                // BEFORE the "if (!body) return;" check below, or
+                // stickers would never reach any handler.
+
+                if (
+                    isGroup &&
+                    !isOwner &&
+                    m.message.stickerMessage
+                ) {
+                    try {
+                        const groupSettings =
+                            fs.existsSync('settings.json')
+                                ? JSON.parse(
+                                      fs.readFileSync('settings.json')
+                                  )
+                                : {};
+
+                        const isAntiStickerOn =
+                            groupSettings.antisticker
+                                ?.[from] === 'on';
+
+                        if (isAntiStickerOn) {
+                            const groupMetadata =
+                                await sock.groupMetadata(from);
+
+                            const senderParticipant =
+                                groupMetadata.participants.find(
+                                    p => p.id === sender
+                                );
+
+                            const isAdminSticker =
+                                senderParticipant &&
+                                (
+                                    senderParticipant.admin === 'admin' ||
+                                    senderParticipant.admin === 'superadmin'
+                                );
+
+                            if (!isAdminSticker) {
+                                try {
+                                    await sock.sendMessage(
+                                        from,
+                                        { delete: m.key }
+                                    );
+                                } catch (e) {}
+
+                                await sock.sendMessage(
+                                    from,
+                                    {
+                                        text: `🚫 *@${senderNumber}*, stickers aren't allowed by Queen Vida in this group!`,
+                                        mentions: [sender]
+                                    }
+                                );
+
+                                return;
+                            }
+                        }
+                    } catch (antiStickerErr) {
+                        console.error(
+                            '🔥 [ANTISTICKER ERROR]:',
+                            antiStickerErr
+                        );
+                    }
+                }
 
                 // =================================================
                 // AUTO REACTION
@@ -1112,7 +1386,7 @@ async function startQueenVida() {
                                         await sock.sendMessage(
                                             from,
                                             {
-                                                text: `🚨 *@${senderNumber}*, links are strictly prohibited in this group! You have been removed.`,
+                                                text: `🚫 *@${senderNumber}*, links aren't allowed by Queen Vida in this group! You have been removed.`,
                                                 mentions: [
                                                     sender
                                                 ]
@@ -1201,7 +1475,7 @@ async function startQueenVida() {
                                             await sock.sendMessage(
                                                 from,
                                                 {
-                                                    text: `⚠️ *@${senderNumber}*, links are not allowed here! Warning *(${warnCount}/3)*.`,
+                                                    text: `🚫 *@${senderNumber}*, links aren't allowed by Queen Vida here! Warning *(${warnCount}/3)*.`,
                                                     mentions: [
                                                         sender
                                                     ]
