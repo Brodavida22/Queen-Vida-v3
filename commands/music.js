@@ -1,6 +1,5 @@
-
 const yts = require('yt-search');
-const youtubedl = require('youtube-dl-exec');
+const ytdl = require('@distube/ytdl-core');
 const fs = require('fs');
 const path = require('path');
 
@@ -18,7 +17,7 @@ async function retryOperation(fn, retries = 2, delay = 3000) {
 
 module.exports = {
     name: 'music',
-    description: 'Download music from YouTube by title or link using alternative client extractors',
+    description: 'Download music from YouTube by title or link',
     async execute(sock, m, from, args) {
         const query = args.join(' ');
         if (!query) {
@@ -30,11 +29,10 @@ module.exports = {
 
             let videoUrl = query;
             let videoTitle = query;
-            let videoThumbnail = null;
             let videoDuration = 'Unknown';
 
             // If input is not a direct URL, search YouTube using yt-search
-            if (!query.startsWith('http://') && !query.startsWith('https://')) {
+            if (!ytdl.validateURL(query)) {
                 const searchResult = await retryOperation(() => yts({ query: query, timeout: 20000 }));
                 const videos = searchResult.videos;
                 if (!videos || videos.length === 0) {
@@ -43,31 +41,51 @@ module.exports = {
                 }
                 videoUrl = videos[0].url;
                 videoTitle = videos[0].title;
-                videoThumbnail = videos[0].thumbnail;
                 videoDuration = videos[0].timestamp;
             } else {
-                try {
-                    const info = await retryOperation(() => youtubedl(videoUrl, { dumpSingleJson: true, noCheckCertificates: true, extractorArgs: 'youtube:player_client=android' }));
-                    videoTitle = info.title || 'Audio Track';
-                    videoThumbnail = info.thumbnail;
-                    videoDuration = info.duration ? `${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, '0')}` : 'Unknown';
-                } catch (e) {}
+                if (!ytdl.validateURL(videoUrl)) {
+                    await sock.sendMessage(from, { react: { text: '❌', key: m.key } });
+                    return sock.sendMessage(from, { text: '❌ That does not look like a valid YouTube link.' }, { quoted: m });
+                }
+            }
+
+            const info = await retryOperation(() => ytdl.getInfo(videoUrl));
+
+            videoTitle = info.videoDetails.title || videoTitle;
+            const durationSeconds = parseInt(info.videoDetails.lengthSeconds, 10);
+            if (!isNaN(durationSeconds)) {
+                videoDuration = `${Math.floor(durationSeconds / 60)}:${String(durationSeconds % 60).padStart(2, '0')}`;
             }
 
             await sock.sendMessage(from, { text: `🎵 *Downloading Audio...*\n\n📌 *Title:* ${videoTitle}\n⏱ *Duration:* ${videoDuration}\n_Please wait a moment._` }, { quoted: m });
 
-            const tempFilePath = path.join(__dirname, `../temp_${Date.now()}.mp3`);
+            // Prefer an mp4/m4a audio-only format (widely compatible), fall back to any audio-only format
+            const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
 
-            // Download audio using yt-dlp with the android client extractor flag to completely bypass web 429 rate limits & bot checks
-            await retryOperation(() => youtubedl(videoUrl, {
-                extractAudio: true,
-                audioFormat: 'mp3',
-                audioQuality: '0',
-                output: tempFilePath,
-                socketTimeout: 30,
-                noCheckCertificates: true,
-                extractorArgs: 'youtube:player_client=android'
-            }));
+            if (!audioFormats || audioFormats.length === 0) {
+                throw new Error('No downloadable audio stream was found for this video.');
+            }
+
+            const mp4Formats = audioFormats.filter(f => f.container === 'mp4');
+            const chosenFormats = mp4Formats.length > 0 ? mp4Formats : audioFormats;
+            const format = ytdl.chooseFormat(chosenFormats, { quality: 'highestaudio' });
+
+            const isMp4 = format.container === 'mp4';
+            const fileExtension = isMp4 ? 'm4a' : (format.container || 'webm');
+            const mimeType = isMp4 ? 'audio/mp4' : 'audio/webm';
+
+            const tempFilePath = path.join(__dirname, `../temp_${Date.now()}.${fileExtension}`);
+
+            await new Promise((resolve, reject) => {
+                const stream = ytdl.downloadFromInfo(info, { format });
+                const writeStream = fs.createWriteStream(tempFilePath);
+
+                stream.on('error', reject);
+                writeStream.on('error', reject);
+                writeStream.on('finish', resolve);
+
+                stream.pipe(writeStream);
+            });
 
             if (!fs.existsSync(tempFilePath)) {
                 throw new Error('Failed to download audio file.');
@@ -76,8 +94,8 @@ module.exports = {
             // Send audio file to WhatsApp
             await sock.sendMessage(from, {
                 audio: fs.readFileSync(tempFilePath),
-                mimetype: 'audio/mp4',
-                fileName: `${videoTitle.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`,
+                mimetype: mimeType,
+                fileName: `${videoTitle.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`,
                 ptt: false
             }, { quoted: m });
 
@@ -94,11 +112,10 @@ module.exports = {
 
             let userFriendlyMsg = err.message || 'Unknown error';
             if (userFriendlyMsg.includes('429') || userFriendlyMsg.includes('Too Many Requests') || userFriendlyMsg.includes('Sign in to confirm')) {
-                userFriendlyMsg = 'YouTube temporarily blocked web requests. Please try again in a few moments or try a different song title.';
+                userFriendlyMsg = 'YouTube temporarily blocked requests. Please try again in a few moments or try a different song title.';
             }
 
             await sock.sendMessage(from, { text: `❌ *Error downloading music*\n_Reason:_ ${userFriendlyMsg}` }, { quoted: m });
         }
     }
 };
-
