@@ -28,7 +28,7 @@ const SECTIONS = [
         emoji: '⚙️',
         commands: [
             'menu', 'ping', 'runtime', 'botcreator', 'owner',
-            'repo', 'prefix', 'mode', 'individual', 'profile'
+            'repo', 'prefix', 'mode', 'individual', 'profile', 'deploy'
         ]
     },
     {
@@ -82,7 +82,7 @@ const SECTIONS = [
         commands: [
             'block', 'unblock', 'broadcast', 'changename',
             'changebio', 'changeprofile', 'creategroup', 'join',
-            'leave', 'update', 'statusreactions'
+            'leave', 'update', 'statusreactions', 'sessions'
         ]
     }
 ];
