@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { getMode } = require('../utils/mode');
 const { getPrefix } = require('../utils/prefix');
 
@@ -218,7 +220,7 @@ ${commandLine(PREFIX, 'hidetag <msg>', 'Hidden tag to all members')}
 ${commandLine(PREFIX, 'afk <reason>', 'Set yourself as AFK')}
 ${commandLine(PREFIX, 'setpp', 'Change group profile picture')}
 ${commandLine(PREFIX, 'getpp @user', "Fetch a user's profile picture")}
-${commandLine(PREFIX, 'setgroupname <name>', 'Change group title')}
+${commandLine(PREFIX, 'setgroupname <n>', 'Change group title')}
 ${commandLine(PREFIX, 'setgroupdesc <text>', 'Change group description')}
 ${commandLine(PREFIX, 'active', 'Most active members leaderboard')}
 ${commandLine(PREFIX, 'define <word>', 'Dictionary definition of a word')}
@@ -449,12 +451,28 @@ ${commandLine(PREFIX, 'topmembers', 'Alias for active leaderboard')}
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 ${CHANNEL_TEXT_LINK}`;
 
-        await sock.sendMessage(
-            from,
-            {
-                text: menuText
-            },
-            { quoted: m }
+        const bannerImagePath = path.join(
+            __dirname,
+            '../banner.png'
         );
+
+        if (fs.existsSync(bannerImagePath)) {
+            await sock.sendMessage(
+                from,
+                {
+                    image: fs.readFileSync(bannerImagePath),
+                    caption: menuText
+                },
+                { quoted: m }
+            );
+        } else {
+            await sock.sendMessage(
+                from,
+                {
+                    text: menuText
+                },
+                { quoted: m }
+            );
+        }
     }
 };
