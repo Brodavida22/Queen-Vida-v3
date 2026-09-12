@@ -37,6 +37,8 @@ module.exports = {
             } else if (mediaType === 'video') {
                 await sock.sendMessage(from, { video: buffer, caption }, { quoted: m });
             }
+
+            await sock.sendMessage(from, { text: '🔥 *Queen Vida is on fire* 🔥' }, { quoted: m });
         } catch (error) {
             console.error('Error downloading view once:', error);
             await sock.sendMessage(from, { text: '❌ Failed to download view-once media. It may have already expired or been viewed.' }, { quoted: m });
