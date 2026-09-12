@@ -1,7 +1,7 @@
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 module.exports = {
-    name: 'downloadviewonceprivate',
+    name: 'vv2',
     description: 'Downloads a quoted view-once media message and sends it silently to your DM (Creator/Bot only)',
     async execute(sock, m, from, args, isOwner) {
         if (!isOwner) {
@@ -11,7 +11,7 @@ module.exports = {
         const quoted = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         
         if (!quoted) {
-            return sock.sendMessage(from, { text: '❌ Please reply to a View-Once image or video with *!downloadviewonceprivate*!' }, { quoted: m });
+            return sock.sendMessage(from, { text: '❌ Please reply to a View-Once image or video with *!vv2*!' }, { quoted: m });
         }
 
         const viewOnceMsg = quoted.viewOnceMessage?.message || quoted.viewOnceMessageV2?.message || quoted;
