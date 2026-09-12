@@ -64,7 +64,7 @@ const SECTIONS = [
         emoji: '🎵',
         commands: [
             'music', 'tik', 'lyrics', 'sticker', 'save',
-            'viewstatus', 'downloadviewonce', 'downloadviewonceprivate'
+            'viewstatus', 'vv', 'vv2'
         ]
     },
     {
