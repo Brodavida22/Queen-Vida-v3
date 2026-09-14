@@ -63,6 +63,34 @@ function isCreator(sender) {
 }
 
 // ============================================================
+// GET PREFIX
+// ============================================================
+
+function getBotPrefix() {
+    try {
+        const prefixModule = require('../utils/prefix');
+
+        // Correctly CALL getPrefix()
+        if (typeof prefixModule.getPrefix === 'function') {
+            const value = prefixModule.getPrefix();
+
+            if (typeof value === 'string' && value.trim()) {
+                return value.trim();
+            }
+        }
+
+        // Support modules that directly export a string
+        if (typeof prefixModule === 'string' && prefixModule.trim()) {
+            return prefixModule.trim();
+        }
+    } catch (error) {
+        console.error('Prefix loading error:', error);
+    }
+
+    return '!';
+}
+
+// ============================================================
 // GAME MENU
 // ============================================================
 
@@ -89,7 +117,7 @@ function gameMenu(prefix) {
 ┃ ${prefix}game start <game> <rounds>
 ┃ ${prefix}game stop
 ┃
-┃ Example:
+┃ *Example:*
 ┃ ${prefix}game start quiz 5
 ┃
 ╰━━━〔 👑 *QUEEN VIDA-V3* 〕━━━╯
@@ -128,21 +156,7 @@ module.exports = {
         // PREFIX
         // ----------------------------------------------------
 
-        let prefix = '!';
-
-        try {
-            const prefixModule = require('../utils/prefix');
-
-            if (typeof prefixModule.getPrefix === 'function') {
-                prefix = prefixModule.getPrefix();
-            }
-
-            if (typeof prefixModule === 'string') {
-                prefix = prefixModule;
-            }
-        } catch {
-            prefix = '!';
-        }
+        const prefix = getBotPrefix();
 
         // ----------------------------------------------------
         // NO ARGUMENT = SHOW MENU
@@ -168,10 +182,6 @@ module.exports = {
 
         if (action === 'start') {
 
-            // -----------------------------------------------
-            // ADMIN / CREATOR CHECK
-            // -----------------------------------------------
-
             const admin = await isGroupAdmin(
                 sock,
                 from,
@@ -195,10 +205,6 @@ module.exports = {
                 );
             }
 
-            // -----------------------------------------------
-            // GAME TYPE
-            // -----------------------------------------------
-
             let gameType = String(args[1] || '')
                 .toLowerCase()
                 .trim();
@@ -215,9 +221,9 @@ module.exports = {
                 );
             }
 
-            // -----------------------------------------------
+            // ------------------------------------------------
             // GAME ALIASES
-            // -----------------------------------------------
+            // ------------------------------------------------
 
             const gameAliases = {
                 trivia: 'trivia',
@@ -250,8 +256,11 @@ module.exports = {
                 typerace: 'typing'
             };
 
-            gameType =
-                gameAliases[gameType];
+            gameType = gameAliases[gameType];
+
+            // ------------------------------------------------
+            // INVALID GAME
+            // ------------------------------------------------
 
             if (!gameType) {
                 return sock.sendMessage(
@@ -274,9 +283,9 @@ module.exports = {
                 );
             }
 
-            // -----------------------------------------------
+            // ------------------------------------------------
             // ROUNDS
-            // -----------------------------------------------
+            // ------------------------------------------------
 
             let rounds = parseInt(
                 args[2],
@@ -295,9 +304,9 @@ module.exports = {
                 rounds = 50;
             }
 
-            // -----------------------------------------------
-            // START
-            // -----------------------------------------------
+            // ------------------------------------------------
+            // START GAME
+            // ------------------------------------------------
 
             return startGame(
                 sock,
@@ -316,10 +325,6 @@ module.exports = {
             action === 'end' ||
             action === 'cancel'
         ) {
-
-            // -----------------------------------------------
-            // ADMIN / CREATOR CHECK
-            // -----------------------------------------------
 
             const admin = await isGroupAdmin(
                 sock,
@@ -362,14 +367,14 @@ module.exports = {
         }
 
         // ====================================================
-        // HELP
+        // HELP / UNKNOWN COMMAND
         // ====================================================
 
         return sock.sendMessage(
             from,
             {
                 text:
-                    `❌ *Unknown game command!*\n\n` +
+                    '❌ *Unknown game command!*\n\n' +
                     gameMenu(prefix)
             },
             { quoted: m }
