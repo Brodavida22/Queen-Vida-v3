@@ -342,25 +342,25 @@ function createMessageHandler(sock, { sessionId, ownerNumber, isMain }) {
                 m.key.fromMe;
 
             // =================================================
-            // ACTIVITY TRACKER
-            // =================================================
+// ACTIVITY TRACKER
+// =================================================
 
-            if (from.endsWith('@g.us') && sender) {
-                try {
-                    let act = fs.existsSync(ACTIVITY_FILE)
-                        ? JSON.parse(fs.readFileSync(ACTIVITY_FILE))
-                        : {};
+if (from.endsWith('@g.us') && sender) {
+    try {
+        let act = fs.existsSync(ACTIVITY_FILE)
+            ? JSON.parse(fs.readFileSync(ACTIVITY_FILE))
+            : {};
 
-                    if (!act[from]) act[from] = {};
-                    if (!act[from][sender]) act[from][sender] = 0;
+        if (!act[from]) act[from] = {};
+        if (!act[from][sender]) act[from][sender] = 0;
 
-                    act[from][sender] += 1;
+        act[from][sender] += 1;
 
-                    fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(act));
-                } catch (actErr) {
-                    console.error('🔥 [ACTIVITY TRACKER ERROR]:', actErr);
-                }
-            }
+        fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(act));
+    } catch (actErr) {
+        console.error('🔥 [ACTIVITY TRACKER ERROR]:', actErr);
+    }
+}
 
             // =================================================
             // MESSAGE BODY
