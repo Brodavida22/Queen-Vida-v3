@@ -5,26 +5,43 @@ function getQuotedMessage(m) {
     return m.message?.extendedTextMessage?.contextInfo?.quotedMessage || null;
 }
 
+function getQuotedContext(m) {
+    return m.message?.extendedTextMessage?.contextInfo || {};
+}
+
 function unwrapMediaMessage(message) {
     if (!message) return null;
 
-    const wrapped =
-        message.viewOnceMessage?.message ||
-        message.viewOnceMessageV2?.message ||
-        message.viewOnceMessageV2Extension?.message ||
-        message;
+    let current = message;
 
-    if (wrapped.imageMessage) {
+    // Unwrap common WhatsApp wrappers
+    if (current.ephemeralMessage?.message) {
+        current = current.ephemeralMessage.message;
+    }
+
+    if (current.viewOnceMessage?.message) {
+        current = current.viewOnceMessage.message;
+    }
+
+    if (current.viewOnceMessageV2?.message) {
+        current = current.viewOnceMessageV2.message;
+    }
+
+    if (current.viewOnceMessageV2Extension?.message) {
+        current = current.viewOnceMessageV2Extension.message;
+    }
+
+    if (current.imageMessage) {
         return {
             type: 'image',
-            message: wrapped.imageMessage
+            message: current.imageMessage
         };
     }
 
-    if (wrapped.videoMessage) {
+    if (current.videoMessage) {
         return {
             type: 'video',
-            message: wrapped.videoMessage
+            message: current.videoMessage
         };
     }
 
@@ -38,6 +55,7 @@ module.exports = {
     async execute(sock, m, from, args, isOwner) {
         const prefix = getPrefix();
 
+        // Creator only
         if (!isOwner) {
             return sock.sendMessage(
                 from,
@@ -48,6 +66,7 @@ module.exports = {
             );
         }
 
+        // Group only
         if (!from.endsWith('@g.us')) {
             return sock.sendMessage(
                 from,
@@ -58,18 +77,22 @@ module.exports = {
             );
         }
 
+        // Get replied message
         const quoted = getQuotedMessage(m);
 
         if (!quoted) {
             return sock.sendMessage(
                 from,
                 {
-                    text: `❌ Reply to an image or video with ${prefix}gcstatus.`
+                    text:
+                        `❌ Reply to an image or video with ${prefix}gcstatus.\n\n` +
+                        `Example: Reply to a picture and send ${prefix}gcstatus`
                 },
                 { quoted: m }
             );
         }
 
+        // Check whether replied message contains supported media
         const media = unwrapMediaMessage(quoted);
 
         if (!media) {
@@ -85,64 +108,85 @@ module.exports = {
         }
 
         try {
-            const contextInfo =
-                m.message?.extendedTextMessage?.contextInfo || {};
+            const contextInfo = getQuotedContext(m);
 
-            const stanzaId = contextInfo.stanzaId;
-            const participant = contextInfo.participant;
-
-            const targetMessage = {
-                key: {
-                    remoteJid: from,
-                    id: stanzaId || `gcstatus-${Date.now()}`,
-                    participant
-                },
-                message: quoted
+            /*
+             * Rebuild the original quoted message key.
+             * This makes media downloading more reliable,
+             * including media sent by another group member.
+             */
+            const quotedKey = {
+                remoteJid: from,
+                id: contextInfo.stanzaId,
+                participant: contextInfo.participant
             };
 
+            if (!quotedKey.id) {
+                throw new Error('Could not identify the replied message.');
+            }
+
+            // Download the replied media
             const buffer = await downloadMediaMessage(
-                targetMessage,
+                {
+                    key: quotedKey,
+                    message: quoted
+                },
                 'buffer',
                 {},
-                { logger: console }
+                {
+                    logger: console
+                }
             );
 
             if (!buffer || !buffer.length) {
                 throw new Error('Downloaded media is empty.');
             }
 
-            // The members of this group become the Status audience.
+            /*
+             * WhatsApp does not have a separate "group status".
+             * This posts to the bot's normal WhatsApp Status
+             * and targets the members of this group as the audience.
+             */
             const metadata = await sock.groupMetadata(from);
 
             const statusJidList = (metadata.participants || [])
-                .map(p => p.id)
+                .map(member => member.id)
                 .filter(Boolean);
 
             if (!statusJidList.length) {
                 throw new Error(
-                    'Could not determine the group status audience.'
+                    'Could not determine the group members for the Status audience.'
                 );
             }
 
+            // Optional caption:
+            // .gcstatus Your caption here
             const customCaption = args.join(' ').trim();
-            const originalCaption = media.message.caption || '';
+
+            const originalCaption =
+                media.message.caption || '';
 
             const caption =
                 customCaption ||
                 originalCaption ||
                 undefined;
 
-            const statusContent =
-                media.type === 'image'
-                    ? {
-                        image: buffer,
-                        ...(caption ? { caption } : {})
-                    }
-                    : {
-                        video: buffer,
-                        ...(caption ? { caption } : {})
-                    };
+            // Prepare Status content
+            let statusContent;
 
+            if (media.type === 'image') {
+                statusContent = {
+                    image: buffer,
+                    ...(caption ? { caption } : {})
+                };
+            } else {
+                statusContent = {
+                    video: buffer,
+                    ...(caption ? { caption } : {})
+                };
+            }
+
+            // Post to the bot's WhatsApp Status
             await sock.sendMessage(
                 'status@broadcast',
                 statusContent,
@@ -152,12 +196,14 @@ module.exports = {
                 }
             );
 
+            // Confirm inside the group
             await sock.sendMessage(
                 from,
                 {
                     text:
                         `✅ ${media.type === 'image' ? 'Image' : 'Video'} ` +
-                        `posted to my WhatsApp Status.`
+                        `has been posted to my WhatsApp Status.\n\n` +
+                        `👥 Group members can view it.`
                 },
                 { quoted: m }
             );
@@ -172,7 +218,7 @@ module.exports = {
                 from,
                 {
                     text:
-                        '❌ Failed to post the media to WhatsApp Status.\n\n' +
+                        `❌ Failed to post the media to WhatsApp Status.\n\n` +
                         `_${error.message || 'Unknown error'}_`
                 },
                 { quoted: m }
