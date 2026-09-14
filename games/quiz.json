@@ -1,0 +1,454 @@
+[
+  {
+    "question": "What is the capital of Nigeria?",
+    "options": {"A": "Lagos", "B": "Abuja", "C": "Kano", "D": "Ibadan"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many continents are there?",
+    "options": {"A": "5", "B": "6", "C": "7", "D": "8"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which planet is closest to the Sun?",
+    "options": {"A": "Earth", "B": "Venus", "C": "Mercury", "D": "Mars"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is 5 + 7?",
+    "options": {"A": "10", "B": "11", "C": "12", "D": "13"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which animal is known for having a long trunk?",
+    "options": {"A": "Lion", "B": "Elephant", "C": "Giraffe", "D": "Horse"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What color is made by mixing blue and yellow?",
+    "options": {"A": "Purple", "B": "Orange", "C": "Green", "D": "Pink"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many hours are in a day?",
+    "options": {"A": "12", "B": "18", "C": "24", "D": "30"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which country is famous for the Eiffel Tower?",
+    "options": {"A": "Italy", "B": "France", "C": "Spain", "D": "Germany"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What do humans use to see?",
+    "options": {"A": "Ears", "B": "Nose", "C": "Eyes", "D": "Hands"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which fruit is yellow and curved?",
+    "options": {"A": "Apple", "B": "Banana", "C": "Grape", "D": "Pear"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the opposite of 'up'?",
+    "options": {"A": "Down", "B": "Left", "C": "High", "D": "Over"},
+    "answer": "A",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which sport uses a ball and a hoop?",
+    "options": {"A": "Tennis", "B": "Basketball", "C": "Swimming", "D": "Boxing"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many sides does a square have?",
+    "options": {"A": "3", "B": "4", "C": "5", "D": "6"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which gas do humans breathe in?",
+    "options": {"A": "Oxygen", "B": "Carbon dioxide", "C": "Helium", "D": "Hydrogen"},
+    "answer": "A",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the largest land animal?",
+    "options": {"A": "Rhino", "B": "Giraffe", "C": "Elephant", "D": "Hippo"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which month comes after January?",
+    "options": {"A": "March", "B": "February", "C": "April", "D": "December"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is 100 divided by 10?",
+    "options": {"A": "5", "B": "10", "C": "20", "D": "100"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which instrument has six strings?",
+    "options": {"A": "Piano", "B": "Drum", "C": "Guitar", "D": "Flute"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which ocean is the largest?",
+    "options": {"A": "Atlantic", "B": "Indian", "C": "Pacific", "D": "Arctic"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the color of a typical school bus in the United States?",
+    "options": {"A": "Blue", "B": "Yellow", "C": "Green", "D": "Black"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which animal says 'meow'?",
+    "options": {"A": "Dog", "B": "Cow", "C": "Cat", "D": "Goat"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "How many minutes are in one hour?",
+    "options": {"A": "30", "B": "45", "C": "60", "D": "90"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is the capital of Ghana?",
+    "options": {"A": "Kumasi", "B": "Accra", "C": "Tamale", "D": "Tema"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which season is usually the coldest?",
+    "options": {"A": "Summer", "B": "Spring", "C": "Winter", "D": "Autumn"},
+    "answer": "C",
+    "difficulty": "easy"
+  },
+  {
+    "question": "Which part of the body helps you hear?",
+    "options": {"A": "Eyes", "B": "Ears", "C": "Nose", "D": "Mouth"},
+    "answer": "B",
+    "difficulty": "easy"
+  },
+
+  {
+    "question": "What is the chemical symbol for gold?",
+    "options": {"A": "Ag", "B": "Au", "C": "Gd", "D": "Go"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which planet is known as the largest planet in our solar system?",
+    "options": {"A": "Saturn", "B": "Neptune", "C": "Jupiter", "D": "Earth"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who wrote 'Things Fall Apart'?",
+    "options": {"A": "Chinua Achebe", "B": "Wole Soyinka", "C": "Ben Okri", "D": "Ngugi wa Thiong'o"},
+    "answer": "A",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the square root of 81?",
+    "options": {"A": "7", "B": "8", "C": "9", "D": "10"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which organ pumps blood around the human body?",
+    "options": {"A": "Liver", "B": "Heart", "C": "Lung", "D": "Kidney"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the currency of Japan?",
+    "options": {"A": "Won", "B": "Yuan", "C": "Yen", "D": "Ringgit"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which country has the city of Dubai?",
+    "options": {"A": "Qatar", "B": "Saudi Arabia", "C": "United Arab Emirates", "D": "Oman"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which process do plants use to convert sunlight into energy?",
+    "options": {"A": "Respiration", "B": "Photosynthesis", "C": "Digestion", "D": "Fermentation"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "How many players are on the field for one soccer team?",
+    "options": {"A": "9", "B": "10", "C": "11", "D": "12"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which continent is the Sahara Desert located in?",
+    "options": {"A": "Asia", "B": "Africa", "C": "Europe", "D": "Australia"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Who painted the Mona Lisa?",
+    "options": {"A": "Pablo Picasso", "B": "Leonardo da Vinci", "C": "Michelangelo", "D": "Claude Monet"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which gas makes up most of Earth's atmosphere?",
+    "options": {"A": "Oxygen", "B": "Nitrogen", "C": "Carbon dioxide", "D": "Hydrogen"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the capital of Australia?",
+    "options": {"A": "Sydney", "B": "Melbourne", "C": "Canberra", "D": "Perth"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which metal is liquid at room temperature?",
+    "options": {"A": "Iron", "B": "Mercury", "C": "Copper", "D": "Silver"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is 15 × 4?",
+    "options": {"A": "45", "B": "50", "C": "60", "D": "75"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which blood type is commonly called the universal red-cell donor?",
+    "options": {"A": "AB+", "B": "A+", "C": "O−", "D": "B+"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which planet is famous for its rings?",
+    "options": {"A": "Mars", "B": "Saturn", "C": "Venus", "D": "Mercury"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the hardest natural substance?",
+    "options": {"A": "Iron", "B": "Diamond", "C": "Quartz", "D": "Steel"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which country is home to Mount Fuji?",
+    "options": {"A": "China", "B": "Japan", "C": "South Korea", "D": "Nepal"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the capital of Kenya?",
+    "options": {"A": "Mombasa", "B": "Nairobi", "C": "Kisumu", "D": "Nakuru"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which instrument measures temperature?",
+    "options": {"A": "Barometer", "B": "Thermometer", "C": "Hygrometer", "D": "Compass"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which ocean lies between Africa and Australia?",
+    "options": {"A": "Atlantic Ocean", "B": "Pacific Ocean", "C": "Indian Ocean", "D": "Arctic Ocean"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the main function of the kidneys?",
+    "options": {"A": "Pump blood", "B": "Filter waste from blood", "C": "Digest food", "D": "Control breathing"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "Which country is shaped like a boot?",
+    "options": {"A": "France", "B": "Italy", "C": "Spain", "D": "Greece"},
+    "answer": "B",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is the smallest prime number?",
+    "options": {"A": "0", "B": "1", "C": "2", "D": "3"},
+    "answer": "C",
+    "difficulty": "medium"
+  },
+
+  {
+    "question": "What is the SI unit of electric resistance?",
+    "options": {"A": "Volt", "B": "Ampere", "C": "Ohm", "D": "Watt"},
+    "answer": "C",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which element has atomic number 79?",
+    "options": {"A": "Silver", "B": "Gold", "C": "Platinum", "D": "Mercury"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Who formulated the three laws of motion?",
+    "options": {"A": "Einstein", "B": "Newton", "C": "Galileo", "D": "Maxwell"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the approximate speed of light in vacuum?",
+    "options": {"A": "300,000 km/s", "B": "30,000 km/s", "C": "3,000 km/s", "D": "3,000,000 km/s"},
+    "answer": "A",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which moon is the largest moon of Saturn?",
+    "options": {"A": "Europa", "B": "Titan", "C": "Ganymede", "D": "Triton"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the chemical formula of sulfuric acid?",
+    "options": {"A": "HCl", "B": "H2SO4", "C": "HNO3", "D": "NaOH"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which layer of the atmosphere contains most of the ozone layer?",
+    "options": {"A": "Troposphere", "B": "Stratosphere", "C": "Mesosphere", "D": "Thermosphere"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which scientist is associated with the uncertainty principle?",
+    "options": {"A": "Niels Bohr", "B": "Werner Heisenberg", "C": "Max Planck", "D": "Erwin Schrödinger"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which empire was ruled by Mansa Musa?",
+    "options": {"A": "Songhai Empire", "B": "Mali Empire", "C": "Benin Empire", "D": "Ghana Empire"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the study of fungi called?",
+    "options": {"A": "Botany", "B": "Mycology", "C": "Ecology", "D": "Zoology"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which ocean trench contains the deepest known point on Earth?",
+    "options": {"A": "Tonga Trench", "B": "Mariana Trench", "C": "Java Trench", "D": "Puerto Rico Trench"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the mathematical constant approximately equal to 2.71828?",
+    "options": {"A": "Pi", "B": "Phi", "C": "Euler's number", "D": "Square root of 2"},
+    "answer": "C",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which programming language was created by Brendan Eich?",
+    "options": {"A": "Python", "B": "Java", "C": "JavaScript", "D": "Ruby"},
+    "answer": "C",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the boundary around a black hole beyond which light cannot escape?",
+    "options": {"A": "Singularity", "B": "Event horizon", "C": "Photon sphere", "D": "Accretion disk"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the derivative of x²?",
+    "options": {"A": "x", "B": "2x", "C": "x²", "D": "2"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which element has the chemical symbol W?",
+    "options": {"A": "Tungsten", "B": "Tin", "C": "Titanium", "D": "Tantalum"},
+    "answer": "A",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which African lake is the largest by surface area?",
+    "options": {"A": "Lake Chad", "B": "Lake Victoria", "C": "Lake Tanganyika", "D": "Lake Malawi"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which nerve is the longest cranial nerve?",
+    "options": {"A": "Optic nerve", "B": "Vagus nerve", "C": "Facial nerve", "D": "Trigeminal nerve"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the primary function of ribosomes?",
+    "options": {"A": "Store DNA", "B": "Produce proteins", "C": "Produce oxygen", "D": "Digest fats"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which country was formerly known as Persia?",
+    "options": {"A": "Iraq", "B": "Iran", "C": "Syria", "D": "Turkey"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the capital of Mongolia?",
+    "options": {"A": "Astana", "B": "Ulaanbaatar", "C": "Tashkent", "D": "Bishkek"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which physicist developed the theory of general relativity?",
+    "options": {"A": "Isaac Newton", "B": "Albert Einstein", "C": "Stephen Hawking", "D": "Niels Bohr"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is the process by which a solid changes directly into a gas?",
+    "options": {"A": "Condensation", "B": "Sublimation", "C": "Evaporation", "D": "Freezing"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which molecule carries genetic information in most living organisms?",
+    "options": {"A": "ATP", "B": "DNA", "C": "Glucose", "D": "Hemoglobin"},
+    "answer": "B",
+    "difficulty": "hard"
+  },
+  {
+    "question": "Which ancient civilization built Machu Picchu?",
+    "options": {"A": "Maya", "B": "Inca", "C": "Aztec", "D": "Roman"},
+    "answer": "B",
+    "difficulty": "hard"
+  }
+      ]
