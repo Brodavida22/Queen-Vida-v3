@@ -787,12 +787,18 @@ if (from.endsWith('@g.us') && sender) {
             if (command) {
                 try {
                     await command.execute(
-                        sock,
-                        m,
-                        m.key.remoteJid,
-                        args,
-                        isOwner
-                    );
+    sock,
+    m,
+    m.key.remoteJid,
+    args,
+    isOwner,
+    {
+        sessionId,
+        ownerNumber,
+        isMain,
+        settingsFile: SETTINGS_FILE
+    }
+);
                 } catch (cmdExecErr) {
                     console.error(
                         `🔥 [COMMAND EXECUTION CRASH] [${PREFIX}${commandName}]:`,
