@@ -344,21 +344,58 @@ function createMessageHandler(sock, { sessionId, ownerNumber, isMain }) {
             // =================================================
 // ACTIVITY TRACKER
 // =================================================
+// Tracks messages + the last time the bot saw each
+// member active in each group.
 
 if (from.endsWith('@g.us') && sender) {
     try {
         let act = fs.existsSync(ACTIVITY_FILE)
-            ? JSON.parse(fs.readFileSync(ACTIVITY_FILE))
+            ? JSON.parse(
+                fs.readFileSync(ACTIVITY_FILE, 'utf8')
+            )
             : {};
 
-        if (!act[from]) act[from] = {};
-        if (!act[from][sender]) act[from][sender] = 0;
+        if (!act || typeof act !== 'object') {
+            act = {};
+        }
 
-        act[from][sender] += 1;
+        if (!act[from] || typeof act[from] !== 'object') {
+            act[from] = {};
+        }
 
-        fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(act));
+        const existing = act[from][sender];
+
+        // Support the old activity format where the value
+        // was simply a number.
+        if (typeof existing === 'number') {
+            act[from][sender] = {
+                messages: existing,
+                lastActive: Date.now()
+            };
+        } else if (
+            !existing ||
+            typeof existing !== 'object'
+        ) {
+            act[from][sender] = {
+                messages: 0,
+                lastActive: Date.now()
+            };
+        }
+
+        act[from][sender].messages =
+            Number(act[from][sender].messages || 0) + 1;
+
+        act[from][sender].lastActive = Date.now();
+
+        fs.writeFileSync(
+            ACTIVITY_FILE,
+            JSON.stringify(act, null, 2)
+        );
     } catch (actErr) {
-        console.error('🔥 [ACTIVITY TRACKER ERROR]:', actErr);
+        console.error(
+            '🔥 [ACTIVITY TRACKER ERROR]:',
+            actErr
+        );
     }
 }
 
