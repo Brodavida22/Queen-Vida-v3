@@ -1,383 +1,231 @@
-// ============================================================
-// QUEEN VIDA-V3 — GAME MENU
-// ============================================================
-
-const {
-    startGame,
-    stopGame,
-    isGameActive
-} = require('../utils/gameManager');
-
-const CREATOR_NUMBERS = [
-    '2348138558590'
-];
-
-// ============================================================
-// GET SENDER
-// ============================================================
-
-function getSender(m) {
-    return (
-        m.key.participant ||
-        m.key.remoteJid ||
-        ''
-    );
-}
-
-// ============================================================
-// CHECK GROUP ADMIN
-// ============================================================
-
-async function isGroupAdmin(sock, chatId, sender) {
-    try {
-        const metadata = await sock.groupMetadata(chatId);
-
-        const participant = metadata.participants.find(
-            p => p.id === sender
-        );
-
-        return !!(
-            participant &&
-            (
-                participant.admin === 'admin' ||
-                participant.admin === 'superadmin'
-            )
-        );
-    } catch (error) {
-        console.error('Game admin check error:', error);
-        return false;
-    }
-}
-
-// ============================================================
-// CHECK CREATOR
-// ============================================================
-
-function isCreator(sender) {
-    const number = String(sender)
-        .split('@')[0]
-        .split(':')[0]
-        .replace(/\D/g, '');
-
-    return CREATOR_NUMBERS.includes(number);
-}
-
-// ============================================================
-// GET PREFIX
-// ============================================================
-
-function getBotPrefix() {
-    try {
-        const prefixModule = require('../utils/prefix');
-
-        // Correctly CALL getPrefix()
-        if (typeof prefixModule.getPrefix === 'function') {
-            const value = prefixModule.getPrefix();
-
-            if (typeof value === 'string' && value.trim()) {
-                return value.trim();
-            }
-        }
-
-        // Support modules that directly export a string
-        if (typeof prefixModule === 'string' && prefixModule.trim()) {
-            return prefixModule.trim();
-        }
-    } catch (error) {
-        console.error('Prefix loading error:', error);
-    }
-
-    return '!';
-}
-
-// ============================================================
-// GAME MENU
-// ============================================================
-
-function gameMenu(prefix) {
-    return `
-╭━━━〔 🎮 *QUEEN VIDA GAME ZONE* 〕━━━╮
-┃
-┃ 🏆 *AVAILABLE GAMES*
-┃
-┃ 🎯 ${prefix}trivia
-┃ 🧠 ${prefix}quiz
-┃ 🔤 ${prefix}scramble
-┃ 🔢 ${prefix}guess
-┃ 🔢 ${prefix}guessnumber
-┃ 🧩 ${prefix}riddle
-┃ 😂 ${prefix}emojigame
-┃ 🎵 ${prefix}guesssong
-┃ ⌨️ ${prefix}typing
-┃
-┣━━━━━━━━━━━━━━━━━━━━
-┃
-┃ 👑 *ADMIN GAME CONTROL*
-┃
-┃ ${prefix}game start <game> <rounds>
-┃ ${prefix}game stop
-┃
-┃ *Example:*
-┃ ${prefix}game start quiz 5
-┃
-╰━━━〔 👑 *QUEEN VIDA-V3* 〕━━━╯
-`;
-}
-
-// ============================================================
-// COMMAND
-// ============================================================
-
 module.exports = {
     name: 'game',
-    aliases: ['games'],
-    description: 'Game menu and game controls',
+    description: 'Start or stop group games',
 
     async execute(sock, m, from, args, isOwner) {
-
-        // ----------------------------------------------------
-        // GROUP ONLY
-        // ----------------------------------------------------
-
+        // Must be used in a group
         if (!from.endsWith('@g.us')) {
             return sock.sendMessage(
                 from,
                 {
-                    text:
-                        '❌ *Games can only be played inside a group.*'
+                    text: '❌ This command can only be used inside groups!'
                 },
                 { quoted: m }
             );
         }
 
-        const sender = getSender(m);
+        // Get sender
+        const sender =
+            m.key.participant ||
+            m.key.remoteJid;
 
-        // ----------------------------------------------------
-        // PREFIX
-        // ----------------------------------------------------
+        // Check group permissions
+        let metadata;
 
-        const prefix = getBotPrefix();
+        try {
+            metadata = await sock.groupMetadata(from);
+        } catch (error) {
+            console.error('❌ Failed to get group metadata:', error);
 
-        // ----------------------------------------------------
-        // NO ARGUMENT = SHOW MENU
-        // ----------------------------------------------------
-
-        if (!args || !args.length) {
             return sock.sendMessage(
                 from,
                 {
-                    text: gameMenu(prefix)
+                    text: '❌ Unable to get group information.'
                 },
                 { quoted: m }
             );
         }
 
-        const action = String(args[0])
-            .toLowerCase()
-            .trim();
-
-        // ====================================================
-        // START GAME
-        // ====================================================
-
-        if (action === 'start') {
-
-            const admin = await isGroupAdmin(
-                sock,
-                from,
-                sender
+        const participant =
+            metadata.participants.find(
+                p =>
+                    p.id === sender ||
+                    p.jid === sender
             );
 
-            const creator =
-                isCreator(sender) ||
-                isOwner === true ||
-                m.key.fromMe === true;
+        const isGroupAdmin =
+            participant?.admin === 'admin' ||
+            participant?.admin === 'superadmin';
 
-            if (!admin && !creator) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            '🚫 *ACCESS DENIED*\n\n' +
-                            'Only group admins or the bot creator can start games from the game control menu.'
-                    },
-                    { quoted: m }
-                );
-            }
-
-            let gameType = String(args[1] || '')
-                .toLowerCase()
-                .trim();
-
-            if (!gameType) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            '❌ *Choose a game first!*\n\n' +
-                            gameMenu(prefix)
-                    },
-                    { quoted: m }
-                );
-            }
-
-            // ------------------------------------------------
-            // GAME ALIASES
-            // ------------------------------------------------
-
-            const gameAliases = {
-                trivia: 'trivia',
-                triviagame: 'trivia',
-
-                quiz: 'quiz',
-                quizgame: 'quiz',
-
-                scramble: 'scramble',
-                wordscramble: 'scramble',
-
-                guess: 'guess',
-                guessnumber: 'guess',
-                numberguess: 'guess',
-
-                riddle: 'riddle',
-                riddles: 'riddle',
-                brain: 'riddle',
-
-                emojigame: 'emojigame',
-                emoji: 'emojigame',
-                emojiguess: 'emojigame',
-
-                guesssong: 'guesssong',
-                songguess: 'guesssong',
-                song: 'guesssong',
-
-                typing: 'typing',
-                typingrace: 'typing',
-                typerace: 'typing'
-            };
-
-            gameType = gameAliases[gameType];
-
-            // ------------------------------------------------
-            // INVALID GAME
-            // ------------------------------------------------
-
-            if (!gameType) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            '❌ *Unknown game!*\n\n' +
-                            'Available games:\n\n' +
-                            '🎯 trivia\n' +
-                            '🧠 quiz\n' +
-                            '🔤 scramble\n' +
-                            '🔢 guess\n' +
-                            '🔢 guessnumber\n' +
-                            '🧩 riddle\n' +
-                            '😂 emojigame\n' +
-                            '🎵 guesssong\n' +
-                            '⌨️ typing'
-                    },
-                    { quoted: m }
-                );
-            }
-
-            // ------------------------------------------------
-            // ROUNDS
-            // ------------------------------------------------
-
-            let rounds = parseInt(
-                args[2],
-                10
-            );
-
-            if (!Number.isFinite(rounds)) {
-                rounds = 5;
-            }
-
-            if (rounds < 1) {
-                rounds = 1;
-            }
-
-            if (rounds > 50) {
-                rounds = 50;
-            }
-
-            // ------------------------------------------------
-            // START GAME
-            // ------------------------------------------------
-
-            return startGame(
-                sock,
+        if (!isOwner && !isGroupAdmin) {
+            return sock.sendMessage(
                 from,
-                gameType,
-                rounds
+                {
+                    text:
+                        '❌ Only group admins can start or stop games!'
+                },
+                { quoted: m }
             );
         }
 
-        // ====================================================
-        // STOP GAME
-        // ====================================================
+        const action =
+            String(args[0] || '').toLowerCase();
+
+        /* =========================
+           HELP
+        ========================= */
+
+        if (!action || action === 'help') {
+            return sock.sendMessage(
+                from,
+                {
+                    text:
+`🎮 *QUEEN VIDA GAME CENTER*
+
+*Available Games:*
+🎯 Trivia
+🧠 Quiz
+🔀 Scramble
+🔤 Guess
+
+*Start a game:*
+.game start trivia 10
+.game start quiz 10
+.game start scramble 10
+.game start guess 10
+
+*With difficulty:*
+.game start trivia easy 10
+.game start trivia medium 10
+.game start trivia hard 10
+
+.game start quiz easy 10
+.game start quiz medium 10
+.game start quiz hard 10
+
+*Stop game:*
+.game stop
+
+🎯 Difficulty:
+• Easy
+• Medium
+• Hard`
+                },
+                { quoted: m }
+            );
+        }
+
+        /* =========================
+           STOP GAME
+        ========================= */
+
+        if (action === 'stop') {
+            const {
+                stopGame
+            } = require('../utils/gameManager');
+
+            return stopGame(sock, from);
+        }
+
+        /* =========================
+           START GAME
+        ========================= */
+
+        if (action !== 'start') {
+            return sock.sendMessage(
+                from,
+                {
+                    text:
+                        '❌ Invalid action.\n\nUse *.game help* to see the available commands.'
+                },
+                { quoted: m }
+            );
+        }
+
+        const gameType =
+            String(args[1] || '').toLowerCase();
+
+        const validGames = [
+            'trivia',
+            'quiz',
+            'scramble',
+            'guess'
+        ];
+
+        if (!validGames.includes(gameType)) {
+            return sock.sendMessage(
+                from,
+                {
+                    text:
+`❌ Invalid game!
+
+Available games:
+🎯 trivia
+🧠 quiz
+🔀 scramble
+🔤 guess
+
+Example:
+*.game start trivia 10*`
+                },
+                { quoted: m }
+            );
+        }
+
+        /*
+         * Supported formats:
+         *
+         * .game start trivia 10
+         * .game start trivia easy 10
+         * .game start trivia medium 10
+         * .game start trivia hard 10
+         */
+
+        let difficulty = null;
+        let roundsArg;
+
+        const possibleDifficulty =
+            String(args[2] || '').toLowerCase();
 
         if (
-            action === 'stop' ||
-            action === 'end' ||
-            action === 'cancel'
+            ['easy', 'medium', 'hard'].includes(
+                possibleDifficulty
+            )
         ) {
+            difficulty = possibleDifficulty;
+            roundsArg = args[3];
+        } else {
+            roundsArg = args[2];
+        }
 
-            const admin = await isGroupAdmin(
-                sock,
+        let rounds =
+            Number(roundsArg || 10);
+
+        if (
+            !Number.isInteger(rounds) ||
+            rounds < 5
+        ) {
+            return sock.sendMessage(
                 from,
-                sender
-            );
-
-            const creator =
-                isCreator(sender) ||
-                isOwner === true ||
-                m.key.fromMe === true;
-
-            if (!admin && !creator) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            '🚫 *ACCESS DENIED*\n\n' +
-                            'Only group admins or the bot creator can stop the game.'
-                    },
-                    { quoted: m }
-                );
-            }
-
-            if (!isGameActive(from)) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            '❌ *There is no active game in this group.*'
-                    },
-                    { quoted: m }
-                );
-            }
-
-            return stopGame(
-                sock,
-                from
+                {
+                    text:
+                        '❌ Number of rounds must be at least *5*.\n\nExample:\n*.game start quiz easy 10*'
+                },
+                { quoted: m }
             );
         }
 
-        // ====================================================
-        // HELP / UNKNOWN COMMAND
-        // ====================================================
+        if (rounds > 100) {
+            return sock.sendMessage(
+                from,
+                {
+                    text:
+                        '❌ Maximum number of rounds is *100*.'
+                },
+                { quoted: m }
+            );
+        }
 
-        return sock.sendMessage(
+        const {
+            startGame
+        } = require('../utils/gameManager');
+
+        await startGame(
+            sock,
             from,
-            {
-                text:
-                    '❌ *Unknown game command!*\n\n' +
-                    gameMenu(prefix)
-            },
-            { quoted: m }
+            gameType,
+            rounds,
+            difficulty
         );
     }
 };
