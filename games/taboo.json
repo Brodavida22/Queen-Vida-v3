@@ -1,0 +1,582 @@
+[
+  {
+    "word": "PIZZA",
+    "forbidden": ["cheese", "dough", "tomato"]
+  },
+  {
+    "word": "PHONE",
+    "forbidden": ["call", "screen", "mobile"]
+  },
+  {
+    "word": "SCHOOL",
+    "forbidden": ["student", "teacher", "class"]
+  },
+  {
+    "word": "CAR",
+    "forbidden": ["drive", "road", "vehicle"]
+  },
+  {
+    "word": "BEACH",
+    "forbidden": ["sand", "sea", "water"]
+  },
+  {
+    "word": "BIRTHDAY",
+    "forbidden": ["cake", "party", "gift"]
+  },
+  {
+    "word": "MUSIC",
+    "forbidden": ["song", "sing", "sound"]
+  },
+  {
+    "word": "MOVIE",
+    "forbidden": ["film", "actor", "cinema"]
+  },
+  {
+    "word": "FOOTBALL",
+    "forbidden": ["ball", "goal", "player"]
+  },
+  {
+    "word": "TEACHER",
+    "forbidden": ["school", "student", "class"]
+  },
+  {
+    "word": "DOCTOR",
+    "forbidden": ["hospital", "patient", "medicine"]
+  },
+  {
+    "word": "HOSPITAL",
+    "forbidden": ["doctor", "nurse", "patient"]
+  },
+  {
+    "word": "POLICE",
+    "forbidden": ["officer", "crime", "arrest"]
+  },
+  {
+    "word": "AIRPLANE",
+    "forbidden": ["fly", "airport", "pilot"]
+  },
+  {
+    "word": "TRAIN",
+    "forbidden": ["rail", "station", "track"]
+  },
+  {
+    "word": "BUS",
+    "forbidden": ["road", "driver", "passenger"]
+  },
+  {
+    "word": "TAXI",
+    "forbidden": ["driver", "car", "fare"]
+  },
+  {
+    "word": "RESTAURANT",
+    "forbidden": ["food", "waiter", "menu"]
+  },
+  {
+    "word": "BURGER",
+    "forbidden": ["meat", "bread", "cheese"]
+  },
+  {
+    "word": "ICE CREAM",
+    "forbidden": ["cold", "sweet", "cone"]
+  },
+  {
+    "word": "CHOCOLATE",
+    "forbidden": ["sweet", "cocoa", "candy"]
+  },
+  {
+    "word": "COFFEE",
+    "forbidden": ["drink", "hot", "cup"]
+  },
+  {
+    "word": "WATER",
+    "forbidden": ["drink", "bottle", "thirst"]
+  },
+  {
+    "word": "BREAD",
+    "forbidden": ["food", "flour", "toast"]
+  },
+  {
+    "word": "RICE",
+    "forbidden": ["food", "grain", "cook"]
+  },
+  {
+    "word": "CHICKEN",
+    "forbidden": ["bird", "meat", "egg"]
+  },
+  {
+    "word": "FISH",
+    "forbidden": ["water", "sea", "swim"]
+  },
+  {
+    "word": "EGG",
+    "forbidden": ["chicken", "shell", "breakfast"]
+  },
+  {
+    "word": "APPLE",
+    "forbidden": ["fruit", "red", "tree"]
+  },
+  {
+    "word": "BANANA",
+    "forbidden": ["yellow", "fruit", "peel"]
+  },
+  {
+    "word": "ORANGE",
+    "forbidden": ["fruit", "juice", "color"]
+  },
+  {
+    "word": "MANGO",
+    "forbidden": ["fruit", "sweet", "yellow"]
+  },
+  {
+    "word": "WATERMELON",
+    "forbidden": ["fruit", "green", "red"]
+  },
+  {
+    "word": "CAT",
+    "forbidden": ["animal", "pet", "meow"]
+  },
+  {
+    "word": "DOG",
+    "forbidden": ["animal", "pet", "bark"]
+  },
+  {
+    "word": "LION",
+    "forbidden": ["animal", "king", "roar"]
+  },
+  {
+    "word": "ELEPHANT",
+    "forbidden": ["animal", "trunk", "big"]
+  },
+  {
+    "word": "MONKEY",
+    "forbidden": ["animal", "banana", "tree"]
+  },
+  {
+    "word": "SNAKE",
+    "forbidden": ["animal", "crawl", "poison"]
+  },
+  {
+    "word": "HORSE",
+    "forbidden": ["animal", "ride", "stable"]
+  },
+  {
+    "word": "BIRD",
+    "forbidden": ["fly", "wings", "animal"]
+  },
+  {
+    "word": "BUTTERFLY",
+    "forbidden": ["wings", "insect", "fly"]
+  },
+  {
+    "word": "SPIDER",
+    "forbidden": ["web", "insect", "eight"]
+  },
+  {
+    "word": "BOOK",
+    "forbidden": ["read", "pages", "story"]
+  },
+  {
+    "word": "PEN",
+    "forbidden": ["write", "ink", "paper"]
+  },
+  {
+    "word": "PENCIL",
+    "forbidden": ["write", "eraser", "sharp"]
+  },
+  {
+    "word": "COMPUTER",
+    "forbidden": ["screen", "keyboard", "mouse"]
+  },
+  {
+    "word": "KEYBOARD",
+    "forbidden": ["computer", "keys", "type"]
+  },
+  {
+    "word": "MOUSE",
+    "forbidden": ["computer", "click", "animal"]
+  },
+  {
+    "word": "CAMERA",
+    "forbidden": ["photo", "picture", "lens"]
+  },
+  {
+    "word": "TELEVISION",
+    "forbidden": ["watch", "screen", "show"]
+  },
+  {
+    "word": "REMOTE",
+    "forbidden": ["control", "television", "button"]
+  },
+  {
+    "word": "HEADPHONES",
+    "forbidden": ["music", "ears", "listen"]
+  },
+  {
+    "word": "CLOCK",
+    "forbidden": ["time", "watch", "hour"]
+  },
+  {
+    "word": "MIRROR",
+    "forbidden": ["reflection", "glass", "look"]
+  },
+  {
+    "word": "BED",
+    "forbidden": ["sleep", "room", "pillow"]
+  },
+  {
+    "word": "PILLOW",
+    "forbidden": ["sleep", "bed", "head"]
+  },
+  {
+    "word": "CHAIR",
+    "forbidden": ["sit", "furniture", "table"]
+  },
+  {
+    "word": "TABLE",
+    "forbidden": ["chair", "food", "furniture"]
+  },
+  {
+    "word": "DOOR",
+    "forbidden": ["open", "house", "lock"]
+  },
+  {
+    "word": "WINDOW",
+    "forbidden": ["glass", "house", "look"]
+  },
+  {
+    "word": "HOUSE",
+    "forbidden": ["home", "room", "building"]
+  },
+  {
+    "word": "KEY",
+    "forbidden": ["lock", "door", "open"]
+  },
+  {
+    "word": "UMBRELLA",
+    "forbidden": ["rain", "water", "weather"]
+  },
+  {
+    "word": "RAIN",
+    "forbidden": ["water", "cloud", "weather"]
+  },
+  {
+    "word": "SUN",
+    "forbidden": ["hot", "sky", "light"]
+  },
+  {
+    "word": "MOON",
+    "forbidden": ["night", "sky", "stars"]
+  },
+  {
+    "word": "STAR",
+    "forbidden": ["sky", "night", "space"]
+  },
+  {
+    "word": "FIRE",
+    "forbidden": ["hot", "burn", "smoke"]
+  },
+  {
+    "word": "SMOKE",
+    "forbidden": ["fire", "air", "burn"]
+  },
+  {
+    "word": "CANDLE",
+    "forbidden": ["wax", "fire", "light"]
+  },
+  {
+    "word": "LIGHT",
+    "forbidden": ["dark", "lamp", "bright"]
+  },
+  {
+    "word": "DARKNESS",
+    "forbidden": ["night", "black", "light"]
+  },
+  {
+    "word": "GHOST",
+    "forbidden": ["spirit", "dead", "haunted"]
+  },
+  {
+    "word": "VAMPIRE",
+    "forbidden": ["blood", "Dracula", "night"]
+  },
+  {
+    "word": "SUPERHERO",
+    "forbidden": ["power", "hero", "cape"]
+  },
+  {
+    "word": "BATMAN",
+    "forbidden": ["Bruce", "Gotham", "bat"]
+  },
+  {
+    "word": "SPIDER-MAN",
+    "forbidden": ["spider", "web", "Peter"]
+  },
+  {
+    "word": "KING",
+    "forbidden": ["queen", "crown", "royal"]
+  },
+  {
+    "word": "QUEEN",
+    "forbidden": ["king", "crown", "royal"]
+  },
+  {
+    "word": "PRINCE",
+    "forbidden": ["king", "royal", "son"]
+  },
+  {
+    "word": "PRINCESS",
+    "forbidden": ["queen", "royal", "girl"]
+  },
+  {
+    "word": "MONEY",
+    "forbidden": ["cash", "bank", "rich"]
+  },
+  {
+    "word": "BANK",
+    "forbidden": ["money", "cash", "account"]
+  },
+  {
+    "word": "SHOPPING",
+    "forbidden": ["buy", "mall", "money"]
+  },
+  {
+    "word": "MARKET",
+    "forbidden": ["shop", "buy", "seller"]
+  },
+  {
+    "word": "GIFT",
+    "forbidden": ["present", "birthday", "give"]
+  },
+  {
+    "word": "WEDDING",
+    "forbidden": ["marriage", "bride", "groom"]
+  },
+  {
+    "word": "BRIDE",
+    "forbidden": ["wedding", "dress", "groom"]
+  },
+  {
+    "word": "GROOM",
+    "forbidden": ["wedding", "bride", "marriage"]
+  },
+  {
+    "word": "LOVE",
+    "forbidden": ["heart", "romance", "relationship"]
+  },
+  {
+    "word": "KISS",
+    "forbidden": ["lips", "love", "romance"]
+  },
+  {
+    "word": "HUG",
+    "forbidden": ["arms", "embrace", "love"]
+  },
+  {
+    "word": "FRIEND",
+    "forbidden": ["best", "person", "buddy"]
+  },
+  {
+    "word": "FAMILY",
+    "forbidden": ["parents", "children", "home"]
+  },
+  {
+    "word": "MOTHER",
+    "forbidden": ["mom", "parent", "woman"]
+  },
+  {
+    "word": "FATHER",
+    "forbidden": ["dad", "parent", "man"]
+  },
+  {
+    "word": "BABY",
+    "forbidden": ["child", "small", "cry"]
+  },
+  {
+    "word": "CHILD",
+    "forbidden": ["baby", "young", "kid"]
+  },
+  {
+    "word": "SLEEP",
+    "forbidden": ["bed", "night", "dream"]
+  },
+  {
+    "word": "DREAM",
+    "forbidden": ["sleep", "night", "imagine"]
+  },
+  {
+    "word": "LAUGH",
+    "forbidden": ["funny", "smile", "joke"]
+  },
+  {
+    "word": "CRY",
+    "forbidden": ["tears", "sad", "eyes"]
+  },
+  {
+    "word": "ANGER",
+    "forbidden": ["mad", "angry", "rage"]
+  },
+  {
+    "word": "HAPPY",
+    "forbidden": ["joy", "smile", "glad"]
+  },
+  {
+    "word": "SAD",
+    "forbidden": ["cry", "unhappy", "tears"]
+  },
+  {
+    "word": "FEAR",
+    "forbidden": ["scared", "afraid", "danger"]
+  },
+  {
+    "word": "SECRET",
+    "forbidden": ["hidden", "tell", "private"]
+  },
+  {
+    "word": "PASSWORD",
+    "forbidden": ["login", "account", "secret"]
+  },
+  {
+    "word": "INTERNET",
+    "forbidden": ["online", "web", "WiFi"]
+  },
+  {
+    "word": "WHATSAPP",
+    "forbidden": ["chat", "message", "group"]
+  },
+  {
+    "word": "INSTAGRAM",
+    "forbidden": ["photo", "social", "followers"]
+  },
+  {
+    "word": "TIKTOK",
+    "forbidden": ["video", "dance", "social"]
+  },
+  {
+    "word": "YOUTUBE",
+    "forbidden": ["video", "channel", "watch"]
+  },
+  {
+    "word": "GAME",
+    "forbidden": ["play", "player", "fun"]
+  },
+  {
+    "word": "WINNER",
+    "forbidden": ["win", "first", "champion"]
+  },
+  {
+    "word": "LOSER",
+    "forbidden": ["lose", "last", "defeat"]
+  },
+  {
+    "word": "PRISON",
+    "forbidden": ["jail", "cell", "criminal"]
+  },
+  {
+    "word": "LAWYER",
+    "forbidden": ["court", "judge", "legal"]
+  },
+  {
+    "word": "JUDGE",
+    "forbidden": ["court", "law", "decision"]
+  },
+  {
+    "word": "CRIMINAL",
+    "forbidden": ["crime", "police", "jail"]
+  },
+  {
+    "word": "FARMER",
+    "forbidden": ["farm", "cow", "crop"]
+  },
+  {
+    "word": "COOK",
+    "forbidden": ["food", "kitchen", "chef"]
+  },
+  {
+    "word": "CHEF",
+    "forbidden": ["cook", "food", "kitchen"]
+  },
+  {
+    "word": "SINGER",
+    "forbidden": ["music", "song", "voice"]
+  },
+  {
+    "word": "DANCER",
+    "forbidden": ["dance", "music", "move"]
+  },
+  {
+    "word": "ACTOR",
+    "forbidden": ["movie", "film", "character"]
+  },
+  {
+    "word": "WRITER",
+    "forbidden": ["book", "write", "author"]
+  },
+  {
+    "word": "ARTIST",
+    "forbidden": ["paint", "draw", "picture"]
+  },
+  {
+    "word": "DOCTOR",
+    "forbidden": ["hospital", "medicine", "patient"]
+  },
+  {
+    "word": "NURSE",
+    "forbidden": ["hospital", "doctor", "patient"]
+  },
+  {
+    "word": "ENGINEER",
+    "forbidden": ["build", "machine", "technical"]
+  },
+  {
+    "word": "TEACHER",
+    "forbidden": ["school", "student", "lesson"]
+  },
+  {
+    "word": "STUDENT",
+    "forbidden": ["school", "teacher", "class"]
+  },
+  {
+    "word": "EXAM",
+    "forbidden": ["test", "school", "question"]
+  },
+  {
+    "word": "HOMEWORK",
+    "forbidden": ["school", "teacher", "assignment"]
+  },
+  {
+    "word": "LIBRARY",
+    "forbidden": ["books", "read", "school"]
+  },
+  {
+    "word": "GYM",
+    "forbidden": ["exercise", "workout", "fitness"]
+  },
+  {
+    "word": "FOOTBALL",
+    "forbidden": ["soccer", "goal", "ball"]
+  },
+  {
+    "word": "BASKETBALL",
+    "forbidden": ["ball", "hoop", "court"]
+  },
+  {
+    "word": "TENNIS",
+    "forbidden": ["racket", "ball", "court"]
+  },
+  {
+    "word": "BOXING",
+    "forbidden": ["fight", "ring", "punch"]
+  },
+  {
+    "word": "SWIMMING",
+    "forbidden": ["water", "pool", "sport"]
+  },
+  {
+    "word": "RUNNING",
+    "forbidden": ["race", "fast", "legs"]
+  },
+  {
+    "word": "DANCE",
+    "forbidden": ["music", "move", "body"]
+  }
+    ]
