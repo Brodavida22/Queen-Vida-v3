@@ -1,0 +1,566 @@
+[
+  {
+    "question": "When the weekend comes, we ____.",
+    "answer": "celebrate"
+  },
+  {
+    "question": "If the music is loud, everybody ____.",
+    "answer": "dances"
+  },
+  {
+    "question": "When the squad arrives, the party ____.",
+    "answer": "starts"
+  },
+  {
+    "question": "Good vibes only, leave the ____ outside.",
+    "answer": "drama"
+  },
+  {
+    "question": "When the beat drops, hands go ____.",
+    "answer": "up"
+  },
+  {
+    "question": "A good friend always has your ____.",
+    "answer": "back"
+  },
+  {
+    "question": "Tonight we came to have some ____.",
+    "answer": "fun"
+  },
+  {
+    "question": "If you know the words, sing them ____.",
+    "answer": "loud"
+  },
+  {
+    "question": "The night is young, so don't go ____.",
+    "answer": "home"
+  },
+  {
+    "question": "When the vibes are right, nobody wants to ____.",
+    "answer": "leave"
+  },
+  {
+    "question": "Dance like nobody is ____.",
+    "answer": "watching"
+  },
+  {
+    "question": "Friends together make the best ____.",
+    "answer": "memories"
+  },
+  {
+    "question": "If life gives you lemons, make some ____.",
+    "answer": "lemonade"
+  },
+  {
+    "question": "Wake up, get dressed, and chase your ____.",
+    "answer": "dreams"
+  },
+  {
+    "question": "Never stop believing in ____.",
+    "answer": "yourself"
+  },
+  {
+    "question": "A smile can brighten someone's ____.",
+    "answer": "day"
+  },
+  {
+    "question": "Keep moving forward and never look ____.",
+    "answer": "back"
+  },
+  {
+    "question": "When things get hard, stay ____.",
+    "answer": "strong"
+  },
+  {
+    "question": "The best moments happen when we live in the ____.",
+    "answer": "moment"
+  },
+  {
+    "question": "Dream big and work even ____.",
+    "answer": "harder"
+  },
+  {
+    "question": "Success starts with a single ____.",
+    "answer": "step"
+  },
+  {
+    "question": "Don't let fear stop your ____.",
+    "answer": "journey"
+  },
+  {
+    "question": "Every sunrise brings a new ____.",
+    "answer": "beginning"
+  },
+  {
+    "question": "Keep your head high and your heart ____.",
+    "answer": "strong"
+  },
+  {
+    "question": "The future belongs to those who ____.",
+    "answer": "believe"
+  },
+  {
+    "question": "If you fall, get back ____.",
+    "answer": "up"
+  },
+  {
+    "question": "Your biggest competition is ____.",
+    "answer": "yourself"
+  },
+  {
+    "question": "Small steps can lead to big ____.",
+    "answer": "results"
+  },
+  {
+    "question": "Work hard today and enjoy the ____ tomorrow.",
+    "answer": "reward"
+  },
+  {
+    "question": "Never give up on something you truly ____.",
+    "answer": "want"
+  },
+  {
+    "question": "A positive mind creates a positive ____.",
+    "answer": "life"
+  },
+  {
+    "question": "Stay humble when you ____.",
+    "answer": "win"
+  },
+  {
+    "question": "Stay strong when you ____.",
+    "answer": "lose"
+  },
+  {
+    "question": "Good energy attracts good ____.",
+    "answer": "people"
+  },
+  {
+    "question": "Your attitude determines your ____.",
+    "answer": "direction"
+  },
+  {
+    "question": "Make today better than ____.",
+    "answer": "yesterday"
+  },
+  {
+    "question": "Tomorrow is another chance to ____.",
+    "answer": "try"
+  },
+  {
+    "question": "Believe you can and you're already ____.",
+    "answer": "winning"
+  },
+  {
+    "question": "Keep shining even when the world gets ____.",
+    "answer": "dark"
+  },
+  {
+    "question": "A little kindness can go a long ____.",
+    "answer": "way"
+  },
+  {
+    "question": "Be yourself because everyone else is already ____.",
+    "answer": "taken"
+  },
+  {
+    "question": "Confidence begins with believing in ____.",
+    "answer": "yourself"
+  },
+  {
+    "question": "Good times become great memories with good ____.",
+    "answer": "friends"
+  },
+  {
+    "question": "The louder the music, the bigger the ____.",
+    "answer": "vibes"
+  },
+  {
+    "question": "Friday night means it's time to ____.",
+    "answer": "vibe"
+  },
+  {
+    "question": "No stress, just ____.",
+    "answer": "vibes"
+  },
+  {
+    "question": "Bring your energy and leave your ____ at home.",
+    "answer": "worries"
+  },
+  {
+    "question": "Tonight's mood is good ____.",
+    "answer": "energy"
+  },
+  {
+    "question": "When the beat hits, let your body ____.",
+    "answer": "move"
+  },
+  {
+    "question": "Music connects hearts without saying a ____.",
+    "answer": "word"
+  },
+  {
+    "question": "A great song can change your entire ____.",
+    "answer": "mood"
+  },
+  {
+    "question": "Turn the volume up and let the music ____.",
+    "answer": "play"
+  },
+  {
+    "question": "When your favorite song comes on, you ____.",
+    "answer": "sing"
+  },
+  {
+    "question": "The dance floor is calling, so don't ____.",
+    "answer": "hide"
+  },
+  {
+    "question": "If the rhythm feels good, follow the ____.",
+    "answer": "beat"
+  },
+  {
+    "question": "Music makes ordinary moments feel ____.",
+    "answer": "special"
+  },
+  {
+    "question": "Good music and good friends make a perfect ____.",
+    "answer": "combination"
+  },
+  {
+    "question": "Let the rhythm take you ____.",
+    "answer": "away"
+  },
+  {
+    "question": "When the song ends, press ____.",
+    "answer": "replay"
+  },
+  {
+    "question": "A catchy tune can stay inside your ____.",
+    "answer": "head"
+  },
+  {
+    "question": "Sing from your heart, not from your ____.",
+    "answer": "ego"
+  },
+  {
+    "question": "The best playlist matches your ____.",
+    "answer": "mood"
+  },
+  {
+    "question": "Music is better when shared with ____.",
+    "answer": "friends"
+  },
+  {
+    "question": "When everyone sings together, the room becomes ____.",
+    "answer": "alive"
+  },
+  {
+    "question": "Let your worries disappear with every ____.",
+    "answer": "beat"
+  },
+  {
+    "question": "Tonight we dance until the music ____.",
+    "answer": "stops"
+  },
+  {
+    "question": "A peaceful heart creates a peaceful ____.",
+    "answer": "mind"
+  },
+  {
+    "question": "Choose happiness whenever you have the ____.",
+    "answer": "choice"
+  },
+  {
+    "question": "Protect your peace and avoid unnecessary ____.",
+    "answer": "drama"
+  },
+  {
+    "question": "Don't chase people who don't value your ____.",
+    "answer": "presence"
+  },
+  {
+    "question": "Know your worth and never settle for ____.",
+    "answer": "less"
+  },
+  {
+    "question": "Respect is earned through your ____.",
+    "answer": "actions"
+  },
+  {
+    "question": "Trust takes time but can disappear in a ____.",
+    "answer": "second"
+  },
+  {
+    "question": "Real friends stay when things get ____.",
+    "answer": "tough"
+  },
+  {
+    "question": "A true friend celebrates your ____.",
+    "answer": "success"
+  },
+  {
+    "question": "Don't confuse attention with genuine ____.",
+    "answer": "love"
+  },
+  {
+    "question": "Actions always speak louder than ____.",
+    "answer": "words"
+  },
+  {
+    "question": "Keep people around who bring you ____.",
+    "answer": "peace"
+  },
+  {
+    "question": "Your circle can influence your ____.",
+    "answer": "future"
+  },
+  {
+    "question": "Loyalty means staying true through good and ____.",
+    "answer": "bad"
+  },
+  {
+    "question": "A real connection needs honesty and ____.",
+    "answer": "trust"
+  },
+  {
+    "question": "Love grows when people communicate with ____.",
+    "answer": "respect"
+  },
+  {
+    "question": "Never lose yourself trying to impress ____.",
+    "answer": "others"
+  },
+  {
+    "question": "Be kind even when nobody is ____.",
+    "answer": "watching"
+  },
+  {
+    "question": "Your peace is more valuable than winning every ____.",
+    "answer": "argument"
+  },
+  {
+    "question": "Sometimes silence is the best ____.",
+    "answer": "answer"
+  },
+  {
+    "question": "Forgive yourself and keep ____.",
+    "answer": "growing"
+  },
+  {
+    "question": "Don't let one bad moment ruin your whole ____.",
+    "answer": "day"
+  },
+  {
+    "question": "Every mistake can teach you something ____.",
+    "answer": "valuable"
+  },
+  {
+    "question": "Failure is not the end of your ____.",
+    "answer": "story"
+  },
+  {
+    "question": "A setback can become a setup for a ____.",
+    "answer": "comeback"
+  },
+  {
+    "question": "Keep trying until something finally ____.",
+    "answer": "works"
+  },
+  {
+    "question": "Patience turns small efforts into big ____.",
+    "answer": "achievements"
+  },
+  {
+    "question": "Consistency is the secret behind many ____.",
+    "answer": "successes"
+  },
+  {
+    "question": "Don't rush the process; trust the ____.",
+    "answer": "journey"
+  },
+  {
+    "question": "Your story is still being ____.",
+    "answer": "written"
+  },
+  {
+    "question": "One day your hard work will ____.",
+    "answer": "payoff"
+  },
+  {
+    "question": "Keep planting seeds even if you cannot see the ____.",
+    "answer": "results"
+  },
+  {
+    "question": "Great things take time, so stay ____.",
+    "answer": "patient"
+  },
+  {
+    "question": "Your future self will thank you for starting ____.",
+    "answer": "today"
+  },
+  {
+    "question": "Don't wait for motivation; build ____.",
+    "answer": "discipline"
+  },
+  {
+    "question": "A strong dream needs strong ____.",
+    "answer": "action"
+  },
+  {
+    "question": "Turn your plans into ____.",
+    "answer": "action"
+  },
+  {
+    "question": "The first step is always the ____.",
+    "answer": "hardest"
+  },
+  {
+    "question": "Keep going until you make yourself ____.",
+    "answer": "proud"
+  },
+  {
+    "question": "When the opportunity comes, be ready to ____.",
+    "answer": "move"
+  },
+  {
+    "question": "Your mindset can change your entire ____.",
+    "answer": "world"
+  },
+  {
+    "question": "Success feels better when you remember where you ____.",
+    "answer": "started"
+  },
+  {
+    "question": "Dreams need action, not just ____.",
+    "answer": "wishes"
+  },
+  {
+    "question": "The best revenge is becoming a better ____.",
+    "answer": "person"
+  },
+  {
+    "question": "Stay focused while everyone else is getting ____.",
+    "answer": "distracted"
+  },
+  {
+    "question": "Don't compare your chapter one to someone's chapter ____.",
+    "answer": "twenty"
+  },
+  {
+    "question": "Keep improving one day at a ____.",
+    "answer": "time"
+  },
+  {
+    "question": "Your only limit may be your own ____.",
+    "answer": "mindset"
+  },
+  {
+    "question": "When you believe in yourself, anything feels more ____.",
+    "answer": "possible"
+  },
+  {
+    "question": "Make memories that make you ____.",
+    "answer": "smile"
+  },
+  {
+    "question": "Life is short, so enjoy every ____.",
+    "answer": "moment"
+  },
+  {
+    "question": "Laugh often and worry ____.",
+    "answer": "less"
+  },
+  {
+    "question": "Collect memories, not just ____.",
+    "answer": "things"
+  },
+  {
+    "question": "Enjoy the little things because one day they may become the ____ things.",
+    "answer": "big"
+  },
+  {
+    "question": "A good laugh can make a bad day feel ____.",
+    "answer": "better"
+  },
+  {
+    "question": "Take pictures, make memories, and enjoy the ____.",
+    "answer": "journey"
+  },
+  {
+    "question": "Life becomes sweeter when you appreciate what you ____.",
+    "answer": "have"
+  },
+  {
+    "question": "Happiness grows when you share it with ____.",
+    "answer": "others"
+  },
+  {
+    "question": "Don't forget to enjoy the journey while chasing the ____.",
+    "answer": "goal"
+  },
+  {
+    "question": "Some moments are worth remembering ____.",
+    "answer": "forever"
+  },
+  {
+    "question": "Good memories are made with good ____.",
+    "answer": "company"
+  },
+  {
+    "question": "Keep your heart open to new ____.",
+    "answer": "experiences"
+  },
+  {
+    "question": "Every day is another chance to create a great ____.",
+    "answer": "memory"
+  },
+  {
+    "question": "Life is an adventure, so enjoy the ____.",
+    "answer": "ride"
+  },
+  {
+    "question": "Sometimes the best plans are the ones made at the last ____.",
+    "answer": "minute"
+  },
+  {
+    "question": "A spontaneous night can become an unforgettable ____.",
+    "answer": "memory"
+  },
+  {
+    "question": "Good friends make every adventure more ____.",
+    "answer": "fun"
+  },
+  {
+    "question": "When the vibes are perfect, time flies ____.",
+    "answer": "fast"
+  },
+  {
+    "question": "Tonight's memories will become tomorrow's ____.",
+    "answer": "stories"
+  },
+  {
+    "question": "Never underestimate the power of a good ____.",
+    "answer": "laugh"
+  },
+  {
+    "question": "The best nights usually start with a simple ____.",
+    "answer": "hello"
+  },
+  {
+    "question": "Bring your smile and leave your ____ behind.",
+    "answer": "stress"
+  },
+  {
+    "question": "Good vibes are contagious, so spread them ____.",
+    "answer": "around"
+  },
+  {
+    "question": "When the group is together, the energy gets ____.",
+    "answer": "higher"
+  },
+  {
+    "question": "No matter what happens, keep the ____ alive.",
+    "answer": "vibe"
+  }
+    ]
