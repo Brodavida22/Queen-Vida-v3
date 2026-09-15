@@ -86,6 +86,12 @@ module.exports = {
 ┃ 6️⃣ *Couples Challenge*
 ┃    \`.game start couples <rounds>\`
 ┃
+┃ 7️⃣ *Words Ending With*
+┃    \`.game start ending <rounds>\`
+┃
+┃ 8️⃣ *Words Starting With*
+┃    \`.game start starting <rounds>\`
+┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ ⚙️ *RULES*
 ┃
@@ -104,6 +110,8 @@ module.exports = {
 ┃ • \`.game start guess 10\`
 ┃ • \`.game start emoji 10\`
 ┃ • \`.game start couples 10\`
+┃ • \`.game start ending 10\`
+┃ • \`.game start starting 10\`
 ┃
 ┃ 🛑 Stop:
 ┃ \`.game stop\`
@@ -180,7 +188,9 @@ module.exports = {
             'scramble',
             'guess',
             'emoji',
-            'couples'
+            'couples',
+            'ending',
+            'starting'
         ];
 
         if (!validGames.includes(gameType)) {
@@ -198,9 +208,13 @@ module.exports = {
 4️⃣ \`guess\`
 5️⃣ \`emoji\`
 6️⃣ \`couples\`
+7️⃣ \`ending\`
+8️⃣ \`starting\`
 
-📌 *Example:*
+📌 *Examples:*
 \`.game start couples 10\`
+\`.game start ending 10\`
+\`.game start starting 10\`
 
 Use \`.game\` to open the full game dashboard.`
                 },
@@ -277,6 +291,8 @@ Use \`.game\` to open the full game dashboard.`
 📌 *Examples:*
 \`.game start couples 10\`
 \`.game start emoji 10\`
+\`.game start ending 10\`
+\`.game start starting 10\`
 \`.game start trivia easy 10\``
                 },
                 {
