@@ -1,338 +1,276 @@
-const { startGame, stopGame } = require('../utils/gameManager');
+const {
+    startGame,
+    stopGame,
+    isGameActive
+} = require('../utils/gameManager');
 
-const CREATOR_NUMBERS = ['2348138558590'];
+const config = require('../bot/config');
+
+const validGames = [
+    'trivia',
+    'quiz',
+    'scramble',
+    'guess',
+    'emoji',
+    'couples',
+    'findemoji',
+    'ending',
+    'starting',
+    'rhyme'
+];
 
 module.exports = {
     name: 'game',
-    description: 'Interactive group mini-games suite',
+    description: 'Start and manage group games',
+    usage: '.game start <game> <rounds> [difficulty]',
 
-    async execute(sock, m, from, args) {
-        const sender =
-            m.key.participant ||
-            m.key.remoteJid;
+    async execute(sock, m, from, args, isOwner) {
+        try {
+            const sender = m.key.participant || m.key.remoteJid;
 
-        const senderNumber =
-            sender.replace(/[^0-9]/g, '');
+            // =====================================================
+            // GAME DASHBOARD
+            // =====================================================
+            if (!args[0]) {
+                const active = isGameActive(from);
 
-        const isOwner =
-            CREATOR_NUMBERS.includes(senderNumber) ||
-            m.key.fromMe;
+                let text = `
+╭━━━ 🎮 *QUEEN VIDA GAME ZONE* 🎮 ━━━╮
 
-        const isGroup =
-            from.endsWith('@g.us');
+🔥 *AVAILABLE GAMES*
 
-        let isAdmin = false;
+1️⃣ 🧠 Trivia
+2️⃣ ❓ Quiz
+3️⃣ 🔀 Scramble
+4️⃣ 🔢 Number Guess
+5️⃣ 😎 Guess the Emoji
+6️⃣ 💑 Couples Challenge
+7️⃣ 🔎 Find the Emoji
+8️⃣ 🔚 Words Ending With
+9️⃣ 🚀 Words Starting With
+🔟 🎵 Rhyming Words
 
-        if (isGroup && !isOwner) {
-            try {
-                const groupMetadata =
-                    await sock.groupMetadata(from);
+━━━━━━━━━━━━━━━━━━━━
+📌 *HOW TO PLAY*
 
-                const participants =
-                    groupMetadata.participants || [];
+.game start <game> <rounds>
 
-                const participantObj =
-                    participants.find(
-                        p =>
-                            p.id.replace(
-                                /[^0-9]/g,
-                                ''
-                            ) === senderNumber
-                    );
+Examples:
 
-                isAdmin =
-                    participantObj &&
-                    (
-                        participantObj.admin === 'admin' ||
-                        participantObj.admin === 'superadmin'
-                    );
-            } catch (e) {
-                console.error(
-                    'Error checking group admin:',
-                    e
-                );
+.game start trivia 10
+.game start quiz 10
+.game start scramble 10
+.game start guess 10
+.game start emoji 10
+.game start couples 10
+.game start findemoji 10
+.game start ending 10 er
+.game start starting 10 ri
+.game start rhyme 10 ball
+
+━━━━━━━━━━━━━━━━━━━━
+
+🛑 Stop current game:
+.game stop
+
+${active ? '🟢 *A GAME IS CURRENTLY ACTIVE!*' : '⚪ No game is currently active.'}
+
+╰━━━━━━━━━━━━━━━━━━━━╯
+`;
+
+                return await sock.sendMessage(from, { text });
             }
-        }
 
-        const action =
-            args[0]
-                ? args[0].toLowerCase()
-                : '';
-
-        /*
-         * GAME DASHBOARD
-         */
-        if (!['start', 'stop'].includes(action)) {
-            const menuText =
-`┏━━━ 🎮 *QUEEN VIDA GAME CENTER* 🎮 ━━━┓
-┃
-┃ 👑 *Available Games*
-┃
-┃ 1️⃣ *Trivia*
-┃    \`.game start trivia <difficulty> <rounds>\`
-┃
-┃ 2️⃣ *Quiz*
-┃    \`.game start quiz <difficulty> <rounds>\`
-┃
-┃ 3️⃣ *Word Scramble*
-┃    \`.game start scramble <rounds>\`
-┃
-┃ 4️⃣ *Number Guess*
-┃    \`.game start guess <rounds>\`
-┃
-┃ 5️⃣ *Guess The Emoji*
-┃    \`.game start emoji <rounds>\`
-┃
-┃ 6️⃣ *Couples Challenge*
-┃    \`.game start couples <rounds>\`
-┃
-┃ 7️⃣ *Words Ending With*
-┃    \`.game start ending <rounds>\`
-┃
-┃ 8️⃣ *Words Starting With*
-┃    \`.game start starting <rounds>\`
-┃
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⚙️ *RULES*
-┃
-┃ • Minimum: *5 rounds*
-┃ • Correct answer: *+5 points*
-┃ • Trivia/Quiz: *25 seconds*
-┃ • Other games: *45 seconds*
-┃ • Only one game per group
-┃
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 💡 *Examples*
-┃
-┃ • \`.game start trivia easy 10\`
-┃ • \`.game start quiz medium 10\`
-┃ • \`.game start scramble 10\`
-┃ • \`.game start guess 10\`
-┃ • \`.game start emoji 10\`
-┃ • \`.game start couples 10\`
-┃ • \`.game start ending 10\`
-┃ • \`.game start starting 10\`
-┃
-┃ 🛑 Stop:
-┃ \`.game stop\`
-┃
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🔒 *Access:* Group Admins & Creator
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-
-            return sock.sendMessage(
-                from,
-                {
-                    text: menuText
-                },
-                {
-                    quoted: m
+            // =====================================================
+            // STOP GAME
+            // =====================================================
+            if (args[0].toLowerCase() === 'stop') {
+                if (!isGameActive(from)) {
+                    return await sock.sendMessage(from, {
+                        text: '⚪ There is no active game in this group.'
+                    });
                 }
-            );
-        }
 
-        /*
-         * ACCESS CONTROL
-         */
-        if (!isOwner && !isAdmin) {
-            return sock.sendMessage(
-                from,
-                {
+                // Only owner/admin should stop games
+                if (!isOwner) {
+                    return await sock.sendMessage(from, {
+                        text: '🚫 Only the bot owner can stop the current game.'
+                    });
+                }
+
+                await stopGame(sock, from);
+
+                return;
+            }
+
+            // =====================================================
+            // START GAME
+            // =====================================================
+            if (args[0].toLowerCase() !== 'start') {
+                return await sock.sendMessage(from, {
+                    text: '❌ Invalid game command.\n\nUse `.game` to see the available games.'
+                });
+            }
+
+            const gameType = (args[1] || '').toLowerCase();
+
+            if (!validGames.includes(gameType)) {
+                return await sock.sendMessage(from, {
                     text:
-                        '❌ *Access Denied!*\n\n' +
-                        'Only group admins and the creator can start or stop games.'
-                },
-                {
-                    quoted: m
-                }
-            );
-        }
+`❌ *INVALID GAME*
 
-        /*
-         * STOP GAME
-         */
-        if (action === 'stop') {
-            return await stopGame(
+Available games:
+
+🧠 trivia
+❓ quiz
+🔀 scramble
+🔢 guess
+😎 emoji
+💑 couples
+🔎 findemoji
+🔚 ending
+🚀 starting
+🎵 rhyme
+
+Example:
+.game start rhyme 10 ball`
+                });
+            }
+
+            // =====================================================
+            // ROUND COUNT
+            // =====================================================
+            const rounds = parseInt(args[2], 10);
+
+            if (isNaN(rounds) || rounds < 5) {
+                return await sock.sendMessage(from, {
+                    text: '❌ Please enter at least *5 rounds*.\n\nExample:\n.game start rhyme 10 ball'
+                });
+            }
+
+            // Prevent excessively large games
+            const roundsNum = Math.min(rounds, 100);
+
+            // =====================================================
+            // DIFFICULTY / EXTRA ARGUMENT
+            // =====================================================
+            let difficulty = null;
+
+            if (gameType === 'trivia' || gameType === 'quiz') {
+                const requestedDifficulty = (args[3] || '').toLowerCase();
+
+                if (
+                    requestedDifficulty &&
+                    ['easy', 'medium', 'hard'].includes(requestedDifficulty)
+                ) {
+                    difficulty = requestedDifficulty;
+                }
+            }
+
+            // =====================================================
+            // ENDING GAME
+            // =====================================================
+            if (gameType === 'ending') {
+                const ending = args[3];
+
+                if (!ending) {
+                    return await sock.sendMessage(from, {
+                        text:
+`❌ Please provide the ending letters.
+
+Example:
+.game start ending 10 er
+
+Other examples:
+.game start ending 10 st
+.game start ending 10 rp
+.game start ending 10 ing`
+                    });
+                }
+
+                difficulty = ending.toLowerCase();
+            }
+
+            // =====================================================
+            // STARTING GAME
+            // =====================================================
+            if (gameType === 'starting') {
+                const starting = args[3];
+
+                if (!starting) {
+                    return await sock.sendMessage(from, {
+                        text:
+`❌ Please provide the starting letters.
+
+Example:
+.game start starting 10 ri
+
+Other examples:
+.game start starting 10 st
+.game start starting 10 ab
+.game start starting 10 re`
+                    });
+                }
+
+                difficulty = starting.toLowerCase();
+            }
+
+            // =====================================================
+            // RHYME GAME
+            // =====================================================
+            if (gameType === 'rhyme') {
+                const rhymeWord = args[3];
+
+                if (!rhymeWord) {
+                    return await sock.sendMessage(from, {
+                        text:
+`❌ Please provide a word to rhyme with.
+
+Example:
+.game start rhyme 10 ball
+
+Other examples:
+.game start rhyme 10 car
+.game start rhyme 10 light
+.game start rhyme 10 day`
+                    });
+                }
+
+                difficulty = rhymeWord.toLowerCase();
+            }
+
+            // =====================================================
+            // EXISTING GAME CHECK
+            // =====================================================
+            if (isGameActive(from)) {
+                return await sock.sendMessage(from, {
+                    text:
+`⚠️ *A GAME IS ALREADY RUNNING!*
+
+Finish or stop the current game before starting another one.
+
+🛑 Owner:
+.game stop`
+                });
+            }
+
+            // =====================================================
+            // START
+            // =====================================================
+            return await startGame(
                 sock,
-                from
-            );
-        }
-
-        /*
-         * GROUP ONLY
-         */
-        if (!isGroup) {
-            return sock.sendMessage(
                 from,
-                {
-                    text:
-                        '❌ *Mini-games can only be played inside WhatsApp groups!*'
-                },
-                {
-                    quoted: m
-                }
-            );
-        }
-
-        /*
-         * GAME TYPE
-         */
-        const gameType =
-            args[1]
-                ? args[1].toLowerCase()
-                : '';
-
-        const validGames = [
-            'trivia',
-            'quiz',
-            'scramble',
-            'guess',
-            'emoji',
-            'couples',
-            'ending',
-            'starting'
-        ];
-
-        if (!validGames.includes(gameType)) {
-            return sock.sendMessage(
-                from,
-                {
-                    text:
-`❌ *Invalid game!*
-
-🎮 *Available Games:*
-
-1️⃣ \`trivia\`
-2️⃣ \`quiz\`
-3️⃣ \`scramble\`
-4️⃣ \`guess\`
-5️⃣ \`emoji\`
-6️⃣ \`couples\`
-7️⃣ \`ending\`
-8️⃣ \`starting\`
-
-📌 *Examples:*
-\`.game start couples 10\`
-\`.game start ending 10\`
-\`.game start starting 10\`
-
-Use \`.game\` to open the full game dashboard.`
-                },
-                {
-                    quoted: m
-                }
-            );
-        }
-
-        /*
-         * DIFFICULTY
-         *
-         * Only Trivia and Quiz use difficulty.
-         */
-        let difficulty = 'all';
-
-        let roundsIndex = 2;
-
-        if (
-            ['trivia', 'quiz'].includes(
-                gameType
-            )
-        ) {
-            const possibleDifficulty =
-                args[2]
-                    ? args[2].toLowerCase()
-                    : '';
-
-            if (
-                [
-                    'easy',
-                    'medium',
-                    'hard'
-                ].includes(
-                    possibleDifficulty
-                )
-            ) {
-                difficulty =
-                    possibleDifficulty;
-
-                roundsIndex = 3;
-            } else if (
-                ['all', 'mixed'].includes(
-                    possibleDifficulty
-                )
-            ) {
-                difficulty = 'all';
-
-                roundsIndex = 3;
-            }
-        }
-
-        /*
-         * NUMBER OF ROUNDS
-         */
-        const roundsNum =
-            parseInt(
-                args[roundsIndex],
-                10
+                gameType,
+                roundsNum,
+                difficulty
             );
 
-        if (
-            isNaN(roundsNum) ||
-            roundsNum < 5
-        ) {
-            return sock.sendMessage(
-                from,
-                {
-                    text:
-`❌ *Invalid number of rounds!*
+        } catch (error) {
+            console.error('GAME COMMAND ERROR:', error);
 
-🎯 Minimum is *5 rounds*.
-
-📌 *Examples:*
-\`.game start couples 10\`
-\`.game start emoji 10\`
-\`.game start ending 10\`
-\`.game start starting 10\`
-\`.game start trivia easy 10\``
-                },
-                {
-                    quoted: m
-                }
-            );
+            return await sock.sendMessage(from, {
+                text: '❌ Something went wrong while starting the game.'
+            });
         }
-
-        /*
-         * TRIVIA / QUIZ DIFFICULTY LIMIT
-         */
-        if (
-            roundsNum > 25 &&
-            ['trivia', 'quiz'].includes(
-                gameType
-            ) &&
-            difficulty !== 'all'
-        ) {
-            return sock.sendMessage(
-                from,
-                {
-                    text:
-                        '❌ *Maximum 25 rounds* ' +
-                        'for a single Trivia/Quiz difficulty.'
-                },
-                {
-                    quoted: m
-                }
-            );
-        }
-
-        /*
-         * START GAME
-         */
-        return await startGame(
-            sock,
-            from,
-            gameType,
-            roundsNum,
-            difficulty
-        );
     }
 };
