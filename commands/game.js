@@ -4,8 +4,6 @@ const {
     isGameActive
 } = require('../utils/gameManager');
 
-const config = require('../bot/config');
-
 const validGames = [
     'trivia',
     'quiz',
@@ -16,25 +14,24 @@ const validGames = [
     'findemoji',
     'ending',
     'starting',
-    'rhyme'
+    'rhyme',
+    'movemoji'
 ];
 
 module.exports = {
     name: 'game',
     description: 'Start and manage group games',
-    usage: '.game start <game> <rounds> [difficulty]',
+    usage: '.game start <game> <rounds> [option]',
 
     async execute(sock, m, from, args, isOwner) {
         try {
-            const sender = m.key.participant || m.key.remoteJid;
-
             // =====================================================
             // GAME DASHBOARD
             // =====================================================
             if (!args[0]) {
                 const active = isGameActive(from);
 
-                let text = `
+                const text = `
 ╭━━━ 🎮 *QUEEN VIDA GAME ZONE* 🎮 ━━━╮
 
 🔥 *AVAILABLE GAMES*
@@ -49,8 +46,10 @@ module.exports = {
 8️⃣ 🔚 Words Ending With
 9️⃣ 🚀 Words Starting With
 🔟 🎵 Rhyming Words
+1️⃣1️⃣ 🎬 Emoji Movie
 
 ━━━━━━━━━━━━━━━━━━━━
+
 📌 *HOW TO PLAY*
 
 .game start <game> <rounds>
@@ -67,13 +66,17 @@ Examples:
 .game start ending 10 er
 .game start starting 10 ri
 .game start rhyme 10 ball
+.game start movemoji 10
 
 ━━━━━━━━━━━━━━━━━━━━
 
-🛑 Stop current game:
+🛑 *STOP GAME*
+
 .game stop
 
-${active ? '🟢 *A GAME IS CURRENTLY ACTIVE!*' : '⚪ No game is currently active.'}
+${active
+    ? '🟢 *A GAME IS CURRENTLY ACTIVE!*'
+    : '⚪ No game is currently active.'}
 
 ╰━━━━━━━━━━━━━━━━━━━━╯
 `;
@@ -91,7 +94,6 @@ ${active ? '🟢 *A GAME IS CURRENTLY ACTIVE!*' : '⚪ No game is currently acti
                     });
                 }
 
-                // Only owner/admin should stop games
                 if (!isOwner) {
                     return await sock.sendMessage(from, {
                         text: '🚫 Only the bot owner can stop the current game.'
@@ -99,7 +101,6 @@ ${active ? '🟢 *A GAME IS CURRENTLY ACTIVE!*' : '⚪ No game is currently acti
                 }
 
                 await stopGame(sock, from);
-
                 return;
             }
 
@@ -114,6 +115,9 @@ ${active ? '🟢 *A GAME IS CURRENTLY ACTIVE!*' : '⚪ No game is currently acti
 
             const gameType = (args[1] || '').toLowerCase();
 
+            // =====================================================
+            // VALIDATE GAME
+            // =====================================================
             if (!validGames.includes(gameType)) {
                 return await sock.sendMessage(from, {
                     text:
@@ -131,9 +135,11 @@ Available games:
 🔚 ending
 🚀 starting
 🎵 rhyme
+🎬 movemoji
 
 Example:
-.game start rhyme 10 ball`
+
+.game start movemoji 10`
                 });
             }
 
@@ -144,15 +150,19 @@ Example:
 
             if (isNaN(rounds) || rounds < 5) {
                 return await sock.sendMessage(from, {
-                    text: '❌ Please enter at least *5 rounds*.\n\nExample:\n.game start rhyme 10 ball'
+                    text:
+`❌ Please enter at least *5 rounds*.
+
+Example:
+
+.game start movemoji 10`
                 });
             }
 
-            // Prevent excessively large games
             const roundsNum = Math.min(rounds, 100);
 
             // =====================================================
-            // DIFFICULTY / EXTRA ARGUMENT
+            // DIFFICULTY
             // =====================================================
             let difficulty = null;
 
@@ -179,9 +189,11 @@ Example:
 `❌ Please provide the ending letters.
 
 Example:
+
 .game start ending 10 er
 
 Other examples:
+
 .game start ending 10 st
 .game start ending 10 rp
 .game start ending 10 ing`
@@ -203,9 +215,11 @@ Other examples:
 `❌ Please provide the starting letters.
 
 Example:
+
 .game start starting 10 ri
 
 Other examples:
+
 .game start starting 10 st
 .game start starting 10 ab
 .game start starting 10 re`
@@ -227,9 +241,11 @@ Other examples:
 `❌ Please provide a word to rhyme with.
 
 Example:
+
 .game start rhyme 10 ball
 
 Other examples:
+
 .game start rhyme 10 car
 .game start rhyme 10 light
 .game start rhyme 10 day`
@@ -240,7 +256,14 @@ Other examples:
             }
 
             // =====================================================
-            // EXISTING GAME CHECK
+            // EMOJI MOVIE
+            // =====================================================
+            if (gameType === 'movemoji') {
+                difficulty = null;
+            }
+
+            // =====================================================
+            // CHECK ACTIVE GAME
             // =====================================================
             if (isGameActive(from)) {
                 return await sock.sendMessage(from, {
@@ -250,12 +273,13 @@ Other examples:
 Finish or stop the current game before starting another one.
 
 🛑 Owner:
+
 .game stop`
                 });
             }
 
             // =====================================================
-            // START
+            // START GAME
             // =====================================================
             return await startGame(
                 sock,
