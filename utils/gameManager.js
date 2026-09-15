@@ -6,7 +6,7 @@ const activeGames = {}; // { groupJid: sessionData }
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [array[j], array[i]] = [array[i], array[j]];
     }
     return array;
 }
@@ -110,6 +110,42 @@ function checkStartingWords(text, starting) {
     return validWords.length >= 3;
 }
 
+/*
+ * Check Rhyming Words.
+ *
+ * Player must provide at least 3 different words
+ * that are listed as valid rhymes for the target word.
+ */
+function checkRhymeWords(text, qData) {
+    const words = extractWords(text);
+
+    if (words.length < 3) {
+        return false;
+    }
+
+    const uniqueWords = [...new Set(words)];
+
+    if (uniqueWords.length < 3) {
+        return false;
+    }
+
+    const validRhymes = Array.isArray(qData.rhymes)
+        ? qData.rhymes.map(word =>
+              String(word).toLowerCase().trim()
+          )
+        : [];
+
+    const targetWord =
+        String(qData.word || '').toLowerCase().trim();
+
+    const validWords = uniqueWords.filter(word =>
+        validRhymes.includes(word) &&
+        word !== targetWord
+    );
+
+    return validWords.length >= 3;
+}
+
 async function startGame(
     sock,
     from,
@@ -185,7 +221,8 @@ async function startGame(
         emoji: '😂 GUESS THE EMOJI',
         couples: '💑 COUPLES CHALLENGE',
         ending: '🔚 WORDS ENDING WITH',
-        starting: '🔤 WORDS STARTING WITH'
+        starting: '🔤 WORDS STARTING WITH',
+        rhyme: '🎵 RHYMING WORDS'
     };
 
     const gameTitle =
@@ -427,6 +464,28 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
+    /*
+     * RHYMING WORDS
+     */
+    else if (session.gameType === 'rhyme') {
+        roundText =
+`┏━━━ 🎵 *RHYMING WORDS* 🎵 ━━━┓
+┃ 🔥 *Round ${session.currentRound}/${session.rounds}*
+┃
+┃ 🎯 *Target Word:* \`${qData.word}\`
+┃
+┃ 📝 Give *3 different words*
+┃ that rhyme with *${qData.word}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 Example format:
+┃ word1 word2 word3
+┃
+┃ 🏆 *First correct player gets +5 points!*
+┃ ⏱️ *Time:* 45s
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
     await session.sock.sendMessage(from, {
         text: roundText
     });
@@ -434,7 +493,7 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
     session.timer = setTimeout(() => {
         if (
             !activeGames[from] ||
-            activeGames[from].answeredThisRound
+            session.answeredThisRound
         ) {
             return;
         }
@@ -482,6 +541,17 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
             timeOutText +=
                 `📌 *Required beginning:* \`${qData.starting}\`\n` +
                 `📝 *You needed 3 different words starting with it.*`;
+        }
+
+        else if (session.gameType === 'rhyme') {
+            const rhymeList =
+                Array.isArray(qData.rhymes)
+                    ? qData.rhymes.slice(0, 8).join(', ')
+                    : '';
+
+            timeOutText +=
+                `📌 *Target Word:* \`${qData.word}\`\n` +
+                `🎵 *Possible rhymes:* ${rhymeList}`;
         }
 
         session.sock.sendMessage(from, {
@@ -628,9 +698,6 @@ async function handleGameMessage(
 
     /*
      * COUPLES CHALLENGE
-     *
-     * Any meaningful response counts as
-     * a participation/vote.
      */
     else if (
         session.gameType === 'couples'
@@ -668,6 +735,22 @@ async function handleGameMessage(
             checkStartingWords(
                 cleanText,
                 q.starting
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+    /*
+     * RHYMING WORDS
+     */
+    else if (
+        session.gameType === 'rhyme'
+    ) {
+        if (
+            checkRhymeWords(
+                cleanText,
+                q
             )
         ) {
             isCorrect = true;
@@ -769,6 +852,31 @@ async function handleGameMessage(
 👑 @${sender.replace(/[^0-9]/g, '')} gave 3 valid words!
 
 📝 *Starting:* \`${q.starting}\`
+
+💎 *+5 Points*
+
+🏆 *Current Scores:*`;
+
+            sortedScores.forEach(
+                ([user, pts], index) => {
+                    winAnnouncement +=
+                        `\n${index + 1}. @${user.replace(
+                            /[^0-9]/g,
+                            ''
+                        )} — *${pts} pts*`;
+                }
+            );
+        }
+
+        if (
+            session.gameType === 'rhyme'
+        ) {
+            winAnnouncement =
+`🔥 *CORRECT!*
+
+👑 @${sender.replace(/[^0-9]/g, '')} gave 3 valid rhyming words!
+
+🎯 *Target:* \`${q.word}\`
 
 💎 *+5 Points*
 
