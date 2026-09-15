@@ -15,285 +15,174 @@ const validGames = [
     'ending',
     'starting',
     'rhyme',
-    'movemoji'
+    'movemoji',
+    '2truth1lie'
 ];
 
 module.exports = {
     name: 'game',
+    aliases: ['games'],
     description: 'Start and manage group games',
-    usage: '.game start <game> <rounds> [option]',
+    usage: '.game start <game> <rounds> [difficulty/argument]',
 
     async execute(sock, m, from, args, isOwner) {
         try {
-            // =====================================================
+            const action = (args[0] || '').toLowerCase();
+
+            // =========================
             // GAME DASHBOARD
-            // =====================================================
-            if (!args[0]) {
-                const active = isGameActive(from);
-
-                const text = `
-╭━━━ 🎮 *QUEEN VIDA GAME ZONE* 🎮 ━━━╮
-
-🔥 *AVAILABLE GAMES*
-
-1️⃣ 🧠 Trivia
-2️⃣ ❓ Quiz
-3️⃣ 🔀 Scramble
-4️⃣ 🔢 Number Guess
-5️⃣ 😎 Guess the Emoji
-6️⃣ 💑 Couples Challenge
-7️⃣ 🔎 Find the Emoji
-8️⃣ 🔚 Words Ending With
-9️⃣ 🚀 Words Starting With
-🔟 🎵 Rhyming Words
-1️⃣1️⃣ 🎬 Emoji Movie
-
-━━━━━━━━━━━━━━━━━━━━
-
-📌 *HOW TO PLAY*
-
-.game start <game> <rounds>
-
-Examples:
-
-.game start trivia 10
-.game start quiz 10
-.game start scramble 10
-.game start guess 10
-.game start emoji 10
-.game start couples 10
-.game start findemoji 10
-.game start ending 10 er
-.game start starting 10 ri
-.game start rhyme 10 ball
-.game start movemoji 10
-
-━━━━━━━━━━━━━━━━━━━━
-
-🛑 *STOP GAME*
-
-.game stop
-
-${active
-    ? '🟢 *A GAME IS CURRENTLY ACTIVE!*'
-    : '⚪ No game is currently active.'}
-
-╰━━━━━━━━━━━━━━━━━━━━╯
-`;
-
-                return await sock.sendMessage(from, { text });
+            // =========================
+            if (!action || action === 'list' || action === 'help') {
+                return await sock.sendMessage(from, {
+                    text:
+                        `🎮 *QUEEN VIDA GAME CENTER* 🎮\n\n` +
+                        `Available games:\n\n` +
+                        `🧠 trivia\n` +
+                        `❓ quiz\n` +
+                        `🔤 scramble\n` +
+                        `🔢 guess\n` +
+                        `🤯 emoji\n` +
+                        `❤️ couples\n` +
+                        `🔎 findemoji\n` +
+                        `🔚 ending\n` +
+                        `🔤 starting\n` +
+                        `🎵 rhyme\n` +
+                        `🎬 movemoji\n` +
+                        `🕵️ 2truth1lie\n\n` +
+                        `━━━━━━━━━━━━━━\n` +
+                        `▶️ *Start a game:*\n` +
+                        `.game start <game> <rounds>\n\n` +
+                        `Example:\n` +
+                        `.game start 2truth1lie 10\n\n` +
+                        `🛑 *Stop current game:*\n` +
+                        `.game stop`
+                });
             }
 
-            // =====================================================
+            // =========================
             // STOP GAME
-            // =====================================================
-            if (args[0].toLowerCase() === 'stop') {
-                if (!isGameActive(from)) {
-                    return await sock.sendMessage(from, {
-                        text: '⚪ There is no active game in this group.'
-                    });
-                }
-
-                if (!isOwner) {
-                    return await sock.sendMessage(from, {
-                        text: '🚫 Only the bot owner can stop the current game.'
-                    });
-                }
-
-                await stopGame(sock, from);
-                return;
+            // =========================
+            if (action === 'stop') {
+                return await stopGame(sock, from);
             }
 
-            // =====================================================
+            // =========================
             // START GAME
-            // =====================================================
-            if (args[0].toLowerCase() !== 'start') {
-                return await sock.sendMessage(from, {
-                    text: '❌ Invalid game command.\n\nUse `.game` to see the available games.'
-                });
-            }
-
-            const gameType = (args[1] || '').toLowerCase();
-
-            // =====================================================
-            // VALIDATE GAME
-            // =====================================================
-            if (!validGames.includes(gameType)) {
+            // =========================
+            if (action !== 'start') {
                 return await sock.sendMessage(from, {
                     text:
-`❌ *INVALID GAME*
-
-Available games:
-
-🧠 trivia
-❓ quiz
-🔀 scramble
-🔢 guess
-😎 emoji
-💑 couples
-🔎 findemoji
-🔚 ending
-🚀 starting
-🎵 rhyme
-🎬 movemoji
-
-Example:
-
-.game start movemoji 10`
+                        `❌ Invalid game command.\n\n` +
+                        `Use *.game list* to see available games.`
                 });
             }
 
-            // =====================================================
-            // ROUND COUNT
-            // =====================================================
-            const rounds = parseInt(args[2], 10);
+            const game = (args[1] || '').toLowerCase();
 
-            if (isNaN(rounds) || rounds < 5) {
+            if (!validGames.includes(game)) {
                 return await sock.sendMessage(from, {
                     text:
-`❌ Please enter at least *5 rounds*.
-
-Example:
-
-.game start movemoji 10`
+                        `❌ Unknown game: *${game || 'none'}*\n\n` +
+                        `Available games:\n` +
+                        validGames.map(g => `• ${g}`).join('\n')
                 });
             }
 
-            const roundsNum = Math.min(rounds, 100);
+            if (isGameActive(from)) {
+                return await sock.sendMessage(from, {
+                    text:
+                        `⚠️ A game is already running in this group!\n\n` +
+                        `🛑 Use *.game stop* to stop it first.`
+                });
+            }
 
-            // =====================================================
-            // DIFFICULTY
-            // =====================================================
+            let rounds = parseInt(args[2], 10);
+
+            if (Number.isNaN(rounds)) {
+                rounds = 10;
+            }
+
+            if (rounds < 5) {
+                return await sock.sendMessage(from, {
+                    text: `⚠️ Minimum number of rounds is *5*.`
+                });
+            }
+
+            if (rounds > 100) {
+                rounds = 100;
+            }
+
             let difficulty = null;
+            let customArg = null;
 
-            if (gameType === 'trivia' || gameType === 'quiz') {
+            // Trivia / Quiz difficulty
+            if (game === 'trivia' || game === 'quiz') {
                 const requestedDifficulty = (args[3] || '').toLowerCase();
 
-                if (
-                    requestedDifficulty &&
-                    ['easy', 'medium', 'hard'].includes(requestedDifficulty)
-                ) {
+                if (['easy', 'medium', 'hard'].includes(requestedDifficulty)) {
                     difficulty = requestedDifficulty;
                 }
             }
 
-            // =====================================================
-            // ENDING GAME
-            // =====================================================
-            if (gameType === 'ending') {
-                const ending = args[3];
+            // Words ending
+            if (game === 'ending') {
+                customArg = args[3] || null;
 
-                if (!ending) {
+                if (!customArg) {
                     return await sock.sendMessage(from, {
                         text:
-`❌ Please provide the ending letters.
-
-Example:
-
-.game start ending 10 er
-
-Other examples:
-
-.game start ending 10 st
-.game start ending 10 rp
-.game start ending 10 ing`
+                            `❌ You need to specify the ending.\n\n` +
+                            `Example:\n` +
+                            `*.game start ending 10 er*`
                     });
                 }
-
-                difficulty = ending.toLowerCase();
             }
 
-            // =====================================================
-            // STARTING GAME
-            // =====================================================
-            if (gameType === 'starting') {
-                const starting = args[3];
+            // Words starting
+            if (game === 'starting') {
+                customArg = args[3] || null;
 
-                if (!starting) {
+                if (!customArg) {
                     return await sock.sendMessage(from, {
                         text:
-`❌ Please provide the starting letters.
-
-Example:
-
-.game start starting 10 ri
-
-Other examples:
-
-.game start starting 10 st
-.game start starting 10 ab
-.game start starting 10 re`
+                            `❌ You need to specify the starting letters.\n\n` +
+                            `Example:\n` +
+                            `*.game start starting 10 ri*`
                     });
                 }
-
-                difficulty = starting.toLowerCase();
             }
 
-            // =====================================================
-            // RHYME GAME
-            // =====================================================
-            if (gameType === 'rhyme') {
-                const rhymeWord = args[3];
-
-                if (!rhymeWord) {
-                    return await sock.sendMessage(from, {
-                        text:
-`❌ Please provide a word to rhyme with.
-
-Example:
-
-.game start rhyme 10 ball
-
-Other examples:
-
-.game start rhyme 10 car
-.game start rhyme 10 light
-.game start rhyme 10 day`
-                    });
-                }
-
-                difficulty = rhymeWord.toLowerCase();
+            // Rhyming words
+            if (game === 'rhyme') {
+                customArg = args[3] || null;
             }
 
-            // =====================================================
-            // EMOJI MOVIE
-            // =====================================================
-            if (gameType === 'movemoji') {
+            // Emoji Movie
+            if (game === 'movemoji') {
                 difficulty = null;
             }
 
-            // =====================================================
-            // CHECK ACTIVE GAME
-            // =====================================================
-            if (isGameActive(from)) {
-                return await sock.sendMessage(from, {
-                    text:
-`⚠️ *A GAME IS ALREADY RUNNING!*
-
-Finish or stop the current game before starting another one.
-
-🛑 Owner:
-
-.game stop`
-                });
+            // 2 Truths 1 Lie
+            if (game === '2truth1lie') {
+                difficulty = null;
             }
 
-            // =====================================================
-            // START GAME
-            // =====================================================
-            return await startGame(
+            await startGame(
                 sock,
                 from,
-                gameType,
-                roundsNum,
-                difficulty
+                game,
+                rounds,
+                difficulty,
+                customArg
             );
 
         } catch (error) {
-            console.error('GAME COMMAND ERROR:', error);
+            console.error('❌ Game command error:', error);
 
-            return await sock.sendMessage(from, {
-                text: '❌ Something went wrong while starting the game.'
+            await sock.sendMessage(from, {
+                text:
+                    `❌ Something went wrong while starting the game.\n\n` +
+                    `Please try again.`
             });
         }
     }
