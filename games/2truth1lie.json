@@ -1,0 +1,1066 @@
+[
+  {
+    "statements": [
+      "I have never broken a bone.",
+      "I can swim.",
+      "I have been to Antarctica."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten pizza before.",
+      "I can ride a bicycle.",
+      "I have climbed Mount Everest."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have stayed awake all night before.",
+      "I have lost my phone before.",
+      "I have never used a smartphone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I like chocolate.",
+      "I have watched a movie this month.",
+      "I have never seen the ocean."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I can cook at least one meal.",
+      "I have forgotten someone's birthday before.",
+      "I have met a famous astronaut."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have laughed until my stomach hurt.",
+      "I have fallen asleep while watching a movie.",
+      "I have never laughed at a joke."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have owned a pet.",
+      "I have eaten ice cream.",
+      "I have never seen a dog."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have sent a message to the wrong person.",
+      "I have forgotten a password.",
+      "I have never used social media."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have worn mismatched socks.",
+      "I have danced when nobody was watching.",
+      "I have never worn shoes."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched a sunrise.",
+      "I have taken a selfie.",
+      "I have never seen the moon."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten noodles.",
+      "I have missed a bus before.",
+      "I have never traveled by road."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have stayed in a hotel.",
+      "I have ordered food online.",
+      "I have never entered a restaurant."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played football.",
+      "I have watched a football match.",
+      "I have never heard of football."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have sung in the shower.",
+      "I have danced at a party.",
+      "I have never listened to music."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten someone's name.",
+      "I have accidentally called someone by the wrong name.",
+      "I have never forgotten anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a long walk.",
+      "I have gotten lost somewhere.",
+      "I have never left my house."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten rice.",
+      "I have eaten plantain.",
+      "I have never eaten any African food."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used a computer.",
+      "I have played a video game.",
+      "I have never touched a keyboard."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a picture of food.",
+      "I have posted a picture online.",
+      "I have never taken a picture."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have been embarrassed in public.",
+      "I have laughed at the wrong moment.",
+      "I have never felt embarrassed."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have had a nickname.",
+      "Someone has called me by the wrong name.",
+      "I have never had a name."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched a horror movie.",
+      "I have been scared by a movie.",
+      "I have never watched television."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten where I parked.",
+      "I have searched for something I was already holding.",
+      "I have never misplaced anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have stayed up past midnight.",
+      "I have slept during the day.",
+      "I have never slept."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have received a surprise.",
+      "I have surprised someone.",
+      "I have never celebrated anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played cards.",
+      "I have played a board game.",
+      "I have never played any game."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten cake.",
+      "I have blown out birthday candles.",
+      "I have never had a birthday."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have been caught singing alone.",
+      "I have danced alone.",
+      "I have never been alone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have had a favorite song.",
+      "I have replayed a song many times.",
+      "I have never listened to a full song."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have borrowed someone's charger.",
+      "I have forgotten to return something.",
+      "I have never charged a phone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used headphones.",
+      "I have listened to music while walking.",
+      "I have never heard music through headphones."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have made a silly mistake.",
+      "I have laughed at myself.",
+      "I have never made a mistake."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten breakfast late.",
+      "I have skipped breakfast.",
+      "I have never eaten breakfast."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have cooked with an oven.",
+      "I have cooked with a frying pan.",
+      "I have never seen a kitchen."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have received a gift I did not expect.",
+      "I have given someone a gift.",
+      "I have never received anything as a gift."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched cartoons.",
+      "I have had a favorite cartoon character.",
+      "I have never watched animation."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used a bicycle.",
+      "I have ridden in a car.",
+      "I have never used transportation."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have been late for something.",
+      "I have waited for someone who was late.",
+      "I have never waited for anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a nap.",
+      "I have fallen asleep during a conversation.",
+      "I have never slept during the day."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have visited a market.",
+      "I have bought something from a street vendor.",
+      "I have never bought anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used an umbrella.",
+      "I have walked in the rain.",
+      "I have never seen rain."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched the stars at night.",
+      "I have made a wish while looking at the sky.",
+      "I have never looked at the sky."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten popcorn.",
+      "I have eaten snacks while watching a movie.",
+      "I have never eaten popcorn."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have visited a beach.",
+      "I have played in sand.",
+      "I have never seen sand."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used a fan.",
+      "I have slept in an air-conditioned room.",
+      "I have never felt cold."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have received a phone call at midnight.",
+      "I have called someone very late.",
+      "I have never made a phone call."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have deleted a message after sending it.",
+      "I have regretted sending a message.",
+      "I have never sent a message."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have muted a group chat.",
+      "I have ignored a message intentionally.",
+      "I have never been in a group chat."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used a voice note.",
+      "I have accidentally sent a voice note.",
+      "I have never recorded my voice."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a screenshot.",
+      "I have accidentally taken a screenshot.",
+      "I have never used a phone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten my phone somewhere.",
+      "I have searched for my phone while holding it.",
+      "I have never owned a phone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have used dark mode.",
+      "I have changed my phone wallpaper.",
+      "I have never changed a phone setting."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched a livestream.",
+      "I have joined an online community.",
+      "I have never used the internet."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have searched for something online.",
+      "I have watched a video online.",
+      "I have never connected to the internet."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten my PIN before.",
+      "I have changed a password before.",
+      "I have never used a password."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have accidentally sent a message to the wrong chat.",
+      "I have deleted a chat by mistake.",
+      "I have never sent a message to anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a group photo.",
+      "I have been in a group photo.",
+      "I have never been photographed."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have laughed at a meme.",
+      "I have shared a meme.",
+      "I have never seen a meme."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have sent an emoji instead of words.",
+      "I have used too many emojis in one message.",
+      "I have never used an emoji."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have accidentally reacted to a message.",
+      "I have removed a reaction.",
+      "I have never reacted to anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have joined a video call.",
+      "I have forgotten to mute myself.",
+      "I have never used video calling."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have fallen asleep on a call.",
+      "I have ended a call accidentally.",
+      "I have never made a call."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have sent a message and immediately regretted it.",
+      "I have stared at a message before replying.",
+      "I have never regretted a message."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have checked someone's profile more than once.",
+      "I have read a message without replying.",
+      "I have never checked a profile."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have been left on read.",
+      "I have left someone on read.",
+      "I have never sent a message."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have accidentally liked something.",
+      "I have unliked something immediately.",
+      "I have never used a social app."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have changed my profile picture.",
+      "I have changed my username.",
+      "I have never had an online profile."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have joined a group because of a friend.",
+      "I have left a group before.",
+      "I have never joined an online group."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten why I opened an app.",
+      "I have opened an app without knowing why.",
+      "I have never forgotten anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched the same movie twice.",
+      "I have rewatched a favorite show.",
+      "I have never watched anything twice."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have cried during a movie.",
+      "I have laughed during a serious movie.",
+      "I have never had an emotional reaction to a movie."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have guessed a movie ending correctly.",
+      "I have spoiled a movie accidentally.",
+      "I have never watched a movie."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched a comedy.",
+      "I have watched an action movie.",
+      "I have never watched a movie genre."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have listened to music before sleeping.",
+      "I have fallen asleep with music playing.",
+      "I have never listened to music."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have learned a song by heart.",
+      "I have forgotten the lyrics to a song.",
+      "I have never heard a song."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have danced to a song I liked.",
+      "I have replayed a song because of one line.",
+      "I have never danced."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have sung in front of someone.",
+      "I have sung when I thought nobody could hear me.",
+      "I have never made a sound while singing."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten the name of a song.",
+      "I have searched for a song using its lyrics.",
+      "I have never searched for music."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played a musical instrument.",
+      "I have tried to learn an instrument.",
+      "I have never heard an instrument."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played a mobile game.",
+      "I have lost a game because of one mistake.",
+      "I have never played a game."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played a racing game.",
+      "I have played a football game.",
+      "I have never touched a game controller."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have rage-quit a game.",
+      "I have celebrated winning a game.",
+      "I have never lost a game."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have played a game with friends.",
+      "I have played a game alone.",
+      "I have never played a game with anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have cheated in a friendly game.",
+      "I have accused someone of cheating.",
+      "I have never played competitively."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have won a competition.",
+      "I have lost a competition.",
+      "I have never competed in anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have received a compliment.",
+      "I have given someone a compliment.",
+      "I have never complimented anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have made a new friend online.",
+      "I have met an online friend in person.",
+      "I have never talked to anyone online."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have helped a stranger.",
+      "A stranger has helped me.",
+      "I have never interacted with a stranger."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have given someone advice.",
+      "I have ignored someone's advice.",
+      "I have never received advice."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have apologized when I was wrong.",
+      "Someone has apologized to me.",
+      "I have never been wrong."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have kept a secret.",
+      "Someone has trusted me with a secret.",
+      "I have never heard a secret."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have told a harmless lie.",
+      "Someone has lied to me.",
+      "I have never told a lie."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have changed my mind about someone.",
+      "Someone has changed their mind about me.",
+      "I have never changed my opinion."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgiven someone.",
+      "I have asked someone for forgiveness.",
+      "I have never forgiven anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have made a promise.",
+      "I have broken a promise.",
+      "I have never made a promise."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten an important date.",
+      "I have remembered a date at the last minute.",
+      "I have never forgotten a date."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have had a crush.",
+      "I have been nervous around someone I liked.",
+      "I have never liked anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have received a romantic message.",
+      "I have sent a romantic message.",
+      "I have never received a message."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have smiled at my phone because of a message.",
+      "I have waited for someone's reply.",
+      "I have never waited for a message."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have had a funny nickname.",
+      "A friend has embarrassed me in public.",
+      "I have never had friends."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have laughed during an awkward moment.",
+      "I have been in an awkward conversation.",
+      "I have never experienced an awkward moment."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have walked into the wrong room.",
+      "I have forgotten someone's face.",
+      "I have never made an awkward mistake."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have waved at someone who was not waving at me.",
+      "I have called someone by the wrong name.",
+      "I have never embarrassed myself."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have tripped in public.",
+      "I have laughed after falling.",
+      "I have never fallen down."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have spilled a drink.",
+      "I have dropped food.",
+      "I have never dropped anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have broken something accidentally.",
+      "I have tried to hide a mistake.",
+      "I have never broken anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten where I put my keys.",
+      "I have looked for something that was right in front of me.",
+      "I have never lost anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten someone's birthday.",
+      "I have remembered a birthday at the last minute.",
+      "I have never celebrated a birthday."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten food past midnight.",
+      "I have ordered food late at night.",
+      "I have never eaten after dinner."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten spicy food.",
+      "I have regretted eating something spicy.",
+      "I have never tasted spicy food."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten food I did not like.",
+      "I have pretended to like someone's cooking.",
+      "I have never disliked any food."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have eaten food with my hands.",
+      "I have eaten food with chopsticks.",
+      "I have never used my hands to eat."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have tasted something extremely sour.",
+      "I have made a funny face because of food.",
+      "I have never tasted sour food."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have drunk something too quickly.",
+      "I have accidentally spilled a drink.",
+      "I have never drunk anything."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have cooked for someone else.",
+      "Someone has cooked for me.",
+      "I have never eaten food cooked by anyone."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have gone shopping without buying anything.",
+      "I have bought something I did not plan to buy.",
+      "I have never gone shopping."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have forgotten my shopping list.",
+      "I have bought the wrong item.",
+      "I have never made a purchase."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have traveled to another city.",
+      "I have traveled by airplane.",
+      "I have never left my neighborhood."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have missed a flight or bus.",
+      "I have arrived somewhere very early.",
+      "I have never traveled anywhere."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have packed too much for a trip.",
+      "I have forgotten something important while traveling.",
+      "I have never packed a bag."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have taken a road trip.",
+      "I have slept during a journey.",
+      "I have never traveled by road."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have visited a place twice in one year.",
+      "I have taken pictures while traveling.",
+      "I have never visited another place."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have watched clouds for fun.",
+      "I have watched rain from a window.",
+      "I have never looked at clouds."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have seen a rainbow.",
+      "I have taken a picture of a rainbow.",
+      "I have never seen the sky."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have seen a shooting star.",
+      "I have made a wish at night.",
+      "I have never looked at stars."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have touched snow.",
+      "I have seen snow in a video.",
+      "I have never heard of snow."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have seen a very large waterfall.",
+      "I have stood near a river.",
+      "I have never seen water."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have seen a mountain.",
+      "I have taken a picture of a hill.",
+      "I have never seen land."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have planted something.",
+      "I have watered a plant.",
+      "I have never seen a plant."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have held a flower.",
+      "I have smelled a flower.",
+      "I have never seen a flower."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have seen a butterfly.",
+      "I have watched a bird fly.",
+      "I have never seen an animal."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have fed an animal.",
+      "I have been scared by an animal.",
+      "I have never been near an animal."
+    ],
+    "lie": 3
+  },
+  {
+    "statements": [
+      "I have held a cat.",
+      "I have seen a dog.",
+      "I have never seen a cat."
+    ],
+    "lie": 3
+  }
+    ]
