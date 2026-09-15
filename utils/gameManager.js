@@ -1,7 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 
-const activeGames = {}; // { groupJid: sessionData }
+const activeGames = {};
+
+
+// ============================================================
+// VALID GAMES
+// ============================================================
+
+const VALID_GAMES = [
+    'trivia',
+    'quiz',
+    'scramble',
+    'guess',
+    'emoji',
+    'couples',
+    'findemoji',
+    'ending',
+    'starting',
+    'rhyme',
+    'movemoji',
+    '2truth1lie',
+    'lyrics',
+    'taboo',
+    'memewar'
+];
 
 
 // ============================================================
@@ -11,6 +34,7 @@ const activeGames = {}; // { groupJid: sessionData }
 function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
+
         [array[i], array[j]] = [array[j], array[i]];
     }
 
@@ -19,7 +43,18 @@ function shuffle(array) {
 
 
 // ============================================================
-// LOAD GAME QUESTIONS
+// NORMALIZE JID
+// ============================================================
+
+function normalizeJid(jid) {
+    return String(jid || '')
+        .split(':')[0]
+        .trim();
+}
+
+
+// ============================================================
+// LOAD QUESTIONS
 // ============================================================
 
 function loadQuestions(gameType, difficulty = 'all') {
@@ -48,10 +83,9 @@ function loadQuestions(gameType, difficulty = 'all') {
             return questions;
         }
 
-        return questions.filter(
-            q =>
-                String(q.difficulty || '')
-                    .toLowerCase() === difficulty.toLowerCase()
+        return questions.filter(q =>
+            String(q.difficulty || '')
+                .toLowerCase() === difficulty.toLowerCase()
         );
 
     } catch (error) {
@@ -79,7 +113,17 @@ function normalizeText(text) {
 
 
 // ============================================================
-// GET GAME TITLE
+// DISPLAY NAME
+// ============================================================
+
+function mentionNumber(jid) {
+    return normalizeJid(jid)
+        .replace(/[^0-9]/g, '');
+}
+
+
+// ============================================================
+// GAME TITLE
 // ============================================================
 
 function getGameTitle(gameType) {
@@ -101,7 +145,66 @@ function getGameTitle(gameType) {
         memewar: '😂 MEME WAR'
     };
 
-    return titles[gameType] || gameType.toUpperCase();
+    return titles[gameType] || String(gameType).toUpperCase();
+}
+
+
+// ============================================================
+// GET GROUP PARTICIPANTS
+// ============================================================
+
+async function getGroupPlayers(sock, from) {
+    try {
+        if (!String(from).endsWith('@g.us')) {
+            return [];
+        }
+
+        const metadata = await sock.groupMetadata(from);
+
+        if (!metadata || !Array.isArray(metadata.participants)) {
+            return [];
+        }
+
+        const botJid = normalizeJid(sock.user?.id);
+
+        return metadata.participants
+            .map(p => p.id)
+            .filter(Boolean)
+            .filter(jid => normalizeJid(jid) !== botJid);
+
+    } catch (error) {
+        console.error('❌ Could not get group participants:', error);
+        return [];
+    }
+}
+
+
+// ============================================================
+// CHOOSE TABOO DESCRIBER
+// ============================================================
+
+async function chooseTabooDescriber(sock, from, previous = null) {
+    const players = await getGroupPlayers(sock, from);
+
+    if (!players.length) {
+        return null;
+    }
+
+    let available = players;
+
+    if (players.length > 1 && previous) {
+        available = players.filter(
+            jid => normalizeJid(jid) !== normalizeJid(previous)
+        );
+    }
+
+    if (!available.length) {
+        available = players;
+    }
+
+    return available[
+        Math.floor(Math.random() * available.length)
+    ];
 }
 
 
@@ -117,6 +220,17 @@ async function startGame(
     difficulty = 'all',
     customArg = null
 ) {
+    gameType = String(gameType || '').toLowerCase();
+
+    if (!VALID_GAMES.includes(gameType)) {
+        await sock.sendMessage(from, {
+            text:
+                `❌ *Invalid game!*\n\n` +
+                `Use `.game list` to see all available games.`
+        });
+
+        return;
+    }
 
     if (activeGames[from]) {
         await sock.sendMessage(from, {
@@ -128,6 +242,18 @@ async function startGame(
         return;
     }
 
+    // Taboo requires a group because players need to participate.
+    if (
+        gameType === 'taboo' &&
+        !String(from).endsWith('@g.us')
+    ) {
+        await sock.sendMessage(from, {
+            text:
+                '❌ *Taboo can only be played inside a group.*'
+        });
+
+        return;
+    }
 
     const validDifficulty = [
         'easy',
@@ -138,48 +264,41 @@ async function startGame(
         ? String(difficulty).toLowerCase()
         : 'all';
 
-
     let allQuestions = loadQuestions(
         gameType,
         validDifficulty
     );
 
-
     // --------------------------------------------------------
-    // CUSTOM WORD FOR ENDING / STARTING / RHYME
+    // CUSTOM WORD
     // --------------------------------------------------------
 
     if (
         ['ending', 'starting', 'rhyme'].includes(gameType) &&
         customArg
     ) {
-
         const custom = normalizeText(customArg);
 
         if (gameType === 'ending') {
             allQuestions = allQuestions.filter(
-                q =>
-                    normalizeText(q.ending) === custom
+                q => normalizeText(q.ending) === custom
             );
         }
 
         if (gameType === 'starting') {
             allQuestions = allQuestions.filter(
-                q =>
-                    normalizeText(q.starting) === custom
+                q => normalizeText(q.starting) === custom
             );
         }
 
         if (gameType === 'rhyme') {
             allQuestions = allQuestions.filter(
-                q =>
-                    normalizeText(q.word) === custom
+                q => normalizeText(q.word) === custom
             );
         }
     }
 
-
-    if (allQuestions.length === 0) {
+    if (!allQuestions.length) {
         await sock.sendMessage(from, {
             text:
                 `❌ *No questions found!*\n\n` +
@@ -189,7 +308,6 @@ async function startGame(
 
         return;
     }
-
 
     let rounds = parseInt(totalRounds, 10);
 
@@ -202,11 +320,9 @@ async function startGame(
         Math.min(rounds, allQuestions.length)
     );
 
-
     const sessionQuestions = shuffle([
         ...allQuestions
     ]).slice(0, rounds);
-
 
     activeGames[from] = {
         gameType,
@@ -219,15 +335,17 @@ async function startGame(
         activeQuestion: null,
         timer: null,
         answeredThisRound: false,
-        sock
-    };
+        sock,
 
+        // Taboo
+        tabooDescriber: null,
+        previousTabooDescriber: null
+    };
 
     const roundDuration =
         ['trivia', 'quiz'].includes(gameType)
             ? 25
             : 45;
-
 
     const difficultyText =
         ['trivia', 'quiz'].includes(gameType)
@@ -237,7 +355,6 @@ async function startGame(
                     : validDifficulty.toUpperCase()
             }\n`
             : '';
-
 
     const startMsg =
 `┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
@@ -250,11 +367,9 @@ ${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
 ┃ 🔥 Get ready...
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
-
     await sock.sendMessage(from, {
         text: startMsg
     });
-
 
     setTimeout(() => {
         nextRound(from);
@@ -267,7 +382,6 @@ ${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
 // ============================================================
 
 async function stopGame(sock, from) {
-
     if (!activeGames[from]) {
         await sock.sendMessage(from, {
             text:
@@ -277,14 +391,11 @@ async function stopGame(sock, from) {
         return;
     }
 
-
     if (activeGames[from].timer) {
         clearTimeout(activeGames[from].timer);
     }
 
-
     delete activeGames[from];
-
 
     await sock.sendMessage(from, {
         text:
@@ -299,38 +410,27 @@ async function stopGame(sock, from) {
 // ============================================================
 
 async function nextRound(from) {
-
     const session = activeGames[from];
 
     if (!session) {
         return;
     }
 
-
     if (session.currentRound >= session.rounds) {
         return endGame(from);
     }
 
-
     session.currentRound++;
     session.answeredThisRound = false;
-
 
     const qData =
         session.questions[
             session.currentRound - 1
         ];
 
-
     session.activeQuestion = qData;
 
-
     let roundText = '';
-
-
-    // --------------------------------------------------------
-    // ROUND TIME
-    // --------------------------------------------------------
 
     const roundTimeLimit =
         ['trivia', 'quiz'].includes(session.gameType)
@@ -339,14 +439,13 @@ async function nextRound(from) {
 
 
     // ========================================================
-    // TRIVIA
+    // TRIVIA / QUIZ
     // ========================================================
 
     if (
         session.gameType === 'trivia' ||
         session.gameType === 'quiz'
     ) {
-
         const label =
             session.gameType === 'trivia'
                 ? 'TRIVIA'
@@ -357,22 +456,20 @@ async function nextRound(from) {
                 ? '🎯'
                 : '🧠';
 
-
         const difficultyLabel =
             qData.difficulty
                 ? `┃ 🎚️ *Difficulty:* ${qData.difficulty.toUpperCase()}\n`
                 : '';
-
 
         roundText =
 `┏━━━ ${emoji} *${label} — ROUND ${session.currentRound}/${session.rounds}* ${emoji} ━━━┓
 ${difficultyLabel}┃ ❓ *Question:*
 ┃ ${qData.question}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🅰️ *A)* ${qData.options.A}
-┃ 🅱️ *B)* ${qData.options.B}
-┃ 🅲 *C)* ${qData.options.C}
-┃ 🅳 *D)* ${qData.options.D}
+┃ 🅰️ *A)* ${qData.options?.A || ''}
+┃ 🅱️ *B)* ${qData.options?.B || ''}
+┃ 🅲 *C)* ${qData.options?.C || ''}
+┃ 🅳 *D)* ${qData.options?.D || ''}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ ⏱️ *Reply A, B, C or D*
 ┃ ⚡ ${roundTimeLimit} seconds!
@@ -381,38 +478,31 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
     // ========================================================
-    // WORD SCRAMBLE
+    // SCRAMBLE
     // ========================================================
 
     else if (session.gameType === 'scramble') {
-
         const word =
             qData.word ||
             qData.targetWord ||
             '';
 
+        let letters = word.split('');
 
-        let scrambled = word
-            .split('')
-            .sort(() => Math.random() - 0.5)
-            .join(' ');
+        shuffle(letters);
 
+        let scrambled = letters.join(' ');
 
-        // Make sure scramble isn't identical
         if (
-            normalizeText(scrambled.replace(/\s/g, '')) ===
-            normalizeText(word)
+            normalizeText(
+                scrambled.replace(/\s/g, '')
+            ) === normalizeText(word)
         ) {
-            scrambled =
-                word
-                    .split('')
-                    .reverse()
-                    .join(' ');
+            letters.reverse();
+            scrambled = letters.join(' ');
         }
 
-
         session.activeQuestion.targetWord = word;
-
 
         roundText =
 `┏━━━ 🔤 *WORD SCRAMBLE — ROUND ${session.currentRound}/${session.rounds}* 🔤 ━━━┓
@@ -432,16 +522,13 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === 'guess') {
-
         const target =
             qData.target ??
             qData.answer ??
             qData.number;
 
-
         session.activeQuestion.targetNumber =
             Number(target);
-
 
         roundText =
 `┏━━━ 🔢 *NUMBER GUESS — ROUND ${session.currentRound}/${session.rounds}* 🔢 ━━━┓
@@ -461,11 +548,10 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === 'emoji') {
-
         roundText =
 `┏━━━ 🤯 *GUESS THE EMOJI* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
-┃ ${qData.emoji}
+┃ ${qData.emoji || ''}
 ┃
 ┃ 🤔 *What does this emoji represent?*
 ┃
@@ -477,35 +563,34 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
     // ========================================================
-    // COUPLES CHALLENGE
+    // COUPLES
     // ========================================================
 
     else if (session.gameType === 'couples') {
-
         roundText =
 `┏━━━ ❤️ *COUPLES CHALLENGE* — ROUND ${session.currentRound}/${session.rounds} ❤️ ━━━┓
 ┃
 ┃ 💕 *Challenge:*
-┃ ${qData.challenge}
+┃ ${qData.challenge || ''}
 ┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 👥 Everyone can participate!
 ┃ 💬 Drop your answer/vote below.
-┃ ⚡ ${roundTimeLimit} seconds!
+┃ ⚡ First valid response gets 5 points!
+┃ ⏱️ ${roundTimeLimit} seconds!
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
 
     // ========================================================
-    // FIND THE EMOJI
+    // FIND EMOJI
     // ========================================================
 
     else if (session.gameType === 'findemoji') {
-
         roundText =
 `┏━━━ 🔎 *FIND THE EMOJI* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
-┃ ${qData.emojis}
+┃ ${qData.emojis || ''}
 ┃
 ┃ 👀 *Find the odd/different emoji!*
 ┃
@@ -517,11 +602,10 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
     // ========================================================
-    // WORDS ENDING WITH
+    // ENDING
     // ========================================================
 
     else if (session.gameType === 'ending') {
-
         roundText =
 `┏━━━ 🔚 *WORDS THAT END WITH* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
@@ -529,7 +613,6 @@ ${difficultyLabel}┃ ❓ *Question:*
 ┃
 ┃ 🎯 Send *3 different words*
 ┃ that end with *${qData.ending}*
-┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ ⚡ First correct player gets 5 points!
 ┃ ⏱️ ${roundTimeLimit} seconds!
@@ -538,11 +621,10 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
     // ========================================================
-    // WORDS STARTING WITH
+    // STARTING
     // ========================================================
 
     else if (session.gameType === 'starting') {
-
         roundText =
 `┏━━━ 🔤 *WORDS THAT START WITH* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
@@ -550,7 +632,6 @@ ${difficultyLabel}┃ ❓ *Question:*
 ┃
 ┃ 🎯 Send *3 different words*
 ┃ that start with *${qData.starting}*
-┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ ⚡ First correct player gets 5 points!
 ┃ ⏱️ ${roundTimeLimit} seconds!
@@ -559,11 +640,10 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
     // ========================================================
-    // RHYMING WORDS
+    // RHYME
     // ========================================================
 
     else if (session.gameType === 'rhyme') {
-
         roundText =
 `┏━━━ 🎵 *RHYMING WORDS* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
@@ -571,7 +651,6 @@ ${difficultyLabel}┃ ❓ *Question:*
 ┃
 ┃ 🎯 Send *3 different words*
 ┃ that rhyme with *${qData.word}*
-┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ ⚡ First correct player gets 5 points!
 ┃ ⏱️ ${roundTimeLimit} seconds!
@@ -584,15 +663,13 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === 'movemoji') {
-
         roundText =
 `┏━━━ 🎬 *EMOJI MOVIE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
 ┃ 🎞️ *Movie:*
-┃ ${qData.emojis || qData.emoji}
+┃ ${qData.emojis || qData.emoji || ''}
 ┃
 ┃ 🤔 Guess the movie!
-┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 💬 Type the movie title.
 ┃ ⚡ ${roundTimeLimit} seconds!
@@ -605,19 +682,16 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === '2truth1lie') {
-
         roundText =
 `┏━━━ 🕵️ *2 TRUTHS 1 LIE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
-┃ 1️⃣ ${qData.statements[0]}
+┃ 1️⃣ ${qData.statements?.[0] || ''}
 ┃
-┃ 2️⃣ ${qData.statements[1]}
+┃ 2️⃣ ${qData.statements?.[1] || ''}
 ┃
-┃ 3️⃣ ${qData.statements[2]}
-┃
+┃ 3️⃣ ${qData.statements?.[2] || ''}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🤔 Which one is the LIE?
-┃
 ┃ 💬 Reply *1, 2 or 3*
 ┃ ⚡ ${roundTimeLimit} seconds!
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
@@ -629,14 +703,12 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === 'lyrics') {
-
         roundText =
 `┏━━━ 🎵 *FINISH THE LINE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
 ┃
 ┃ 🎤 *Complete this line:*
 ┃
-┃ ${qData.question}
-┃
+┃ ${qData.question || ''}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 💬 Type the missing word/answer!
 ┃ ⚡ ${roundTimeLimit} seconds!
@@ -650,22 +722,84 @@ ${difficultyLabel}┃ ❓ *Question:*
 
     else if (session.gameType === 'taboo') {
 
-        roundText =
+        /*
+         * IMPORTANT:
+         * The target and forbidden words are NOT sent
+         * to the group.
+         */
+
+        const describer =
+            await chooseTabooDescriber(
+                session.sock,
+                from,
+                session.previousTabooDescriber
+            );
+
+        session.tabooDescriber = describer;
+
+        if (describer) {
+            session.previousTabooDescriber = describer;
+        }
+
+        if (describer) {
+
+            // Send secret information privately.
+            try {
+                await session.sock.sendMessage(
+                    describer,
+                    {
+                        text:
+`🚫 *QUEEN VIDA TABOO — SECRET CARD* 🚫
+
+🎯 *YOUR WORD:*
+*${qData.word}*
+
+🚫 *FORBIDDEN WORDS:*
+• ${qData.forbidden?.[0] || ''}
+• ${qData.forbidden?.[1] || ''}
+• ${qData.forbidden?.[2] || ''}
+
+🎤 *Your job:*
+Describe the secret word WITHOUT saying the word itself or any forbidden word.
+
+👥 Everyone in the group will try to guess it.
+
+⚠️ Do NOT send this secret card to the group!`
+                    }
+                );
+            } catch (error) {
+                console.error(
+                    '❌ Failed to DM Taboo describer:',
+                    error
+                );
+            }
+
+            roundText =
 `┏━━━ 🚫 *TABOO* — ROUND ${session.currentRound}/${session.rounds} 🚫 ━━━┓
 ┃
-┃ 🎯 *WORD:*
-┃ *${qData.word}*
+┃ 👤 *DESCRIBER:*
+┃ @${mentionNumber(describer)}
 ┃
-┃ 🚫 *DO NOT USE:*
-┃ • ${qData.forbidden?.[0] || ''}
-┃ • ${qData.forbidden?.[1] || ''}
-┃ • ${qData.forbidden?.[2] || ''}
+┃ 🎤 The describer has received
+┃ a secret word privately.
 ┃
+┃ 👥 Everyone else must guess!
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 👤 One player describes the word.
-┃ 👥 Everyone else guesses!
+┃ 🚫 The secret word is hidden.
+┃ 🤫 Don't ask the describer to reveal it!
 ┃ ⚡ ${roundTimeLimit} seconds!
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+
+        } else {
+
+            roundText =
+`┏━━━ 🚫 *TABOO* — ROUND ${session.currentRound}/${session.rounds} 🚫 ━━━┓
+┃
+┃ ⚠️ *Unable to select a describer.*
+┃
+┃ Please wait for the next round.
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+        }
     }
 
 
@@ -674,18 +808,15 @@ ${difficultyLabel}┃ ❓ *Question:*
     // ========================================================
 
     else if (session.gameType === 'memewar') {
-
         roundText =
 `┏━━━ 😂 *MEME WAR* — ROUND ${session.currentRound}/${session.rounds} 😂 ━━━┓
 ┃
 ┃ 🎯 *PROMPT:*
-┃ ${qData.prompt || qData.question}
-┃
+┃ ${qData.prompt || qData.question || ''}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 😂 Drop your funniest meme/reply!
-┃
-┃ 🏆 Group votes for the winner.
-┃ ⚡ ${roundTimeLimit} seconds!
+┃ 🏆 First valid submission gets 5 points.
+┃ ⏱️ ${roundTimeLimit} seconds!
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
@@ -694,8 +825,15 @@ ${difficultyLabel}┃ ❓ *Question:*
     // SEND ROUND
     // ========================================================
 
+    const mentions =
+        session.gameType === 'taboo' &&
+        session.tabooDescriber
+            ? [session.tabooDescriber]
+            : [];
+
     await session.sock.sendMessage(from, {
-        text: roundText
+        text: roundText,
+        mentions
     });
 
 
@@ -712,9 +850,7 @@ ${difficultyLabel}┃ ❓ *Question:*
             return;
         }
 
-
         session.answeredThisRound = true;
-
 
         let timeOutText =
             `⏰ *TIME'S UP!*\n\n` +
@@ -722,14 +858,13 @@ ${difficultyLabel}┃ ❓ *Question:*
 
 
         // ----------------------------------------------------
-        // ANSWER DISPLAY
+        // TRIVIA / QUIZ
         // ----------------------------------------------------
 
         if (
             session.gameType === 'trivia' ||
             session.gameType === 'quiz'
         ) {
-
             const answer =
                 qData.answer;
 
@@ -737,111 +872,160 @@ ${difficultyLabel}┃ ❓ *Question:*
                 qData.options?.[answer] ||
                 answer;
 
-
             timeOutText +=
                 `📌 *Correct Answer:* ` +
                 `*${answer} — ${answerText}*`;
         }
 
 
-        else if (session.gameType === 'scramble') {
+        // ----------------------------------------------------
+        // SCRAMBLE
+        // ----------------------------------------------------
 
+        else if (session.gameType === 'scramble') {
             timeOutText +=
                 `📌 *Correct Word:* ` +
-                `*${qData.word}*`;
+                `*${qData.targetWord || qData.word || ''}*`;
         }
 
+
+        // ----------------------------------------------------
+        // GUESS
+        // ----------------------------------------------------
 
         else if (session.gameType === 'guess') {
-
             timeOutText +=
                 `📌 *Secret Number:* ` +
-                `*${qData.target}*`;
+                `*${qData.target ?? qData.answer ?? qData.number ?? ''}*`;
         }
 
 
-        else if (session.gameType === 'emoji') {
+        // ----------------------------------------------------
+        // EMOJI
+        // ----------------------------------------------------
 
+        else if (
+            session.gameType === 'emoji' ||
+            session.gameType === 'findemoji'
+        ) {
             timeOutText +=
                 `📌 *Answer:* ` +
-                `*${qData.answer}*`;
+                `*${qData.answer || ''}*`;
         }
 
 
-        else if (session.gameType === 'findemoji') {
-
-            timeOutText +=
-                `📌 *Answer:* ` +
-                `*${qData.answer}*`;
-        }
-
+        // ----------------------------------------------------
+        // MOVIE
+        // ----------------------------------------------------
 
         else if (session.gameType === 'movemoji') {
-
             timeOutText +=
                 `📌 *Movie:* ` +
-                `*${qData.answer}*`;
+                `*${qData.answer || ''}*`;
         }
 
 
-        else if (session.gameType === '2truth1lie') {
+        // ----------------------------------------------------
+        // 2 TRUTHS 1 LIE
+        // ----------------------------------------------------
 
+        else if (session.gameType === '2truth1lie') {
             timeOutText +=
                 `📌 *The lie was statement:* ` +
                 `*${qData.lie}️⃣*`;
         }
 
 
-        else if (session.gameType === 'lyrics') {
+        // ----------------------------------------------------
+        // LYRICS
+        // ----------------------------------------------------
 
+        else if (session.gameType === 'lyrics') {
             timeOutText +=
                 `📌 *Answer:* ` +
-                `*${qData.answer}*`;
+                `*${qData.answer || ''}*`;
         }
 
+
+        // ----------------------------------------------------
+        // ENDING
+        // ----------------------------------------------------
 
         else if (session.gameType === 'ending') {
-
             timeOutText +=
                 `📌 Send 3 words ending with ` +
-                `*${qData.ending}*`;
+                `*${qData.ending || ''}*`;
         }
 
+
+        // ----------------------------------------------------
+        // STARTING
+        // ----------------------------------------------------
 
         else if (session.gameType === 'starting') {
-
             timeOutText +=
                 `📌 Send 3 words starting with ` +
-                `*${qData.starting}*`;
+                `*${qData.starting || ''}*`;
         }
 
 
-        else if (session.gameType === 'rhyme') {
+        // ----------------------------------------------------
+        // RHYME
+        // ----------------------------------------------------
 
+        else if (session.gameType === 'rhyme') {
             timeOutText +=
-                `📌 Examples: ` +
+                `📌 Some valid rhymes were: ` +
                 `*${(qData.rhymes || []).slice(0, 3).join(', ')}*`;
         }
 
 
-        else if (session.gameType === 'couples') {
+        // ----------------------------------------------------
+        // COUPLES
+        // ----------------------------------------------------
 
+        else if (session.gameType === 'couples') {
             timeOutText +=
                 `📌 *Challenge:* ` +
-                `*${qData.challenge}*`;
+                `*${qData.challenge || ''}*`;
         }
 
 
-        else if (session.gameType === 'taboo') {
+        // ----------------------------------------------------
+        // TABOO
+        // ----------------------------------------------------
 
+        else if (session.gameType === 'taboo') {
             timeOutText +=
-                `📌 *Target Word:* ` +
-                `*${qData.word}*`;
+                `📌 *The secret word was:* ` +
+                `*${qData.word || ''}*`;
+
+            if (session.tabooDescriber) {
+                timeOutText +=
+                    `\n👤 Describer: @${mentionNumber(
+                        session.tabooDescriber
+                    )}`;
+            }
+        }
+
+
+        // ----------------------------------------------------
+        // MEME WAR
+        // ----------------------------------------------------
+
+        else if (session.gameType === 'memewar') {
+            timeOutText +=
+                `\n😂 No winning submission this round.`;
         }
 
 
         await session.sock.sendMessage(from, {
-            text: timeOutText
+            text: timeOutText,
+            mentions:
+                session.gameType === 'taboo' &&
+                session.tabooDescriber
+                    ? [session.tabooDescriber]
+                    : []
         });
 
 
@@ -858,7 +1042,6 @@ ${difficultyLabel}┃ ❓ *Question:*
 // ============================================================
 
 function extractWords(text) {
-
     return String(text || '')
         .trim()
         .split(/[\s,]+/)
@@ -868,30 +1051,27 @@ function extractWords(text) {
 
 
 // ============================================================
-// CHECK ENDING WORDS
+// ENDING WORD CHECK
 // ============================================================
 
 function checkEndingWords(text, ending) {
-
     const words = extractWords(text);
 
     if (words.length !== 3) {
         return false;
     }
 
-
-    const uniqueWords =
-        new Set(words);
-
+    const uniqueWords = new Set(words);
 
     if (uniqueWords.size !== 3) {
         return false;
     }
 
+    const suffix = normalizeText(ending);
 
-    const suffix =
-        normalizeText(ending);
-
+    if (!suffix) {
+        return false;
+    }
 
     return words.every(word =>
         word.endsWith(suffix)
@@ -900,30 +1080,27 @@ function checkEndingWords(text, ending) {
 
 
 // ============================================================
-// CHECK STARTING WORDS
+// STARTING WORD CHECK
 // ============================================================
 
 function checkStartingWords(text, starting) {
-
     const words = extractWords(text);
 
     if (words.length !== 3) {
         return false;
     }
 
-
-    const uniqueWords =
-        new Set(words);
-
+    const uniqueWords = new Set(words);
 
     if (uniqueWords.size !== 3) {
         return false;
     }
 
+    const prefix = normalizeText(starting);
 
-    const prefix =
-        normalizeText(starting);
-
+    if (!prefix) {
+        return false;
+    }
 
     return words.every(word =>
         word.startsWith(prefix)
@@ -932,43 +1109,60 @@ function checkStartingWords(text, starting) {
 
 
 // ============================================================
-// CHECK RHYMING WORDS
+// RHYME CHECK
 // ============================================================
 
 function checkRhymeWords(text, qData) {
-
-    const words =
-        extractWords(text);
-
+    const words = extractWords(text);
 
     if (words.length !== 3) {
         return false;
     }
 
-
-    const uniqueWords =
-        new Set(words);
-
+    const uniqueWords = new Set(words);
 
     if (uniqueWords.size !== 3) {
         return false;
     }
 
-
     const target =
         normalizeText(qData.word);
-
 
     const validRhymes =
         Array.isArray(qData.rhymes)
             ? qData.rhymes.map(normalizeText)
             : [];
 
-
     return words.every(word =>
         word !== target &&
         validRhymes.includes(word)
     );
+}
+
+
+// ============================================================
+// TABOO FORBIDDEN WORD CHECK
+// ============================================================
+
+function containsForbiddenWord(text, forbidden) {
+    const clean = normalizeText(text);
+
+    if (!clean) {
+        return false;
+    }
+
+    return forbidden.some(word => {
+        const forbiddenWord =
+            normalizeText(word);
+
+        if (!forbiddenWord) {
+            return false;
+        }
+
+        return clean
+            .split(/\s+/)
+            .includes(forbiddenWord);
+    });
 }
 
 
@@ -982,10 +1176,8 @@ async function handleGameMessage(
     from,
     text
 ) {
-
     const session =
         activeGames[from];
-
 
     if (
         !session ||
@@ -995,41 +1187,107 @@ async function handleGameMessage(
         return false;
     }
 
-
     const sender =
         m.key.participant ||
         m.key.remoteJid;
 
+    const senderNormalized =
+        normalizeJid(sender);
 
     const cleanText =
         normalizeText(text);
-
 
     const cleanUpper =
         String(text || '')
             .trim()
             .toUpperCase();
 
-
     const q =
         session.activeQuestion;
 
-
     let isCorrect = false;
+
+
+    // ========================================================
+    // TABOO SPECIAL HANDLING
+    // ========================================================
+
+    if (session.gameType === 'taboo') {
+
+        // Describer must never score.
+        if (
+            session.tabooDescriber &&
+            senderNormalized ===
+                normalizeJid(session.tabooDescriber)
+        ) {
+
+            const target =
+                normalizeText(q.word);
+
+            const forbidden =
+                Array.isArray(q.forbidden)
+                    ? q.forbidden
+                    : [];
+
+            // If describer accidentally says the secret word
+            // or a forbidden word, warn them privately/group.
+            if (
+                cleanText === target ||
+                containsForbiddenWord(
+                    cleanText,
+                    forbidden
+                )
+            ) {
+                await sock.sendMessage(
+                    from,
+                    {
+                        text:
+                            `🚫 *TABOO VIOLATION!*\n\n` +
+                            `@${mentionNumber(sender)} ` +
+                            `You used the secret/forbidden word.\n` +
+                            `⚠️ Keep describing without saying it!`,
+                        mentions: [sender]
+                    },
+                    {
+                        quoted: m
+                    }
+                );
+            }
+
+            // Describer's message is consumed.
+            return true;
+        }
+
+
+        const target =
+            normalizeText(q.word);
+
+        if (
+            cleanText &&
+            cleanText === target
+        ) {
+            isCorrect = true;
+        }
+
+        // Any other guess simply waits for another player.
+        if (!isCorrect) {
+            return true;
+        }
+    }
 
 
     // ========================================================
     // TRIVIA / QUIZ
     // ========================================================
 
-    if (
+    else if (
         session.gameType === 'trivia' ||
         session.gameType === 'quiz'
     ) {
-
         if (
             ['A', 'B', 'C', 'D'].includes(cleanUpper) &&
-            cleanUpper === String(q.answer).toUpperCase()
+            cleanUpper ===
+                String(q.answer).toUpperCase()
         ) {
             isCorrect = true;
         }
@@ -1041,13 +1299,11 @@ async function handleGameMessage(
     // ========================================================
 
     else if (session.gameType === 'scramble') {
-
         const answer =
             normalizeText(
                 q.targetWord ||
                 q.word
             );
-
 
         if (cleanText === answer) {
             isCorrect = true;
@@ -1060,30 +1316,25 @@ async function handleGameMessage(
     // ========================================================
 
     else if (session.gameType === 'guess') {
-
         const num =
             parseInt(
                 String(text).trim(),
                 10
             );
 
-
         if (!isNaN(num)) {
 
-            if (
-                num ===
-                Number(q.targetNumber)
-            ) {
+            const target =
+                Number(q.targetNumber);
 
+            if (num === target) {
                 isCorrect = true;
-
             } else {
 
                 const hintDir =
-                    num < Number(q.targetNumber)
+                    num < target
                         ? '📈 *Higher!*'
                         : '📉 *Lower!*';
-
 
                 await sock.sendMessage(
                     from,
@@ -1097,7 +1348,6 @@ async function handleGameMessage(
                     }
                 );
 
-
                 return true;
             }
         }
@@ -1105,19 +1355,22 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // GUESS THE EMOJI
+    // EMOJI
     // ========================================================
 
     else if (session.gameType === 'emoji') {
-
         const answer =
             normalizeText(q.answer);
 
-
         if (
             cleanText === answer ||
-            cleanText.includes(answer) ||
-            answer.includes(cleanText)
+            (
+                cleanText.length >= 3 &&
+                (
+                    cleanText.includes(answer) ||
+                    answer.includes(cleanText)
+                )
+            )
         ) {
             isCorrect = true;
         }
@@ -1125,19 +1378,22 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // FIND THE EMOJI
+    // FIND EMOJI
     // ========================================================
 
     else if (session.gameType === 'findemoji') {
-
         const answer =
             normalizeText(q.answer);
 
-
         if (
             cleanText === answer ||
-            cleanText.includes(answer) ||
-            answer.includes(cleanText)
+            (
+                cleanText.length >= 3 &&
+                (
+                    cleanText.includes(answer) ||
+                    answer.includes(cleanText)
+                )
+            )
         ) {
             isCorrect = true;
         }
@@ -1149,15 +1405,18 @@ async function handleGameMessage(
     // ========================================================
 
     else if (session.gameType === 'movemoji') {
-
         const answer =
             normalizeText(q.answer);
 
-
         if (
             cleanText === answer ||
-            cleanText.includes(answer) ||
-            answer.includes(cleanText)
+            (
+                cleanText.length >= 3 &&
+                (
+                    cleanText.includes(answer) ||
+                    answer.includes(cleanText)
+                )
+            )
         ) {
             isCorrect = true;
         }
@@ -1176,7 +1435,6 @@ async function handleGameMessage(
                 10
             );
 
-
         if (
             [1, 2, 3].includes(choice) &&
             choice === Number(q.lie)
@@ -1184,16 +1442,14 @@ async function handleGameMessage(
             isCorrect = true;
         }
 
-
         else if (
             [1, 2, 3].includes(choice)
         ) {
-
             await sock.sendMessage(
                 from,
                 {
                     text:
-                        `❌ *Wrong!* @${sender.replace(/[^0-9]/g, '')}\n` +
+                        `❌ *Wrong!* @${mentionNumber(sender)}\n` +
                         `That wasn't the lie. Keep watching!`,
                     mentions: [sender]
                 },
@@ -1201,7 +1457,6 @@ async function handleGameMessage(
                     quoted: m
                 }
             );
-
 
             return true;
         }
@@ -1217,11 +1472,15 @@ async function handleGameMessage(
         const answer =
             normalizeText(q.answer);
 
-
         if (
             cleanText === answer ||
-            cleanText.includes(answer) ||
-            answer.includes(cleanText)
+            (
+                cleanText.length >= 2 &&
+                (
+                    cleanText.includes(answer) ||
+                    answer.includes(cleanText)
+                )
+            )
         ) {
             isCorrect = true;
         }
@@ -1229,7 +1488,7 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // WORDS ENDING WITH
+    // ENDING
     // ========================================================
 
     else if (session.gameType === 'ending') {
@@ -1246,7 +1505,7 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // WORDS STARTING WITH
+    // STARTING
     // ========================================================
 
     else if (session.gameType === 'starting') {
@@ -1263,7 +1522,7 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // RHYMING WORDS
+    // RHYME
     // ========================================================
 
     else if (session.gameType === 'rhyme') {
@@ -1280,7 +1539,7 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // COUPLES CHALLENGE
+    // COUPLES
     // ========================================================
 
     else if (session.gameType === 'couples') {
@@ -1292,50 +1551,11 @@ async function handleGameMessage(
 
 
     // ========================================================
-    // TABOO
-    // ========================================================
-
-    else if (session.gameType === 'taboo') {
-
-        const target =
-            normalizeText(q.word);
-
-
-        const forbidden =
-            Array.isArray(q.forbidden)
-                ? q.forbidden.map(normalizeText)
-                : [];
-
-
-        const usedForbidden =
-            forbidden.some(word =>
-                cleanText
-                    .split(/\s+/)
-                    .includes(word)
-            );
-
-
-        // In Taboo, the current player is
-        // describing the word, so the bot awards
-        // the point only if the target itself
-        // is guessed by another player.
-        if (
-            cleanText === target &&
-            !usedForbidden
-        ) {
-            isCorrect = true;
-        }
-    }
-
-
-    // ========================================================
     // MEME WAR
     // ========================================================
 
     else if (session.gameType === 'memewar') {
 
-        // Meme War is voting/participation based.
-        // Any non-empty response counts as participation.
         if (cleanText.length > 0) {
             isCorrect = true;
         }
@@ -1350,15 +1570,12 @@ async function handleGameMessage(
 
         session.answeredThisRound = true;
 
-
         if (session.timer) {
             clearTimeout(session.timer);
         }
 
-
-        session.scores[sender] =
-            (session.scores[sender] || 0) + 5;
-
+        session.scores[senderNormalized] =
+            (session.scores[senderNormalized] || 0) + 5;
 
         const sortedScores =
             Object.entries(session.scores)
@@ -1367,15 +1584,13 @@ async function handleGameMessage(
                         b[1] - a[1]
                 );
 
-
         let winAnnouncement =
 `🎉 *CORRECT!*
 
-🏆 @${sender.replace(/[^0-9]/g, '')}
+🏆 @${mentionNumber(senderNormalized)}
 💎 *+5 POINTS*
 
 📊 *CURRENT SCORE:*`;
-
 
         sortedScores.forEach(
             ([user, points], index) => {
@@ -1389,14 +1604,12 @@ async function handleGameMessage(
                                 ? '🥉'
                                 : '▪️';
 
-
                 winAnnouncement +=
                     `\n${medal} ${index + 1}. ` +
-                    `@${user.replace(/[^0-9]/g, '')} — ` +
+                    `@${mentionNumber(user)} — ` +
                     `*${points} pts*`;
             }
         );
-
 
         await sock.sendMessage(
             from,
@@ -1412,15 +1625,12 @@ async function handleGameMessage(
             }
         );
 
-
         setTimeout(() => {
             nextRound(from);
         }, 3000);
 
-
         return true;
     }
-
 
     return false;
 }
@@ -1435,16 +1645,13 @@ async function endGame(from) {
     const session =
         activeGames[from];
 
-
     if (!session) {
         return;
     }
 
-
     if (session.timer) {
         clearTimeout(session.timer);
     }
-
 
     const sortedScores =
         Object.entries(session.scores)
@@ -1453,14 +1660,12 @@ async function endGame(from) {
                     b[1] - a[1]
             );
 
-
     let finalDashboard =
 `┏━━━ 🏆 *GAME OVER* 🏆 ━━━┓
 ┃ 🎮 *${getGameTitle(session.gameType)}*
 ┃
 ┃ 🎉 *FINAL LEADERBOARD*
 ┣━━━━━━━━━━━━━━━━━━━━━━━`;
-
 
     if (sortedScores.length === 0) {
 
@@ -1481,28 +1686,23 @@ async function endGame(from) {
                                 ? '🥉'
                                 : '▪️';
 
-
                 finalDashboard +=
                     `\n┃ ${medal} ${index + 1}. ` +
-                    `@${user.replace(/[^0-9]/g, '')} — ` +
+                    `@${mentionNumber(user)} — ` +
                     `*${points} Points*`;
             }
         );
 
-
         const winner =
             sortedScores[0][0];
 
-
         finalDashboard +=
             `\n┣━━━━━━━━━━━━━━━━━━━━━━━` +
-            `\n┃ 👑 *WINNER:* @${winner.replace(/[^0-9]/g, '')} 🎉`;
+            `\n┃ 👑 *WINNER:* @${mentionNumber(winner)} 🎉`;
     }
-
 
     finalDashboard +=
         `\n┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-
 
     await session.sock.sendMessage(
         from,
@@ -1515,13 +1715,12 @@ async function endGame(from) {
         }
     );
 
-
     delete activeGames[from];
 }
 
 
 // ============================================================
-// CHECK IF GAME IS ACTIVE
+// CHECK ACTIVE GAME
 // ============================================================
 
 function isGameActive(from) {
