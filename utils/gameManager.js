@@ -20,32 +20,20 @@ function loadQuestions(gameType, difficulty = 'all') {
             `${gameType}.json`
         );
 
-        if (!fs.existsSync(filePath)) {
-            return [];
-        }
+        if (!fs.existsSync(filePath)) return [];
 
         const raw = fs.readFileSync(filePath, 'utf8');
         const questions = JSON.parse(raw);
 
-        if (!Array.isArray(questions)) {
-            return [];
-        }
+        if (!Array.isArray(questions)) return [];
 
-        if (difficulty === 'all') {
-            return questions;
-        }
+        if (difficulty === 'all') return questions;
 
         return questions.filter(
-            q =>
-                String(q.difficulty || '').toLowerCase() ===
-                difficulty
+            q => String(q.difficulty || '').toLowerCase() === difficulty
         );
-    } catch (error) {
-        console.error(
-            `❌ Error loading questions for ${gameType}:`,
-            error
-        );
-
+    } catch (e) {
+        console.error(`Error loading questions for ${gameType}:`, e);
         return [];
     }
 }
@@ -60,34 +48,26 @@ async function startGame(
     if (activeGames[from]) {
         await sock.sendMessage(from, {
             text:
-                '❌ A game is already active in this group!\n\n' +
-                'Use *.game stop* to end it first.'
+                '❌ *A game is already active in this group!*\n\n' +
+                'Use `.game stop` to end the current game first.'
         });
-
         return;
     }
 
-    const validDifficulty = [
-        'easy',
-        'medium',
-        'hard',
-        'all'
-    ].includes(difficulty)
+    const validDifficulty = ['easy', 'medium', 'hard', 'all'].includes(
+        difficulty
+    )
         ? difficulty
         : 'all';
 
-    const allQuestions = loadQuestions(
-        gameType,
-        validDifficulty
-    );
+    const allQuestions = loadQuestions(gameType, validDifficulty);
 
     if (allQuestions.length === 0) {
         await sock.sendMessage(from, {
             text:
-                `❌ No questions found for *${gameType}* ` +
-                `at *${validDifficulty}* difficulty.`
+                `❌ *No questions found for ${gameType.toUpperCase()}!*\n\n` +
+                `📂 Make sure the correct JSON file exists inside the *games* folder.`
         });
-
         return;
     }
 
@@ -96,17 +76,16 @@ async function startGame(
             text:
                 `❌ *Not enough questions!*\n\n` +
                 `🎮 Game: *${gameType.toUpperCase()}*\n` +
-                `📚 Difficulty: *${validDifficulty.toUpperCase()}*\n` +
-                `❓ Available: *${allQuestions.length}*\n` +
+                `📚 Available: *${allQuestions.length}*\n` +
                 `🎯 Requested: *${totalRounds}*`
         });
-
         return;
     }
 
-    const sessionQuestions = shuffle([
-        ...allQuestions
-    ]).slice(0, totalRounds);
+    const sessionQuestions = shuffle([...allQuestions]).slice(
+        0,
+        totalRounds
+    );
 
     activeGames[from] = {
         gameType,
@@ -125,17 +104,15 @@ async function startGame(
         trivia: '🎯 TRIVIA SHOWDOWN',
         quiz: '🧠 QUIZ CHALLENGE',
         scramble: '🔤 WORD SCRAMBLE',
-        guess: '🔢 NUMBER GUESSING'
+        guess: '🔢 NUMBER GUESSING',
+        emoji: '😂 GUESS THE EMOJI'
     };
 
     const gameTitle =
-        gameTitles[gameType] ||
-        gameType.toUpperCase();
+        gameTitles[gameType] || gameType.toUpperCase();
 
     const roundDuration =
-        ['trivia', 'quiz'].includes(gameType)
-            ? '25s'
-            : '45s';
+        ['trivia', 'quiz'].includes(gameType) ? 25 : 45;
 
     const difficultyText =
         ['trivia', 'quiz'].includes(gameType)
@@ -150,57 +127,47 @@ async function startGame(
 `┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
 ┃ 🏆 *Game:* ${gameTitle}
 ┃ 🔄 *Total Rounds:* ${sessionQuestions.length}
-${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration} Per Round
-┃ 💎 *Reward:* 5 Points / Correct Answer
+${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
+┃ 💎 *Reward:* +5 Points / Correct Answer
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🚀 *Game session is starting now!*
+┃ 👑 *QUEEN VIDA is your host!*
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
     await sock.sendMessage(from, {
         text: startMsg
     });
 
-    setTimeout(
-        () => nextRound(from),
-        2000
-    );
+    setTimeout(() => nextRound(from), 2000);
 }
 
 async function stopGame(sock, from) {
     if (!activeGames[from]) {
         await sock.sendMessage(from, {
-            text:
-                '❌ No active game session found in this group.'
+            text: '❌ *No active game session found in this group.*'
         });
-
         return;
     }
 
     if (activeGames[from].timer) {
-        clearTimeout(
-            activeGames[from].timer
-        );
+        clearTimeout(activeGames[from].timer);
     }
 
     delete activeGames[from];
 
     await sock.sendMessage(from, {
         text:
-            '🛑 *Game session has been manually stopped!*'
+            '🛑 *Game session has been manually stopped!*\n\n' +
+            '👑 Queen Vida is leaving the game table.'
     });
 }
 
 async function nextRound(from) {
     const session = activeGames[from];
 
-    if (!session) {
-        return;
-    }
+    if (!session) return;
 
-    if (
-        session.currentRound >=
-        session.rounds
-    ) {
+    if (session.currentRound >= session.rounds) {
         return endGame(from);
     }
 
@@ -208,27 +175,20 @@ async function nextRound(from) {
     session.answeredThisRound = false;
 
     const qData =
-        session.questions[
-            session.currentRound - 1
-        ];
+        session.questions[session.currentRound - 1];
 
     session.activeQuestion = qData;
 
     let roundText = '';
 
     const roundTimeLimit =
-        ['trivia', 'quiz'].includes(
-            session.gameType
-        )
+        ['trivia', 'quiz'].includes(session.gameType)
             ? 25
             : 45;
 
     /*
-     * ================================
      * TRIVIA / QUIZ
-     * ================================
      */
-
     if (
         session.gameType === 'trivia' ||
         session.gameType === 'quiz'
@@ -249,152 +209,124 @@ async function nextRound(from) {
                 : '';
 
         roundText =
-`┏━━━ ${emoji} *${label}* ${emoji} ━━━┓
-┃
-┃ 📍 *Round ${session.currentRound}/${session.rounds}*
-${difficultyLabel}┃
-┃ ❓ *${qData.question}*
-┃
+`┏━━━ ${emoji} *${label} (Round ${session.currentRound}/${session.rounds})* ${emoji} ━━━┓
+${difficultyLabel}┃ ❓ *Question:* ${qData.question}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🅰️ *A)* ${qData.options.A}
 ┃ 🅱️ *B)* ${qData.options.B}
 ┃ 🅲 *C)* ${qData.options.C}
 ┃ 🅳 *D)* ${qData.options.D}
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃
-┃ ⏱️ *You have ${roundTimeLimit} seconds!*
-┃ 💡 *Reply with A, B, C, or D.*
-┃
+┃ ⏱️ *Type A, B, C or D!* (${roundTimeLimit}s)
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
 
     /*
-     * ================================
      * WORD SCRAMBLE
-     * ================================
      */
-
-    } else if (
-        session.gameType === 'scramble'
-    ) {
-        const scrambled =
-            qData.word
-                .split('')
-                .sort(
-                    () =>
-                        Math.random() - 0.5
-                )
-                .join(' ');
+    else if (session.gameType === 'scramble') {
+        const scrambled = qData.word
+            .split('')
+            .sort(() => Math.random() - 0.5)
+            .join(' ');
 
         session.activeQuestion.targetWord =
             qData.word;
 
         roundText =
-`┏━━━ 🔤 *WORD SCRAMBLE* 🔤 ━━━┓
-┃
-┃ 📍 *Round ${session.currentRound}/${session.rounds}*
-┃
-┃ 🔀 *Scrambled:* ${scrambled}
+`┏━━━ 🔤 *WORD SCRAMBLE (Round ${session.currentRound}/${session.rounds})* 🔤 ━━━┓
+┃ 🔀 *Scrambled:* \`${scrambled}\`
 ┃ 💡 *Hint:* ${qData.hint}
-┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⏱️ *You have ${roundTimeLimit} seconds!*
-┃ ✍️ *Type the correct word!*
-┃
+┃ ⏱️ *Unscramble the word!* (${roundTimeLimit}s)
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
 
     /*
-     * ================================
      * NUMBER GUESS
-     * ================================
      */
-
-    } else if (
-        session.gameType === 'guess'
-    ) {
+    else if (session.gameType === 'guess') {
         session.activeQuestion.targetNumber =
             qData.target;
 
         roundText =
-`┏━━━ 🔢 *NUMBER GUESS* 🔢 ━━━┓
-┃
-┃ 📍 *Round ${session.currentRound}/${session.rounds}*
-┃
-┃ 🎯 Guess the number between
-┃ *${qData.min}* and *${qData.max}*
-┃
+`┏━━━ 🔢 *NUMBER GUESS (Round ${session.currentRound}/${session.rounds})* 🔢 ━━━┓
+┃ 🎯 *Guess the number between* ${qData.min} *and* ${qData.max}!
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⏱️ *You have ${roundTimeLimit} seconds!*
-┃ 💡 *Type your guessed number!*
-┃
+┃ 💡 Queen Vida will give Higher/Lower hints.
+┃ ⏱️ *Time:* ${roundTimeLimit}s
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
-    await session.sock.sendMessage(
-        from,
-        {
-            text: roundText
-        }
-    );
-
     /*
-     * ================================
-     * ROUND TIMER
-     * ================================
+     * GUESS THE EMOJI
      */
+    else if (session.gameType === 'emoji') {
+        session.activeQuestion.targetAnswer =
+            String(qData.answer || '')
+                .trim()
+                .toLowerCase();
 
-    session.timer = setTimeout(
-        async () => {
-            if (
-                !activeGames[from] ||
-                session.answeredThisRound
-            ) {
-                return;
-            }
+        roundText =
+`┏━━━ 😂 *GUESS THE EMOJI (Round ${session.currentRound}/${session.rounds})* 😂 ━━━┓
+┃
+┃ 🎭 *What does this emoji combination mean?*
+┃
+┃     ${qData.emoji}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 *Type your answer in the chat!*
+┃ ⏱️ *Time:* ${roundTimeLimit}s
+┃ 🏆 *First correct answer gets +5 points!*
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
 
-            let timeOutText =
-                `⏰ *TIME'S UP!*\n\n` +
-                `❌ Nobody got this round.\n`;
+    await session.sock.sendMessage(from, {
+        text: roundText
+    });
 
-            if (
-                session.gameType === 'trivia' ||
-                session.gameType === 'quiz'
-            ) {
-                timeOutText +=
-                    `\n📌 *Correct Answer:* ` +
-                    `*${qData.answer}* — ` +
-                    `${qData.options[qData.answer]}`;
-            }
+    session.timer = setTimeout(() => {
+        if (
+            !activeGames[from] ||
+            session.answeredThisRound
+        ) {
+            return;
+        }
 
-            else if (
-                session.gameType === 'scramble'
-            ) {
-                timeOutText +=
-                    `\n📌 *Correct Word:* ` +
-                    `*${qData.word}*`;
-            }
+        let timeOutText =
+            `⏰ *TIME'S UP!*\n\n` +
+            `❌ Nobody got this round correct.\n`;
 
-            else if (
-                session.gameType === 'guess'
-            ) {
-                timeOutText +=
-                    `\n📌 *Secret Number:* ` +
-                    `*${qData.target}*`;
-            }
+        if (
+            session.gameType === 'trivia' ||
+            session.gameType === 'quiz'
+        ) {
+            timeOutText +=
+                `📌 *Correct Answer:* *${qData.answer}* ` +
+                `(${qData.options[qData.answer]})`;
+        }
 
-            await session.sock.sendMessage(
-                from,
-                {
-                    text: timeOutText
-                }
-            );
+        else if (session.gameType === 'scramble') {
+            timeOutText +=
+                `📌 *Correct Word:* *${qData.word}*`;
+        }
 
-            setTimeout(
-                () => nextRound(from),
-                3000
-            );
-        },
-        roundTimeLimit * 1000
-    );
+        else if (session.gameType === 'guess') {
+            timeOutText +=
+                `📌 *Secret Number:* *${qData.target}*`;
+        }
+
+        else if (session.gameType === 'emoji') {
+            timeOutText +=
+                `📌 *Answer:* *${qData.answer}*`;
+        }
+
+        session.sock.sendMessage(from, {
+            text: timeOutText
+        });
+
+        setTimeout(() => nextRound(from), 3000);
+    }, roundTimeLimit * 1000);
 }
 
 async function handleGameMessage(
@@ -422,81 +354,49 @@ async function handleGameMessage(
             .trim()
             .toUpperCase();
 
-    const q =
-        session.activeQuestion;
+    const q = session.activeQuestion;
 
     let isCorrect = false;
 
     /*
-     * ================================
-     * TRIVIA / QUIZ ANSWERS
-     * ================================
+     * TRIVIA / QUIZ
      */
-
     if (
         session.gameType === 'trivia' ||
         session.gameType === 'quiz'
     ) {
-        /*
-         * Only A, B, C or D can be accepted.
-         */
-
         if (
-            ['A', 'B', 'C', 'D'].includes(
-                cleanText
-            )
-        ) {
-            if (
-                cleanText ===
-                String(q.answer)
-                    .trim()
-                    .toUpperCase()
-            ) {
-                isCorrect = true;
-            }
-        }
-
-    /*
-     * ================================
-     * SCRAMBLE ANSWERS
-     * ================================
-     */
-
-    } else if (
-        session.gameType === 'scramble'
-    ) {
-        if (
+            ['A', 'B', 'C', 'D'].includes(cleanText) &&
             cleanText ===
-            String(
-                q.targetWord
-            ).toUpperCase()
+                String(q.answer).toUpperCase()
         ) {
             isCorrect = true;
         }
+    }
 
     /*
-     * ================================
-     * NUMBER GUESS ANSWERS
-     * ================================
+     * SCRAMBLE
      */
+    else if (session.gameType === 'scramble') {
+        if (
+            cleanText ===
+            String(q.targetWord).toUpperCase()
+        ) {
+            isCorrect = true;
+        }
+    }
 
-    } else if (
-        session.gameType === 'guess'
-    ) {
-        const num =
-            parseInt(
-                cleanText,
-                10
-            );
+    /*
+     * NUMBER GUESS
+     */
+    else if (session.gameType === 'guess') {
+        const num = parseInt(cleanText, 10);
 
         if (!isNaN(num)) {
-            if (
-                num ===
-                q.targetNumber
-            ) {
+            if (num === q.targetNumber) {
                 isCorrect = true;
             } else {
-                const hint =
+                const hintDir =
                     num < q.targetNumber
                         ? '📈 *Higher!*'
                         : '📉 *Lower!*';
@@ -506,11 +406,9 @@ async function handleGameMessage(
                     {
                         text:
                             `❌ *${num}* is wrong!\n` +
-                            `${hint} Try again!`
+                            `${hintDir} Try again!`
                     },
-                    {
-                        quoted: m
-                    }
+                    { quoted: m }
                 );
 
                 return true;
@@ -519,68 +417,81 @@ async function handleGameMessage(
     }
 
     /*
-     * ================================
-     * CORRECT ANSWER
-     * ================================
+     * GUESS THE EMOJI
      */
+    else if (session.gameType === 'emoji') {
+        const playerAnswer =
+            String(text || '')
+                .trim()
+                .toLowerCase();
 
+        const correctAnswer =
+            String(q.answer || '')
+                .trim()
+                .toLowerCase();
+
+        if (
+            playerAnswer &&
+            (
+                playerAnswer === correctAnswer ||
+                playerAnswer.includes(correctAnswer) ||
+                correctAnswer.includes(playerAnswer)
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+    /*
+     * CORRECT ANSWER
+     */
     if (isCorrect) {
         session.answeredThisRound = true;
 
         if (session.timer) {
-            clearTimeout(
-                session.timer
-            );
+            clearTimeout(session.timer);
         }
 
         session.scores[sender] =
-            (session.scores[sender] || 0) +
-            5;
+            (session.scores[sender] || 0) + 5;
 
         const sortedScores =
-            Object.entries(
-                session.scores
-            ).sort(
-                (a, b) =>
-                    b[1] - a[1]
-            );
+            Object.entries(session.scores)
+                .sort((a, b) => b[1] - a[1]);
 
         let winAnnouncement =
-`🎉 *CORRECT ANSWER!* 🎉
+`🎉 *CORRECT!* 🎉
 
-👑 @${sender.replace(
-    /[^0-9]/g,
-    ''
-)} got it right!
-
+🏆 @${sender.replace(/[^0-9]/g, '')} got it right!
 💎 *+5 POINTS*
 
-🏆 *CURRENT SCORES:*`;
+📊 *CURRENT SCORE:*`;
 
         sortedScores.forEach(
-            ([user, points], index) => {
+            ([user, pts], index) => {
                 winAnnouncement +=
                     `\n${index + 1}. @${user.replace(
                         /[^0-9]/g,
                         ''
-                    )} — *${points} pts*`;
+                    )} — *${pts} pts*`;
             }
         );
+
+        if (session.gameType === 'emoji') {
+            winAnnouncement +=
+                `\n\n😂 *Emoji Answer:* *${q.answer}*`;
+        }
 
         await sock.sendMessage(
             from,
             {
-                text:
-                    winAnnouncement,
+                text: winAnnouncement,
                 mentions:
                     sortedScores.map(
-                        ([user]) =>
-                            user
+                        ([user]) => user
                     )
             },
-            {
-                quoted: m
-            }
+            { quoted: m }
         );
 
         setTimeout(
@@ -595,45 +506,31 @@ async function handleGameMessage(
 }
 
 async function endGame(from) {
-    const session =
-        activeGames[from];
+    const session = activeGames[from];
 
-    if (!session) {
-        return;
-    }
+    if (!session) return;
 
     if (session.timer) {
-        clearTimeout(
-            session.timer
-        );
+        clearTimeout(session.timer);
     }
 
     const sortedScores =
-        Object.entries(
-            session.scores
-        ).sort(
-            (a, b) =>
-                b[1] - a[1]
-        );
+        Object.entries(session.scores)
+            .sort((a, b) => b[1] - a[1]);
 
     let finalDashboard =
 `┏━━━ 🏆 *GAME OVER* 🏆 ━━━┓
+┃ 🎮 *QUEEN VIDA GAME RESULTS*
 ┃
-┃ 🎮 *GAME COMPLETED!*
-┃
+┃ *Final Leaderboard*
 ┣━━━━━━━━━━━━━━━━━━━━━━━`;
 
-    if (
-        sortedScores.length === 0
-    ) {
+    if (sortedScores.length === 0) {
         finalDashboard +=
-            `\n┃ ❌ *Nobody scored points this session.*`;
+            `\n┃ ❌ *Nobody scored any points!*`;
     } else {
-        finalDashboard +=
-            `\n┃ 🏆 *FINAL LEADERBOARD:*`;
-
         sortedScores.forEach(
-            ([user, points], index) => {
+            ([user, pts], index) => {
                 const medal =
                     index === 0
                         ? '🥇'
@@ -644,12 +541,10 @@ async function endGame(from) {
                         : '▪️';
 
                 finalDashboard +=
-                    `\n┃ ${medal} ${
-                        index + 1
-                    }. @${user.replace(
+                    `\n┃ ${medal} ${index + 1}. @${user.replace(
                         /[^0-9]/g,
                         ''
-                    )} — *${points} Points*`;
+                    )} — *${pts} Points*`;
             }
         );
 
@@ -657,24 +552,23 @@ async function endGame(from) {
             sortedScores[0][0];
 
         finalDashboard +=
-            `\n┃\n┃ 👑 *WINNER:* @${winner.replace(
+            `\n┣━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `┃ 👑 *WINNER:* @${winner.replace(
                 /[^0-9]/g,
                 ''
             )} 🎉`;
     }
 
     finalDashboard +=
-        `\n┃\n┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+        `\n┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
     await session.sock.sendMessage(
         from,
         {
-            text:
-                finalDashboard,
+            text: finalDashboard,
             mentions:
                 sortedScores.map(
-                    ([user]) =>
-                        user
+                    ([user]) => user
                 )
         }
     );
