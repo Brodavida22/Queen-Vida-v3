@@ -4,26 +4,19 @@ const path = require('path');
 const activeGames = new Map();
 
 function loadQuestions(game) {
-    try {
-        const filePath = path.join(__dirname, '..', 'games', `${game}.json`);
+    const filePath = path.join(__dirname, '..', 'games', `${game}.json`);
 
-        if (!fs.existsSync(filePath)) {
-            console.error(`❌ Game file not found: ${filePath}`);
-            return [];
-        }
-
-        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-        if (!Array.isArray(data)) {
-            console.error(`❌ Game file must contain an array: ${game}.json`);
-            return [];
-        }
-
-        return data;
-    } catch (error) {
-        console.error(`❌ Failed to load ${game}.json:`, error);
-        return [];
+    if (!fs.existsSync(filePath)) {
+        throw new Error(`Game file not found: ${game}.json`);
     }
+
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+    if (!Array.isArray(data) || data.length === 0) {
+        throw new Error(`No questions found for ${game}`);
+    }
+
+    return data;
 }
 
 function shuffle(array) {
@@ -41,62 +34,73 @@ function normalizeText(text) {
     return String(text || '')
         .toLowerCase()
         .trim()
-        .replace(/[.,!?'"`]/g, '');
+        .replace(/[.,!?'"`]/g, '')
+        .replace(/\s+/g, ' ');
 }
 
 function extractWords(text) {
-    return String(text || '')
-        .trim()
+    return normalizeText(text)
         .split(/\s+/)
+        .map(word => word.replace(/[^a-z0-9'-]/g, ''))
         .filter(Boolean);
 }
 
-function checkEndingWords(text, qData) {
+function checkEndingWords(text, ending) {
     const words = extractWords(text);
 
-    if (words.length !== 3) return false;
+    if (words.length !== 3) {
+        return false;
+    }
 
-    const ending = String(qData.ending || '').toLowerCase();
+    const uniqueWords = new Set(words);
 
-    const uniqueWords = [...new Set(words.map(w => normalizeText(w)))];
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
 
-    if (uniqueWords.length !== 3) return false;
+    const suffix = normalizeText(ending);
 
-    return uniqueWords.every(word => word.endsWith(ending));
+    return words.every(word => word.endsWith(suffix));
 }
 
-function checkStartingWords(text, qData) {
+function checkStartingWords(text, starting) {
     const words = extractWords(text);
 
-    if (words.length !== 3) return false;
+    if (words.length !== 3) {
+        return false;
+    }
 
-    const starting = String(qData.starting || '').toLowerCase();
+    const uniqueWords = new Set(words);
 
-    const uniqueWords = [...new Set(words.map(w => normalizeText(w)))];
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
 
-    if (uniqueWords.length !== 3) return false;
+    const prefix = normalizeText(starting);
 
-    return uniqueWords.every(word => word.startsWith(starting));
+    return words.every(word => word.startsWith(prefix));
 }
 
-function checkRhymeWords(text, qData) {
+function checkRhymeWords(text, question) {
     const words = extractWords(text);
 
-    if (words.length !== 3) return false;
+    if (words.length !== 3) {
+        return false;
+    }
 
-    const uniqueWords = [...new Set(words.map(w => normalizeText(w)))];
+    const uniqueWords = new Set(words);
 
-    if (uniqueWords.length !== 3) return false;
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
 
-    const rhymes = Array.isArray(qData.rhymes)
-        ? qData.rhymes.map(word => normalizeText(word))
-        : [];
+    if (!Array.isArray(question.rhymes)) {
+        return false;
+    }
 
-    const target = normalizeText(qData.word);
+    const validRhymes = question.rhymes.map(word => normalizeText(word));
 
-    return uniqueWords.every(word =>
-        word !== target && rhymes.includes(word)
-    );
+    return words.every(word => validRhymes.includes(word));
 }
 
 function getGameTitle(game) {
@@ -111,273 +115,266 @@ function getGameTitle(game) {
         ending: '🔚 WORDS THAT END WITH',
         starting: '🔤 WORDS THAT START WITH',
         rhyme: '🎵 RHYMING WORDS',
-        movemoji: '🎬 EMOJI MOVIE'
+        movemoji: '🎬 EMOJI MOVIE',
+        '2truth1lie': '🕵️ 2 TRUTHS 1 LIE'
     };
 
     return titles[game] || game.toUpperCase();
 }
 
-function formatPlayer(jid) {
-    return jid ? `@${jid.split('@')[0]}` : 'Player';
-}
-
 async function startGame(sock, from, game, rounds = 10, difficulty = null, customArg = null) {
-    if (activeGames.has(from)) {
-        await sock.sendMessage(from, {
-            text: '⚠️ There is already an active game in this group.\n\nUse `.game stop` to stop it first.'
-        });
-        return false;
-    }
+    try {
+        let questions = loadQuestions(game);
 
-    let questions = loadQuestions(game);
+        if (difficulty) {
+            const filtered = questions.filter(
+                q => String(q.difficulty || '').toLowerCase() === String(difficulty).toLowerCase()
+            );
 
-    if (!questions.length) {
-        await sock.sendMessage(from, {
-            text: `❌ No questions found for *${game}*.\n\nMake sure games/${game}.json exists and contains valid JSON.`
-        });
-        return false;
-    }
+            if (filtered.length > 0) {
+                questions = filtered;
+            }
+        }
 
-    if (difficulty) {
-        const filtered = questions.filter(
-            q => String(q.difficulty || '').toLowerCase() === String(difficulty).toLowerCase()
+        questions = shuffle(questions);
+
+        rounds = Math.max(
+            1,
+            Math.min(Number(rounds) || 10, questions.length)
         );
 
-        if (filtered.length > 0) {
-            questions = filtered;
-        }
+        const gameData = {
+            game,
+            questions: questions.slice(0, rounds),
+            currentRound: 0,
+            scores: {},
+            timer: null,
+            difficulty,
+            customArg
+        };
+
+        activeGames.set(from, gameData);
+
+        await sock.sendMessage(from, {
+            text:
+                `🎮 *${getGameTitle(game)} STARTED!*\n\n` +
+                `📚 Game: *${getGameTitle(game)}*\n` +
+                `🔢 Rounds: *${rounds}*\n` +
+                (difficulty ? `🎯 Difficulty: *${difficulty}*\n` : '') +
+                `⏱️ You have *30 seconds* per round!\n\n` +
+                `🔥 LET THE GAME BEGIN!`
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        await nextRound(sock, from);
+
+        return true;
+    } catch (error) {
+        console.error('startGame error:', error);
+
+        await sock.sendMessage(from, {
+            text: `❌ Could not start *${game}*.\n\n${error.message}`
+        });
+
+        return false;
     }
-
-    questions = shuffle(questions);
-
-    const totalRounds = Math.min(
-        Math.max(parseInt(rounds, 10) || 10, 1),
-        questions.length
-    );
-
-    const gameData = {
-        game,
-        rounds: totalRounds,
-        currentRound: 0,
-        questions,
-        difficulty,
-        customArg,
-        scores: {},
-        currentQuestion: null,
-        timer: null,
-        startedAt: Date.now()
-    };
-
-    activeGames.set(from, gameData);
-
-    await sock.sendMessage(from, {
-        text:
-            `🎮 *${getGameTitle(game)} STARTED!*\n\n` +
-            `👥 Group Game\n` +
-            `🏆 Rounds: *${totalRounds}*\n` +
-            (difficulty ? `📊 Difficulty: *${difficulty}*\n` : '') +
-            `\n🔥 Everybody can play!\n` +
-            `⚡ First correct answer gets the point!\n\n` +
-            `Get ready...`
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    await nextRound(sock, from);
-
-    return true;
 }
 
 async function nextRound(sock, from) {
     const gameData = activeGames.get(from);
 
-    if (!gameData) return;
-
-    if (gameData.currentRound >= gameData.rounds) {
-        await endGame(sock, from);
+    if (!gameData) {
         return;
+    }
+
+    if (gameData.timer) {
+        clearTimeout(gameData.timer);
+        gameData.timer = null;
     }
 
     gameData.currentRound++;
 
-    const questionIndex = gameData.currentRound - 1;
-    const qData = gameData.questions[questionIndex];
-
-    if (!qData) {
+    if (gameData.currentRound > gameData.questions.length) {
         await endGame(sock, from);
         return;
     }
 
-    gameData.currentQuestion = qData;
+    const qData = gameData.questions[gameData.currentRound - 1];
 
     let text = '';
 
     switch (gameData.game) {
         case 'trivia':
-        case 'quiz':
+        case 'quiz': {
             text =
-                `🧠 *ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `❓ ${qData.question || qData.q || 'Question'}\n\n`;
+                `🧠 *${getGameTitle(gameData.game)} — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `❓ ${qData.question}\n\n`;
 
             if (Array.isArray(qData.options)) {
-                text += qData.options
-                    .map((option, index) => `${String.fromCharCode(65 + index)}. ${option}`)
-                    .join('\n');
+                qData.options.forEach((option, index) => {
+                    text += `${String.fromCharCode(65 + index)}️⃣ ${option}\n`;
+                });
 
-                text += '\n\n💬 Reply with the answer or option letter.';
+                text += `\n💬 Reply with the correct option!`;
             } else {
-                text += '💬 Reply with your answer!';
+                text += `💬 Reply with your answer!`;
             }
+
             break;
+        }
 
         case 'scramble':
             text =
-                `🔤 *ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `🔀 Unscramble this word:\n\n` +
-                `*${qData.scrambled || qData.word || qData.question}*\n\n` +
-                `💬 First correct answer wins!`;
+                `🔤 *WORD SCRAMBLE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `🧩 Unscramble this word:\n\n` +
+                `👉 *${qData.scrambled || qData.word || qData.question}*\n\n` +
+                `💬 Type the correct word!`;
             break;
 
         case 'guess':
             text =
-                `🔢 *ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
+                `🔢 *NUMBER GUESS — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
                 `🎯 Guess the number!\n\n` +
-                `🔢 Range: *${qData.min || 1} - ${qData.max || 100}*\n\n` +
-                `💬 Send your guess!`;
+                `💡 ${qData.hint || 'Take your best guess!'}\n\n` +
+                `💬 Send a number between ${qData.min || 1} and ${qData.max || 100}.`;
             break;
 
         case 'emoji':
             text =
-                `🤯 *ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `${qData.emoji || qData.emojis || '❓'}\n\n` +
-                `🎯 What does this emoji combination mean?\n\n` +
-                `💬 First correct answer wins!`;
-            break;
-
-        case 'couples':
-            text =
-                `❤️ *COUPLES CHALLENGE — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `💞 ${qData.challenge || qData.question}\n\n` +
-                `💬 Get involved and reply!`;
+                `🤯 *GUESS THE EMOJI — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `${qData.emoji}\n\n` +
+                `🎯 What does this emoji represent?\n` +
+                `💬 Send your answer!`;
             break;
 
         case 'findemoji':
             text =
-                `🔎 *FIND THE EMOJI — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `${qData.emojis || '❓'}\n\n` +
-                `🎯 Find the hidden/different emoji!\n\n` +
-                `💬 Send your answer!`;
-            break;
-
-        case 'ending':
-            text =
-                `🔚 *WORDS THAT END WITH — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `🎯 Give me *3 words* that end with:\n\n` +
-                `👉 *${qData.ending}*\n\n` +
-                `💬 Send all 3 words in one message!`;
-            break;
-
-        case 'starting':
-            text =
-                `🔤 *WORDS THAT START WITH — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `🎯 Give me *3 words* that start with:\n\n` +
-                `👉 *${qData.starting}*\n\n` +
-                `💬 Send all 3 words in one message!`;
-            break;
-
-        case 'rhyme':
-            text =
-                `🎵 *RHYMING WORDS — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `🎯 Give me *3 words* that rhyme with:\n\n` +
-                `👉 *${qData.word}*\n\n` +
-                `💬 Send all 3 words in one message!`;
+                `🔎 *FIND THE EMOJI — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `${qData.emojis || qData.emoji}\n\n` +
+                `🎯 Find the odd/different emoji!\n` +
+                `💬 Reply with your answer.`;
             break;
 
         case 'movemoji':
             text =
-                `🎬 *EMOJI MOVIE — ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `${qData.emojis || qData.emoji || '❓'}\n\n` +
-                `🎯 Guess the movie represented by these emojis!\n\n` +
-                `💬 First correct answer wins!`;
+                `🎬 *EMOJI MOVIE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `${qData.emojis || qData.emoji}\n\n` +
+                `🎯 Guess the movie!\n` +
+                `💬 Send the movie title.`;
+            break;
+
+        case 'couples':
+            text =
+                `❤️ *COUPLES CHALLENGE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `💞 ${qData.challenge}\n\n` +
+                `💬 Participate to earn a point!`;
+            break;
+
+        case 'ending':
+            text =
+                `🔚 *WORDS THAT END WITH — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `🎯 Give me *3 words* that end with:\n\n` +
+                `👉 *${qData.ending}*\n\n` +
+                `💬 Example: if the ending is "er" → player, water, tiger\n\n` +
+                `⚡ First correct answer gets the point!`;
+            break;
+
+        case 'starting':
+            text =
+                `🔤 *WORDS THAT START WITH — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `🎯 Give me *3 words* that start with:\n\n` +
+                `👉 *${qData.starting}*\n\n` +
+                `💬 Example: if the starting is "st" → star, stone, story\n\n` +
+                `⚡ First correct answer gets the point!`;
+            break;
+
+        case 'rhyme':
+            text =
+                `🎵 *RHYMING WORDS — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `🎯 Give me *3 words* that rhyme with:\n\n` +
+                `👉 *${qData.word}*\n\n` +
+                `💬 Send exactly 3 words!\n\n` +
+                `⚡ First correct answer gets the point!`;
+            break;
+
+        case '2truth1lie':
+            text =
+                `🕵️ *2 TRUTHS 1 LIE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `1️⃣ ${qData.statements?.[0] || ''}\n` +
+                `2️⃣ ${qData.statements?.[1] || ''}\n` +
+                `3️⃣ ${qData.statements?.[2] || ''}\n\n` +
+                `🎯 *Which statement is the LIE?*\n\n` +
+                `💬 Reply with *1*, *2*, or *3*!`;
             break;
 
         default:
             text =
-                `🎮 *ROUND ${gameData.currentRound}/${gameData.rounds}*\n\n` +
-                `${qData.question || qData.challenge || 'Your turn!'}\n\n` +
-                `💬 Send your answer!`;
+                `🎮 *ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
+                `${qData.question || 'Answer this challenge!'}\n\n` +
+                `💬 Reply with your answer!`;
     }
 
     await sock.sendMessage(from, { text });
 
-    if (gameData.timer) {
-        clearTimeout(gameData.timer);
-    }
-
     gameData.timer = setTimeout(async () => {
         const currentGame = activeGames.get(from);
 
-        if (!currentGame || currentGame.currentRound !== gameData.currentRound) {
+        if (!currentGame || currentGame !== gameData) {
             return;
         }
 
-        let timeoutText = `⏰ *TIME'S UP!*\n\n`;
+        let answerText = '';
 
-        if (gameData.game === 'trivia' || gameData.game === 'quiz') {
-            timeoutText += `✅ Answer: *${qData.answer || 'Unknown'}*`;
-        } else if (gameData.game === 'scramble') {
-            timeoutText += `✅ Answer: *${qData.answer || qData.word || 'Unknown'}*`;
-        } else if (gameData.game === 'guess') {
-            timeoutText += `🎯 Number was: *${qData.answer || qData.number || 'Unknown'}*`;
-        } else if (gameData.game === 'emoji' || gameData.game === 'movemoji') {
-            timeoutText += `🎯 Answer: *${qData.answer || 'Unknown'}*`;
-        } else if (gameData.game === 'ending') {
-            timeoutText += `📝 Examples: *${qData.examples || qData.ending || 'Unknown'}*`;
-        } else if (gameData.game === 'starting') {
-            timeoutText += `📝 Examples: *${qData.examples || qData.starting || 'Unknown'}*`;
-        } else if (gameData.game === 'rhyme') {
-            const examples = Array.isArray(qData.rhymes)
-                ? qData.rhymes.slice(0, 8).join(', ')
-                : 'No examples available';
-
-            timeoutText += `📝 Possible rhymes: *${examples}*`;
-        } else if (gameData.game === 'couples') {
-            timeoutText += `❤️ Challenge skipped!`;
-        } else if (gameData.game === 'findemoji') {
-            timeoutText += `🔎 Answer: *${qData.answer || 'Unknown'}*`;
+        if (gameData.game === '2truth1lie') {
+            answerText =
+                `⏰ *TIME'S UP!*\n\n` +
+                `The lie was statement *${qData.lie}*.\n\n` +
+                `😅 Better luck next round!`;
+        } else if (
+            gameData.game === 'emoji' ||
+            gameData.game === 'movemoji' ||
+            gameData.game === 'scramble' ||
+            gameData.game === 'trivia' ||
+            gameData.game === 'quiz'
+        ) {
+            answerText =
+                `⏰ *TIME'S UP!*\n\n` +
+                `✅ Correct answer: *${qData.answer || qData.word || 'See the next round'}*`;
         } else {
-            timeoutText += `🎯 Round skipped!`;
+            answerText =
+                `⏰ *TIME'S UP!*\n\n` +
+                `Nobody got it this round! 😭`;
         }
 
-        await sock.sendMessage(from, { text: timeoutText });
+        await sock.sendMessage(from, { text: answerText });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const latestGame = activeGames.get(from);
-
-        if (latestGame && latestGame.currentRound === gameData.currentRound) {
-            await nextRound(sock, from);
-        }
+        setTimeout(async () => {
+            if (activeGames.get(from) === gameData) {
+                await nextRound(sock, from);
+            }
+        }, 2000);
     }, 30000);
 }
 
 async function handleGameMessage(sock, m, from, body) {
     const gameData = activeGames.get(from);
 
-    if (!gameData) return false;
+    if (!gameData) {
+        return false;
+    }
 
     const text = String(body || '').trim();
 
-    if (!text) return true;
-
-    if (text.toLowerCase() === '.game stop') {
-        await stopGame(sock, from);
+    if (!text) {
         return true;
     }
 
-    const qData = gameData.currentQuestion;
+    const qData = gameData.questions[gameData.currentRound - 1];
 
-    if (!qData) return true;
+    if (!qData) {
+        return true;
+    }
 
     let correct = false;
 
@@ -386,31 +383,18 @@ async function handleGameMessage(sock, m, from, body) {
         case 'quiz': {
             const answer = normalizeText(qData.answer);
 
-            const possibleAnswers = [
-                answer,
-                normalizeText(qData.correctAnswer)
-            ].filter(Boolean);
-
             const userAnswer = normalizeText(text);
 
-            correct = possibleAnswers.includes(userAnswer);
-
-            if (!correct && Array.isArray(qData.options)) {
-                const index = qData.options.findIndex(
-                    option => normalizeText(option) === userAnswer
-                );
-
-                if (index >= 0) {
-                    const letter = String.fromCharCode(65 + index).toLowerCase();
-
-                    if (possibleAnswers.includes(letter)) {
-                        correct = true;
-                    }
-                }
-            }
-
-            if (!correct && /^[a-d]$/i.test(text)) {
-                correct = possibleAnswers.includes(text.toLowerCase());
+            if (
+                userAnswer === answer ||
+                (Array.isArray(qData.options) &&
+                    qData.options.some(
+                        (option, index) =>
+                            userAnswer === String.fromCharCode(97 + index) &&
+                            normalizeText(option) === answer
+                    ))
+            ) {
+                correct = true;
             }
 
             break;
@@ -423,13 +407,11 @@ async function handleGameMessage(sock, m, from, body) {
         }
 
         case 'guess': {
-            const number = parseInt(text, 10);
-            const answer = Number(qData.answer ?? qData.number);
+            const userNumber = Number(text);
+            const answer = Number(qData.answer);
 
-            if (!Number.isNaN(number) && !Number.isNaN(answer)) {
-                if (number === answer) {
-                    correct = true;
-                }
+            if (!Number.isNaN(userNumber) && userNumber === answer) {
+                correct = true;
             }
 
             break;
@@ -438,61 +420,44 @@ async function handleGameMessage(sock, m, from, body) {
         case 'emoji':
         case 'movemoji': {
             const answer = normalizeText(qData.answer);
-
-            if (answer) {
-                const userAnswer = normalizeText(text);
-
-                correct =
-                    userAnswer === answer ||
-                    userAnswer.includes(answer) ||
-                    answer.includes(userAnswer);
-            }
-
+            correct = normalizeText(text) === answer;
             break;
         }
 
         case 'findemoji': {
             const answer = normalizeText(qData.answer);
-
-            if (answer) {
-                const userAnswer = normalizeText(text);
-
-                correct =
-                    userAnswer === answer ||
-                    userAnswer.includes(answer) ||
-                    answer.includes(userAnswer);
-            }
-
+            correct = normalizeText(text) === answer;
             break;
         }
 
+        case 'couples':
+            correct = text.length > 0;
+            break;
+
         case 'ending':
-            correct = checkEndingWords(text, qData);
+            correct = checkEndingWords(text, qData.ending);
             break;
 
         case 'starting':
-            correct = checkStartingWords(text, qData);
+            correct = checkStartingWords(text, qData.starting);
             break;
 
         case 'rhyme':
             correct = checkRhymeWords(text, qData);
             break;
 
-        case 'couples':
-            // Couples challenges are participation-based.
-            // Any non-empty response counts as participation.
-            correct = text.length > 0;
-            break;
+        case '2truth1lie': {
+            const answer = Number(text);
 
-        default: {
-            const answer = normalizeText(qData.answer);
-
-            if (answer) {
-                correct = normalizeText(text) === answer;
+            if ([1, 2, 3].includes(answer)) {
+                correct = answer === Number(qData.lie);
             }
 
             break;
         }
+
+        default:
+            correct = normalizeText(text) === normalizeText(qData.answer);
     }
 
     if (!correct) {
@@ -505,40 +470,41 @@ async function handleGameMessage(sock, m, from, body) {
     }
 
     const participant =
-        m?.pushName ||
-        m?.name ||
-        (m?.key?.participant ? formatPlayer(m.key.participant) : 'Player');
+        m.pushName ||
+        m.notifyName ||
+        m.sender ||
+        'Player';
 
-    const participantJid = m?.key?.participant || m?.participant;
+    if (!gameData.scores[participant]) {
+        gameData.scores[participant] = 0;
+    }
 
-    const scoreKey = participantJid || participant;
+    gameData.scores[participant]++;
 
-    gameData.scores[scoreKey] =
-        (gameData.scores[scoreKey] || 0) + 1;
+    let answerMessage = '';
 
-    let answerDisplay = qData.answer || '';
-
-    if (gameData.game === 'rhyme') {
-        answerDisplay = qData.word;
+    if (gameData.game === '2truth1lie') {
+        answerMessage =
+            `🎯 *CORRECT!*\n\n` +
+            `🕵️ ${participant} found the lie!\n` +
+            `✅ Statement *${qData.lie}* was the lie.\n\n` +
+            `🏆 *+1 POINT*`;
+    } else {
+        answerMessage =
+            `🎉 *CORRECT!*\n\n` +
+            `👑 ${participant} got it first!\n` +
+            `🏆 *+1 POINT*`;
     }
 
     await sock.sendMessage(from, {
-        text:
-            `🎉 *CORRECT!*\n\n` +
-            `🏆 @${String(scoreKey).split('@')[0]} gets *+1 point!*\n\n` +
-            `📊 Score: *${gameData.scores[scoreKey]}*\n` +
-            (answerDisplay ? `✅ Answer: *${answerDisplay}*\n` : '') +
-            `\n🔥 Next round coming up...`,
-        mentions: participantJid ? [participantJid] : []
+        text: answerMessage
     });
 
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const currentGame = activeGames.get(from);
-
-    if (currentGame && currentGame.currentRound === gameData.currentRound) {
-        await nextRound(sock, from);
-    }
+    setTimeout(async () => {
+        if (activeGames.get(from) === gameData) {
+            await nextRound(sock, from);
+        }
+    }, 2000);
 
     return true;
 }
@@ -548,7 +514,7 @@ async function stopGame(sock, from) {
 
     if (!gameData) {
         await sock.sendMessage(from, {
-            text: 'ℹ️ There is no active game in this group.'
+            text: `❌ There is no active game in this group.`
         });
 
         return false;
@@ -561,7 +527,10 @@ async function stopGame(sock, from) {
     activeGames.delete(from);
 
     await sock.sendMessage(from, {
-        text: '🛑 *GAME STOPPED!*\n\nThe current game has been cancelled.'
+        text:
+            `🛑 *GAME STOPPED!*\n\n` +
+            `🎮 ${getGameTitle(gameData.game)}\n` +
+            `📊 Round: ${gameData.currentRound}/${gameData.questions.length}`
     });
 
     return true;
@@ -570,48 +539,41 @@ async function stopGame(sock, from) {
 async function endGame(sock, from) {
     const gameData = activeGames.get(from);
 
-    if (!gameData) return;
+    if (!gameData) {
+        return;
+    }
 
     if (gameData.timer) {
         clearTimeout(gameData.timer);
+        gameData.timer = null;
     }
 
     const scores = Object.entries(gameData.scores)
-        .sort((a, b) => b[1] - a[1]);
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
 
     let text =
-        `🏁 *${getGameTitle(gameData.game)} FINISHED!*\n\n` +
-        `🔥 Great game everyone!\n\n`;
+        `🏁 *GAME OVER!*\n\n` +
+        `🎮 *${getGameTitle(gameData.game)}*\n` +
+        `📊 ${gameData.questions.length} rounds completed\n\n`;
 
-    if (!scores.length) {
-        text += '😅 Nobody scored this time!';
+    if (scores.length === 0) {
+        text += `😅 Nobody scored this time!`;
     } else {
-        text += '🏆 *FINAL SCORES*\n\n';
+        text += `🏆 *FINAL LEADERBOARD*\n\n`;
 
-        scores.slice(0, 10).forEach(([jid, score], index) => {
-            const medal =
-                index === 0 ? '🥇' :
-                index === 1 ? '🥈' :
-                index === 2 ? '🥉' :
-                '🏅';
+        scores.forEach(([name, score], index) => {
+            const medals = ['🥇', '🥈', '🥉'];
 
-            text += `${medal} @${String(jid).split('@')[0]} — *${score} point${score === 1 ? '' : 's'}*\n`;
+            text += `${medals[index] || `${index + 1}.`} *${name}* — ${score} point${score === 1 ? '' : 's'}\n`;
         });
 
-        text += '\n🎉 Thanks for playing!';
+        text += `\n🔥 Thanks for playing!`;
     }
-
-    const mentions = scores
-        .slice(0, 10)
-        .map(([jid]) => jid)
-        .filter(jid => jid.includes('@'));
 
     activeGames.delete(from);
 
-    await sock.sendMessage(from, {
-        text,
-        mentions
-    });
+    await sock.sendMessage(from, { text });
 }
 
 function isGameActive(from) {
@@ -620,10 +582,10 @@ function isGameActive(from) {
 
 module.exports = {
     startGame,
-    stopGame,
     nextRound,
     handleGameMessage,
+    stopGame,
     endGame,
     isGameActive,
-    loadQuestions
+    getGameTitle
 };
