@@ -59,10 +59,13 @@ function getGlobalSettings(settingsFile) {
                     data.autoViewStatus !== undefined
                         ? data.autoViewStatus
                         : 'on',
+
+                // AUTO-REACTION DEFAULT IS NOW OFF
                 autoReaction:
                     data.autoReaction !== undefined
                         ? data.autoReaction
-                        : 'on',
+                        : 'off',
+
                 statusReaction:
                     data.statusReaction !== undefined
                         ? data.statusReaction
@@ -79,7 +82,7 @@ function getGlobalSettings(settingsFile) {
 
     return {
         autoViewStatus: 'on',
-        autoReaction: 'on',
+        autoReaction: 'off',
         statusReaction: 'off'
     };
 }
@@ -342,62 +345,65 @@ function createMessageHandler(sock, { sessionId, ownerNumber, isMain }) {
                 m.key.fromMe;
 
             // =================================================
-// ACTIVITY TRACKER
-// =================================================
-// Tracks messages + the last time the bot saw each
-// member active in each group.
+            // ACTIVITY TRACKER
+            // =================================================
+            // Tracks messages + the last time the bot saw each
+            // member active in each group.
 
-if (from.endsWith('@g.us') && sender) {
-    try {
-        let act = fs.existsSync(ACTIVITY_FILE)
-            ? JSON.parse(
-                fs.readFileSync(ACTIVITY_FILE, 'utf8')
-            )
-            : {};
+            if (from.endsWith('@g.us') && sender) {
+                try {
+                    let act = fs.existsSync(ACTIVITY_FILE)
+                        ? JSON.parse(
+                              fs.readFileSync(
+                                  ACTIVITY_FILE,
+                                  'utf8'
+                              )
+                          )
+                        : {};
 
-        if (!act || typeof act !== 'object') {
-            act = {};
-        }
+                    if (!act || typeof act !== 'object') {
+                        act = {};
+                    }
 
-        if (!act[from] || typeof act[from] !== 'object') {
-            act[from] = {};
-        }
+                    if (!act[from] || typeof act[from] !== 'object') {
+                        act[from] = {};
+                    }
 
-        const existing = act[from][sender];
+                    const existing = act[from][sender];
 
-        // Support the old activity format where the value
-        // was simply a number.
-        if (typeof existing === 'number') {
-            act[from][sender] = {
-                messages: existing,
-                lastActive: Date.now()
-            };
-        } else if (
-            !existing ||
-            typeof existing !== 'object'
-        ) {
-            act[from][sender] = {
-                messages: 0,
-                lastActive: Date.now()
-            };
-        }
+                    // Support the old activity format where the value
+                    // was simply a number.
+                    if (typeof existing === 'number') {
+                        act[from][sender] = {
+                            messages: existing,
+                            lastActive: Date.now()
+                        };
+                    } else if (
+                        !existing ||
+                        typeof existing !== 'object'
+                    ) {
+                        act[from][sender] = {
+                            messages: 0,
+                            lastActive: Date.now()
+                        };
+                    }
 
-        act[from][sender].messages =
-            Number(act[from][sender].messages || 0) + 1;
+                    act[from][sender].messages =
+                        Number(act[from][sender].messages || 0) + 1;
 
-        act[from][sender].lastActive = Date.now();
+                    act[from][sender].lastActive = Date.now();
 
-        fs.writeFileSync(
-            ACTIVITY_FILE,
-            JSON.stringify(act, null, 2)
-        );
-    } catch (actErr) {
-        console.error(
-            '🔥 [ACTIVITY TRACKER ERROR]:',
-            actErr
-        );
-    }
-}
+                    fs.writeFileSync(
+                        ACTIVITY_FILE,
+                        JSON.stringify(act, null, 2)
+                    );
+                } catch (actErr) {
+                    console.error(
+                        '🔥 [ACTIVITY TRACKER ERROR]:',
+                        actErr
+                    );
+                }
+            }
 
             // =================================================
             // MESSAGE BODY
@@ -418,14 +424,19 @@ if (from.endsWith('@g.us') && sender) {
             if (isGroup && !isOwner && m.message.stickerMessage) {
                 try {
                     const groupSettings = fs.existsSync(SETTINGS_FILE)
-                        ? JSON.parse(fs.readFileSync(SETTINGS_FILE))
+                        ? JSON.parse(
+                              fs.readFileSync(
+                                  SETTINGS_FILE
+                              )
+                          )
                         : {};
 
                     const isAntiStickerOn =
                         groupSettings.antisticker?.[from] === 'on';
 
                     if (isAntiStickerOn) {
-                        const groupMetadata = await sock.groupMetadata(from);
+                        const groupMetadata =
+                            await sock.groupMetadata(from);
 
                         const senderParticipant =
                             groupMetadata.participants.find(
@@ -434,8 +445,10 @@ if (from.endsWith('@g.us') && sender) {
 
                         const isAdminSticker =
                             senderParticipant &&
-                            (senderParticipant.admin === 'admin' ||
-                                senderParticipant.admin === 'superadmin');
+                            (
+                                senderParticipant.admin === 'admin' ||
+                                senderParticipant.admin === 'superadmin'
+                            );
 
                         if (!isAdminSticker) {
                             try {
@@ -453,13 +466,20 @@ if (from.endsWith('@g.us') && sender) {
                         }
                     }
                 } catch (antiStickerErr) {
-                    console.error('🔥 [ANTISTICKER ERROR]:', antiStickerErr);
+                    console.error(
+                        '🔥 [ANTISTICKER ERROR]:',
+                        antiStickerErr
+                    );
                 }
             }
 
             // =================================================
             // AUTO REACTION
             // =================================================
+
+            // DEFAULT: OFF
+            // Auto-reaction only runs when settings explicitly
+            // contain autoReaction: "on".
 
             if (
                 settings.autoReaction === 'on' &&
@@ -491,22 +511,33 @@ if (from.endsWith('@g.us') && sender) {
 
             if (isGroup && !isOwner) {
                 try {
-                    const groupMetadata = await sock.groupMetadata(from);
-                    const participants = groupMetadata.participants;
+                    const groupMetadata =
+                        await sock.groupMetadata(from);
 
-                    const senderParticipant = participants.find(
-                        p => p.id === sender
-                    );
+                    const participants =
+                        groupMetadata.participants;
+
+                    const senderParticipant =
+                        participants.find(
+                            p => p.id === sender
+                        );
 
                     const isAdmin =
                         senderParticipant &&
-                        (senderParticipant.admin === 'admin' ||
-                            senderParticipant.admin === 'superadmin');
+                        (
+                            senderParticipant.admin === 'admin' ||
+                            senderParticipant.admin === 'superadmin'
+                        );
 
                     if (!isAdmin) {
-                        let groupSettings = fs.existsSync(SETTINGS_FILE)
-                            ? JSON.parse(fs.readFileSync(SETTINGS_FILE))
-                            : {};
+                        let groupSettings =
+                            fs.existsSync(SETTINGS_FILE)
+                                ? JSON.parse(
+                                      fs.readFileSync(
+                                          SETTINGS_FILE
+                                      )
+                                  )
+                                : {};
 
                         // =====================================
                         // ANTI-SPAM
@@ -518,7 +549,9 @@ if (from.endsWith('@g.us') && sender) {
                         if (isAntiSpamOn) {
                             const now = Date.now();
 
-                            if (!spamTracker[from]) spamTracker[from] = {};
+                            if (!spamTracker[from]) {
+                                spamTracker[from] = {};
+                            }
 
                             if (!spamTracker[from][sender]) {
                                 spamTracker[from][sender] = {
@@ -527,7 +560,8 @@ if (from.endsWith('@g.us') && sender) {
                                 };
                             }
 
-                            const userSpam = spamTracker[from][sender];
+                            const userSpam =
+                                spamTracker[from][sender];
 
                             if (now - userSpam.lastTime < 3000) {
                                 userSpam.count += 1;
@@ -565,7 +599,11 @@ if (from.endsWith('@g.us') && sender) {
 
                                 fs.writeFileSync(
                                     SETTINGS_FILE,
-                                    JSON.stringify(groupSettings, null, 2)
+                                    JSON.stringify(
+                                        groupSettings,
+                                        null,
+                                        2
+                                    )
                                 );
 
                                 if (spamWarnCount === 1) {
@@ -578,7 +616,11 @@ if (from.endsWith('@g.us') && sender) {
 
                                     fs.writeFileSync(
                                         SETTINGS_FILE,
-                                        JSON.stringify(groupSettings, null, 2)
+                                        JSON.stringify(
+                                            groupSettings,
+                                            null,
+                                            2
+                                        )
                                     );
 
                                     await sock.sendMessage(from, {
@@ -593,9 +635,9 @@ if (from.endsWith('@g.us') && sender) {
                                             'remove'
                                         );
                                     } catch (e) {}
-                                }
 
-                                return;
+                                    return;
+                                }
                             }
                         }
 
@@ -603,18 +645,26 @@ if (from.endsWith('@g.us') && sender) {
                         // BADWORDS
                         // =====================================
 
-                        const badWordsConfig = groupSettings.badwords?.[from];
+                        const badWordsConfig =
+                            groupSettings.badwords?.[from];
 
                         if (
                             badWordsConfig &&
                             badWordsConfig.status === 'on' &&
-                            Array.isArray(badWordsConfig.list)
+                            Array.isArray(
+                                badWordsConfig.list
+                            )
                         ) {
-                            const lowerBody = body.toLowerCase();
+                            const lowerBody =
+                                body.toLowerCase();
 
-                            const containsBadWord = badWordsConfig.list.some(
-                                word => lowerBody.includes(word.toLowerCase())
-                            );
+                            const containsBadWord =
+                                badWordsConfig.list.some(
+                                    word =>
+                                        lowerBody.includes(
+                                            word.toLowerCase()
+                                        )
+                                );
 
                             if (containsBadWord) {
                                 try {
@@ -636,12 +686,15 @@ if (from.endsWith('@g.us') && sender) {
                         // ANTILINK
                         // =====================================
 
-                        const antiLinkConfig = groupSettings.antilink?.[from];
+                        const antiLinkConfig =
+                            groupSettings.antilink?.[from];
 
                         if (
                             antiLinkConfig &&
-                            (antiLinkConfig.warn === 'on' ||
-                                antiLinkConfig.instant === 'on')
+                            (
+                                antiLinkConfig.warn === 'on' ||
+                                antiLinkConfig.instant === 'on'
+                            )
                         ) {
                             const linkRegex =
                                 /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9][-a-zA-Z0-9]{0,62}\.)+[a-zA-Z]{2,}(\/[^\s]*)?/gi;
@@ -738,15 +791,18 @@ if (from.endsWith('@g.us') && sender) {
                                                 'remove'
                                             );
                                         } catch (e) {}
-                                    }
 
-                                    return;
+                                        return;
+                                    }
                                 }
                             }
                         }
                     }
                 } catch (groupSecErr) {
-                    console.error('🔥 [GROUP SECURITY ERROR]:', groupSecErr);
+                    console.error(
+                        '🔥 [GROUP SECURITY ERROR]:',
+                        groupSecErr
+                    );
                 }
             }
 
@@ -754,12 +810,13 @@ if (from.endsWith('@g.us') && sender) {
             // GAME MANAGER
             // =================================================
 
-            const isGameHandled = await handleGameMessage(
-                sock,
-                m,
-                from,
-                body
-            );
+            const isGameHandled =
+                await handleGameMessage(
+                    sock,
+                    m,
+                    from,
+                    body
+                );
 
             if (isGameHandled) return;
 
@@ -780,25 +837,27 @@ if (from.endsWith('@g.us') && sender) {
                 .trim()
                 .split(/ +/);
 
-            const commandName = args.shift().toLowerCase();
+            const commandName =
+                args.shift().toLowerCase();
 
-            const command = sock.commands.get(commandName);
+            const command =
+                sock.commands.get(commandName);
 
             if (command) {
                 try {
                     await command.execute(
-    sock,
-    m,
-    m.key.remoteJid,
-    args,
-    isOwner,
-    {
-        sessionId,
-        ownerNumber,
-        isMain,
-        settingsFile: SETTINGS_FILE
-    }
-);
+                        sock,
+                        m,
+                        m.key.remoteJid,
+                        args,
+                        isOwner,
+                        {
+                            sessionId,
+                            ownerNumber,
+                            isMain,
+                            settingsFile: SETTINGS_FILE
+                        }
+                    );
                 } catch (cmdExecErr) {
                     console.error(
                         `🔥 [COMMAND EXECUTION CRASH] [${PREFIX}${commandName}]:`,
@@ -807,15 +866,24 @@ if (from.endsWith('@g.us') && sender) {
 
                     await sock
                         .sendMessage(from, {
-                            text: `❌ An error occurred while executing command *${PREFIX}${commandName}*.\n_Details:_ ${cmdExecErr.message}`
+                            text:
+                                `❌ An error occurred while executing command *${PREFIX}${commandName}*.\n` +
+                                `_Details:_ ${cmdExecErr.message}`
                         })
                         .catch(() => {});
                 }
             }
         } catch (upsertErr) {
-            console.error('🔥 [CRITICAL MESSAGES UPSERT ERROR]:', upsertErr);
+            console.error(
+                '🔥 [CRITICAL MESSAGES UPSERT ERROR]:',
+                upsertErr
+            );
         }
     };
 }
 
-module.exports = { createMessageHandler, getGlobalSettings, getContextEmoji };
+module.exports = {
+    createMessageHandler,
+    getGlobalSettings,
+    getContextEmoji
+};
