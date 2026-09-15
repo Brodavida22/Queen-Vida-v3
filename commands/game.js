@@ -1,145 +1,175 @@
+const { startGame, stopGame } = require('../utils/gameManager');
+
+const CREATOR_NUMBERS = ["2348138558590"];
+
 module.exports = {
     name: 'game',
-    description: 'Start or stop group games',
+    description: 'Interactive group mini-games suite dashboard and control',
 
-    async execute(sock, m, from, args, isOwner) {
-        // Must be used in a group
-        if (!from.endsWith('@g.us')) {
-            return sock.sendMessage(
-                from,
-                {
-                    text: '❌ This command can only be used inside groups!'
-                },
-                { quoted: m }
-            );
-        }
+    async execute(sock, m, from, args) {
+        const sender = m.key.participant || m.key.remoteJid;
+        const senderNumber = sender.replace(/[^0-9]/g, '');
 
-        // Get sender
-        const sender =
-            m.key.participant ||
-            m.key.remoteJid;
+        const isOwner =
+            CREATOR_NUMBERS.includes(senderNumber) ||
+            m.key.fromMe;
 
-        // Check group permissions
-        let metadata;
+        const isGroup = from.endsWith('@g.us');
 
-        try {
-            metadata = await sock.groupMetadata(from);
-        } catch (error) {
-            console.error('❌ Failed to get group metadata:', error);
+        let isAdmin = false;
 
-            return sock.sendMessage(
-                from,
-                {
-                    text: '❌ Unable to get group information.'
-                },
-                { quoted: m }
-            );
-        }
+        if (isGroup && !isOwner) {
+            try {
+                const groupMetadata =
+                    await sock.groupMetadata(from);
 
-        const participant =
-            metadata.participants.find(
-                p =>
-                    p.id === sender ||
-                    p.jid === sender
-            );
+                const participants =
+                    groupMetadata.participants || [];
 
-        const isGroupAdmin =
-            participant?.admin === 'admin' ||
-            participant?.admin === 'superadmin';
+                const participantObj =
+                    participants.find(
+                        p =>
+                            p.id.replace(/[^0-9]/g, '') ===
+                            senderNumber
+                    );
 
-        if (!isOwner && !isGroupAdmin) {
-            return sock.sendMessage(
-                from,
-                {
-                    text:
-                        '❌ Only group admins can start or stop games!'
-                },
-                { quoted: m }
-            );
+                isAdmin =
+                    participantObj &&
+                    (
+                        participantObj.admin === 'admin' ||
+                        participantObj.admin === 'superadmin'
+                    );
+            } catch (e) {
+                console.error(
+                    'Error fetching group metadata:',
+                    e
+                );
+            }
         }
 
         const action =
-            String(args[0] || '').toLowerCase();
+            args[0]
+                ? args[0].toLowerCase()
+                : '';
 
-        /* =========================
-           HELP
-        ========================= */
+        /*
+         * GAME DASHBOARD
+         */
+        if (!['start', 'stop'].includes(action)) {
+            const menuText =
+`┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
+┃ 🌟 *WELCOME TO THE GAME ZONE!*
+┃ 👑 *Queen Vida is your host!*
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🎯 *CLASSIC GAMES*
+┃
+┃ 1️⃣ *.game start trivia <difficulty> <rounds>*
+┃    🧠 General knowledge
+┃
+┃ 2️⃣ *.game start quiz <difficulty> <rounds>*
+┃    📝 Multiple choice challenge
+┃
+┃ 3️⃣ *.game start scramble <rounds>*
+┃    🔤 Unscramble the word
+┃
+┃ 4️⃣ *.game start guess <rounds>*
+┃    🔢 Guess the secret number
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 😂 *NEW GAMES*
+┃
+┃ 5️⃣ *.game start emoji <rounds>*
+┃    😂 Guess the Emoji
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🚀 *MORE GAMES COMING*
+┃
+┃ ❤️ Couples Challenge
+┃ 🔎 Find the Emoji
+┃ 🔤 Words Ending With
+┃ 🔡 Words Starting With
+┃ 🎵 Rhyming Words
+┃ 🎬 Emoji Movie
+┃ 🤥 2 Truth 1 Lie
+┃ 🎤 Finish the Lyrics
+┃ 🚫 Taboo
+┃ 😂 Meme War
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⚙️ *GAME RULES*
+┃ • 🎯 Minimum: *5 rounds*
+┃ • 💎 Correct answer: *+5 points*
+┃ • ⏱️ Trivia/Quiz: *25 seconds*
+┃ • ⏱️ Other games: *45 seconds*
+┃ • 🏆 Final leaderboard at the end
+┃ • 🛑 Use *.game stop* to stop
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 *EXAMPLES*
+┃
+┃ • *.game start emoji 10*
+┃ • *.game start emoji 20*
+┃ • *.game start trivia easy 10*
+┃ • *.game start quiz hard 15*
+┃ • *.game start scramble 10*
+┃ • *.game start guess 10*
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🔒 *Access:* Admins & Creator
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
-        if (!action || action === 'help') {
+            return sock.sendMessage(
+                from,
+                { text: menuText },
+                { quoted: m }
+            );
+        }
+
+        /*
+         * ACCESS CONTROL
+         */
+        if (!isOwner && !isAdmin) {
             return sock.sendMessage(
                 from,
                 {
                     text:
-`🎮 *QUEEN VIDA GAME CENTER*
-
-*Available Games:*
-🎯 Trivia
-🧠 Quiz
-🔀 Scramble
-🔤 Guess
-
-*Start a game:*
-.game start trivia 10
-.game start quiz 10
-.game start scramble 10
-.game start guess 10
-
-*With difficulty:*
-.game start trivia easy 10
-.game start trivia medium 10
-.game start trivia hard 10
-
-.game start quiz easy 10
-.game start quiz medium 10
-.game start quiz hard 10
-
-*Stop game:*
-.game stop
-
-🎯 Difficulty:
-• Easy
-• Medium
-• Hard`
+                        '❌ *ACCESS DENIED!*\n\n' +
+                        'Only group admins and the creator can start or stop games.'
                 },
                 { quoted: m }
             );
         }
 
-        /* =========================
-           STOP GAME
-        ========================= */
-
+        /*
+         * STOP GAME
+         */
         if (action === 'stop') {
-            const {
-                stopGame
-            } = require('../utils/gameManager');
-
-            return stopGame(sock, from);
+            return await stopGame(sock, from);
         }
 
-        /* =========================
-           START GAME
-        ========================= */
-
-        if (action !== 'start') {
+        /*
+         * GROUP ONLY
+         */
+        if (!isGroup) {
             return sock.sendMessage(
                 from,
                 {
                     text:
-                        '❌ Invalid action.\n\nUse *.game help* to see the available commands.'
+                        '❌ *Mini-games can only be played inside WhatsApp groups!*'
                 },
                 { quoted: m }
             );
         }
 
+        /*
+         * GAME TYPE
+         */
         const gameType =
-            String(args[1] || '').toLowerCase();
+            args[1]
+                ? args[1].toLowerCase()
+                : '';
 
         const validGames = [
             'trivia',
             'quiz',
             'scramble',
-            'guess'
+            'guess',
+            'emoji'
         ];
 
         if (!validGames.includes(gameType)) {
@@ -147,84 +177,133 @@ module.exports = {
                 from,
                 {
                     text:
-`❌ Invalid game!
+`❌ *Invalid game!*
 
-Available games:
+🎮 *Available Games:*
+
 🎯 trivia
 🧠 quiz
-🔀 scramble
-🔤 guess
+🔤 scramble
+🔢 guess
+😂 emoji
 
-Example:
-*.game start trivia 10*`
+*Examples:*
+
+.game start emoji 10
+.game start trivia easy 10
+.game start quiz medium 15
+.game start scramble 10
+.game start guess 10`
                 },
                 { quoted: m }
             );
         }
 
         /*
-         * Supported formats:
-         *
-         * .game start trivia 10
-         * .game start trivia easy 10
-         * .game start trivia medium 10
-         * .game start trivia hard 10
+         * DIFFICULTY / ROUND SETTINGS
          */
-
-        let difficulty = null;
-        let roundsArg;
-
-        const possibleDifficulty =
-            String(args[2] || '').toLowerCase();
+        let difficulty = 'all';
+        let roundsIndex = 2;
 
         if (
-            ['easy', 'medium', 'hard'].includes(
-                possibleDifficulty
-            )
+            ['trivia', 'quiz'].includes(gameType)
         ) {
-            difficulty = possibleDifficulty;
-            roundsArg = args[3];
-        } else {
-            roundsArg = args[2];
+            const possibleDifficulty =
+                args[2]
+                    ? args[2].toLowerCase()
+                    : '';
+
+            if (
+                ['easy', 'medium', 'hard']
+                    .includes(possibleDifficulty)
+            ) {
+                difficulty =
+                    possibleDifficulty;
+
+                roundsIndex = 3;
+            }
+
+            else if (
+                ['all', 'mixed']
+                    .includes(possibleDifficulty)
+            ) {
+                difficulty = 'all';
+
+                roundsIndex = 3;
+            }
         }
 
-        let rounds =
-            Number(roundsArg || 10);
-
+        /*
+         * EMOJI / SCRAMBLE / GUESS
+         */
         if (
-            !Number.isInteger(rounds) ||
-            rounds < 5
+            ['emoji', 'scramble', 'guess']
+                .includes(gameType)
+        ) {
+            roundsIndex = 2;
+        }
+
+        const roundsNum =
+            parseInt(args[roundsIndex], 10);
+
+        /*
+         * ROUND VALIDATION
+         */
+        if (
+            isNaN(roundsNum) ||
+            roundsNum < 5
         ) {
             return sock.sendMessage(
                 from,
                 {
                     text:
-                        '❌ Number of rounds must be at least *5*.\n\nExample:\n*.game start quiz easy 10*'
+`❌ *Invalid number of rounds!*
+
+Minimum is *5 rounds*.
+
+*Examples:*
+
+.game start emoji 10
+.game start emoji 20
+.game start trivia easy 10
+.game start quiz hard 15
+.game start scramble 10
+.game start guess 10`
                 },
                 { quoted: m }
             );
         }
 
-        if (rounds > 100) {
+        /*
+         * MAXIMUM FOR DIFFICULTY-SPECIFIC
+         * TRIVIA / QUIZ
+         */
+        if (
+            roundsNum > 25 &&
+            ['trivia', 'quiz'].includes(gameType) &&
+            difficulty !== 'all'
+        ) {
             return sock.sendMessage(
                 from,
                 {
                     text:
-                        '❌ Maximum number of rounds is *100*.'
+                        `❌ *Maximum is 25 rounds* for ` +
+                        `${difficulty.toUpperCase()} ` +
+                        `${gameType.toUpperCase()}.\n\n` +
+                        `There are 25 questions available at this difficulty.`
                 },
                 { quoted: m }
             );
         }
 
-        const {
-            startGame
-        } = require('../utils/gameManager');
-
-        await startGame(
+        /*
+         * START GAME
+         */
+        return await startGame(
             sock,
             from,
             gameType,
-            rounds,
+            roundsNum,
             difficulty
         );
     }
