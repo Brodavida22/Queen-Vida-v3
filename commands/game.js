@@ -1,20 +1,25 @@
 const { startGame, stopGame } = require('../utils/gameManager');
 
-const CREATOR_NUMBERS = ["2348138558590"];
+const CREATOR_NUMBERS = ['2348138558590'];
 
 module.exports = {
     name: 'game',
-    description: 'Interactive group mini-games suite dashboard and control',
+    description: 'Interactive group mini-games suite',
 
     async execute(sock, m, from, args) {
-        const sender = m.key.participant || m.key.remoteJid;
-        const senderNumber = sender.replace(/[^0-9]/g, '');
+        const sender =
+            m.key.participant ||
+            m.key.remoteJid;
+
+        const senderNumber =
+            sender.replace(/[^0-9]/g, '');
 
         const isOwner =
             CREATOR_NUMBERS.includes(senderNumber) ||
             m.key.fromMe;
 
-        const isGroup = from.endsWith('@g.us');
+        const isGroup =
+            from.endsWith('@g.us');
 
         let isAdmin = false;
 
@@ -29,8 +34,10 @@ module.exports = {
                 const participantObj =
                     participants.find(
                         p =>
-                            p.id.replace(/[^0-9]/g, '') ===
-                            senderNumber
+                            p.id.replace(
+                                /[^0-9]/g,
+                                ''
+                            ) === senderNumber
                     );
 
                 isAdmin =
@@ -41,7 +48,7 @@ module.exports = {
                     );
             } catch (e) {
                 console.error(
-                    'Error fetching group metadata:',
+                    'Error checking group admin:',
                     e
                 );
             }
@@ -57,66 +64,62 @@ module.exports = {
          */
         if (!['start', 'stop'].includes(action)) {
             const menuText =
-`┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
-┃ 🌟 *WELCOME TO THE GAME ZONE!*
-┃ 👑 *Queen Vida is your host!*
+`┏━━━ 🎮 *QUEEN VIDA GAME CENTER* 🎮 ━━━┓
+┃
+┃ 👑 *Available Games*
+┃
+┃ 1️⃣ *Trivia*
+┃    \`.game start trivia <difficulty> <rounds>\`
+┃
+┃ 2️⃣ *Quiz*
+┃    \`.game start quiz <difficulty> <rounds>\`
+┃
+┃ 3️⃣ *Word Scramble*
+┃    \`.game start scramble <rounds>\`
+┃
+┃ 4️⃣ *Number Guess*
+┃    \`.game start guess <rounds>\`
+┃
+┃ 5️⃣ *Guess The Emoji*
+┃    \`.game start emoji <rounds>\`
+┃
+┃ 6️⃣ *Couples Challenge*
+┃    \`.game start couples <rounds>\`
+┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🎯 *CLASSIC GAMES*
+┃ ⚙️ *RULES*
 ┃
-┃ 1️⃣ *.game start trivia <difficulty> <rounds>*
-┃    🧠 General knowledge
+┃ • Minimum: *5 rounds*
+┃ • Correct answer: *+5 points*
+┃ • Trivia/Quiz: *25 seconds*
+┃ • Other games: *45 seconds*
+┃ • Only one game per group
 ┃
-┃ 2️⃣ *.game start quiz <difficulty> <rounds>*
-┃    📝 Multiple choice challenge
-┃
-┃ 3️⃣ *.game start scramble <rounds>*
-┃    🔤 Unscramble the word
-┃
-┃ 4️⃣ *.game start guess <rounds>*
-┃    🔢 Guess the secret number
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 😂 *NEW GAMES*
+┃ 💡 *Examples*
 ┃
-┃ 5️⃣ *.game start emoji <rounds>*
-┃    😂 Guess the Emoji
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🚀 *MORE GAMES COMING*
+┃ • \`.game start trivia easy 10\`
+┃ • \`.game start quiz medium 10\`
+┃ • \`.game start scramble 10\`
+┃ • \`.game start guess 10\`
+┃ • \`.game start emoji 10\`
+┃ • \`.game start couples 10\`
 ┃
-┃ ❤️ Couples Challenge
-┃ 🔎 Find the Emoji
-┃ 🔤 Words Ending With
-┃ 🔡 Words Starting With
-┃ 🎵 Rhyming Words
-┃ 🎬 Emoji Movie
-┃ 🤥 2 Truth 1 Lie
-┃ 🎤 Finish the Lyrics
-┃ 🚫 Taboo
-┃ 😂 Meme War
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⚙️ *GAME RULES*
-┃ • 🎯 Minimum: *5 rounds*
-┃ • 💎 Correct answer: *+5 points*
-┃ • ⏱️ Trivia/Quiz: *25 seconds*
-┃ • ⏱️ Other games: *45 seconds*
-┃ • 🏆 Final leaderboard at the end
-┃ • 🛑 Use *.game stop* to stop
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 💡 *EXAMPLES*
+┃ 🛑 Stop:
+┃ \`.game stop\`
 ┃
-┃ • *.game start emoji 10*
-┃ • *.game start emoji 20*
-┃ • *.game start trivia easy 10*
-┃ • *.game start quiz hard 15*
-┃ • *.game start scramble 10*
-┃ • *.game start guess 10*
 ┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🔒 *Access:* Admins & Creator
+┃ 🔒 *Access:* Group Admins & Creator
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
             return sock.sendMessage(
                 from,
-                { text: menuText },
-                { quoted: m }
+                {
+                    text: menuText
+                },
+                {
+                    quoted: m
+                }
             );
         }
 
@@ -128,10 +131,12 @@ module.exports = {
                 from,
                 {
                     text:
-                        '❌ *ACCESS DENIED!*\n\n' +
+                        '❌ *Access Denied!*\n\n' +
                         'Only group admins and the creator can start or stop games.'
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
 
@@ -139,7 +144,10 @@ module.exports = {
          * STOP GAME
          */
         if (action === 'stop') {
-            return await stopGame(sock, from);
+            return await stopGame(
+                sock,
+                from
+            );
         }
 
         /*
@@ -152,7 +160,9 @@ module.exports = {
                     text:
                         '❌ *Mini-games can only be played inside WhatsApp groups!*'
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
 
@@ -169,7 +179,8 @@ module.exports = {
             'quiz',
             'scramble',
             'guess',
-            'emoji'
+            'emoji',
+            'couples'
         ];
 
         if (!validGames.includes(gameType)) {
@@ -181,32 +192,37 @@ module.exports = {
 
 🎮 *Available Games:*
 
-🎯 trivia
-🧠 quiz
-🔤 scramble
-🔢 guess
-😂 emoji
+1️⃣ \`trivia\`
+2️⃣ \`quiz\`
+3️⃣ \`scramble\`
+4️⃣ \`guess\`
+5️⃣ \`emoji\`
+6️⃣ \`couples\`
 
-*Examples:*
+📌 *Example:*
+\`.game start couples 10\`
 
-.game start emoji 10
-.game start trivia easy 10
-.game start quiz medium 15
-.game start scramble 10
-.game start guess 10`
+Use \`.game\` to open the full game dashboard.`
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
 
         /*
-         * DIFFICULTY / ROUND SETTINGS
+         * DIFFICULTY
+         *
+         * Only Trivia and Quiz use difficulty.
          */
         let difficulty = 'all';
+
         let roundsIndex = 2;
 
         if (
-            ['trivia', 'quiz'].includes(gameType)
+            ['trivia', 'quiz'].includes(
+                gameType
+            )
         ) {
             const possibleDifficulty =
                 args[2]
@@ -214,18 +230,22 @@ module.exports = {
                     : '';
 
             if (
-                ['easy', 'medium', 'hard']
-                    .includes(possibleDifficulty)
+                [
+                    'easy',
+                    'medium',
+                    'hard'
+                ].includes(
+                    possibleDifficulty
+                )
             ) {
                 difficulty =
                     possibleDifficulty;
 
                 roundsIndex = 3;
-            }
-
-            else if (
-                ['all', 'mixed']
-                    .includes(possibleDifficulty)
+            } else if (
+                ['all', 'mixed'].includes(
+                    possibleDifficulty
+                )
             ) {
                 difficulty = 'all';
 
@@ -234,21 +254,14 @@ module.exports = {
         }
 
         /*
-         * EMOJI / SCRAMBLE / GUESS
+         * NUMBER OF ROUNDS
          */
-        if (
-            ['emoji', 'scramble', 'guess']
-                .includes(gameType)
-        ) {
-            roundsIndex = 2;
-        }
-
         const roundsNum =
-            parseInt(args[roundsIndex], 10);
+            parseInt(
+                args[roundsIndex],
+                10
+            );
 
-        /*
-         * ROUND VALIDATION
-         */
         if (
             isNaN(roundsNum) ||
             roundsNum < 5
@@ -259,40 +272,39 @@ module.exports = {
                     text:
 `❌ *Invalid number of rounds!*
 
-Minimum is *5 rounds*.
+🎯 Minimum is *5 rounds*.
 
-*Examples:*
-
-.game start emoji 10
-.game start emoji 20
-.game start trivia easy 10
-.game start quiz hard 15
-.game start scramble 10
-.game start guess 10`
+📌 *Examples:*
+\`.game start couples 10\`
+\`.game start emoji 10\`
+\`.game start trivia easy 10\``
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
 
         /*
-         * MAXIMUM FOR DIFFICULTY-SPECIFIC
-         * TRIVIA / QUIZ
+         * TRIVIA / QUIZ DIFFICULTY LIMIT
          */
         if (
             roundsNum > 25 &&
-            ['trivia', 'quiz'].includes(gameType) &&
+            ['trivia', 'quiz'].includes(
+                gameType
+            ) &&
             difficulty !== 'all'
         ) {
             return sock.sendMessage(
                 from,
                 {
                     text:
-                        `❌ *Maximum is 25 rounds* for ` +
-                        `${difficulty.toUpperCase()} ` +
-                        `${gameType.toUpperCase()}.\n\n` +
-                        `There are 25 questions available at this difficulty.`
+                        '❌ *Maximum 25 rounds* ' +
+                        'for a single Trivia/Quiz difficulty.'
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
 
