@@ -1,112 +1,91 @@
 const fs = require('fs');
 const path = require('path');
 
-const activeGames = new Map();
+const activeGames = {}; // { groupJid: sessionData }
 
-function loadQuestions(game) {
-    const filePath = path.join(__dirname, '..', 'games', `${game}.json`);
 
-    if (!fs.existsSync(filePath)) {
-        throw new Error(`Game file not found: ${game}.json`);
-    }
-
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-    if (!Array.isArray(data) || data.length === 0) {
-        throw new Error(`No questions found for ${game}`);
-    }
-
-    return data;
-}
+// ============================================================
+// RANDOM SHUFFLE
+// ============================================================
 
 function shuffle(array) {
-    const arr = [...array];
-
-    for (let i = arr.length - 1; i > 0; i--) {
+    for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+        [array[i], array[j]] = [array[j], array[i]];
     }
 
-    return arr;
+    return array;
 }
+
+
+// ============================================================
+// LOAD GAME QUESTIONS
+// ============================================================
+
+function loadQuestions(gameType, difficulty = 'all') {
+    try {
+        const filePath = path.join(
+            __dirname,
+            '..',
+            'games',
+            `${gameType}.json`
+        );
+
+        if (!fs.existsSync(filePath)) {
+            console.error(`❌ Game file not found: ${gameType}.json`);
+            return [];
+        }
+
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const questions = JSON.parse(raw);
+
+        if (!Array.isArray(questions)) {
+            console.error(`❌ ${gameType}.json is not an array.`);
+            return [];
+        }
+
+        if (difficulty === 'all') {
+            return questions;
+        }
+
+        return questions.filter(
+            q =>
+                String(q.difficulty || '')
+                    .toLowerCase() === difficulty.toLowerCase()
+        );
+
+    } catch (error) {
+        console.error(
+            `🔥 Error loading questions for ${gameType}:`,
+            error
+        );
+
+        return [];
+    }
+}
+
+
+// ============================================================
+// TEXT NORMALIZER
+// ============================================================
 
 function normalizeText(text) {
     return String(text || '')
         .toLowerCase()
         .trim()
-        .replace(/[.,!?'"`]/g, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
         .replace(/\s+/g, ' ');
 }
 
-function extractWords(text) {
-    return normalizeText(text)
-        .split(/\s+/)
-        .map(word => word.replace(/[^a-z0-9'-]/g, ''))
-        .filter(Boolean);
-}
 
-function checkEndingWords(text, ending) {
-    const words = extractWords(text);
+// ============================================================
+// GET GAME TITLE
+// ============================================================
 
-    if (words.length !== 3) {
-        return false;
-    }
-
-    const uniqueWords = new Set(words);
-
-    if (uniqueWords.size !== 3) {
-        return false;
-    }
-
-    const suffix = normalizeText(ending);
-
-    return words.every(word => word.endsWith(suffix));
-}
-
-function checkStartingWords(text, starting) {
-    const words = extractWords(text);
-
-    if (words.length !== 3) {
-        return false;
-    }
-
-    const uniqueWords = new Set(words);
-
-    if (uniqueWords.size !== 3) {
-        return false;
-    }
-
-    const prefix = normalizeText(starting);
-
-    return words.every(word => word.startsWith(prefix));
-}
-
-function checkRhymeWords(text, question) {
-    const words = extractWords(text);
-
-    if (words.length !== 3) {
-        return false;
-    }
-
-    const uniqueWords = new Set(words);
-
-    if (uniqueWords.size !== 3) {
-        return false;
-    }
-
-    if (!Array.isArray(question.rhymes)) {
-        return false;
-    }
-
-    const validRhymes = question.rhymes.map(word => normalizeText(word));
-
-    return words.every(word => validRhymes.includes(word));
-}
-
-function getGameTitle(game) {
+function getGameTitle(gameType) {
     const titles = {
-        trivia: '🧠 TRIVIA',
-        quiz: '❓ QUIZ',
+        trivia: '🎯 TRIVIA SHOWDOWN',
+        quiz: '🧠 QUIZ CHALLENGE',
         scramble: '🔤 WORD SCRAMBLE',
         guess: '🔢 NUMBER GUESS',
         emoji: '🤯 GUESS THE EMOJI',
@@ -116,476 +95,1447 @@ function getGameTitle(game) {
         starting: '🔤 WORDS THAT START WITH',
         rhyme: '🎵 RHYMING WORDS',
         movemoji: '🎬 EMOJI MOVIE',
-        '2truth1lie': '🕵️ 2 TRUTHS 1 LIE'
+        '2truth1lie': '🕵️ 2 TRUTHS 1 LIE',
+        lyrics: '🎵 FINISH THE LINE',
+        taboo: '🚫 TABOO',
+        memewar: '😂 MEME WAR'
     };
 
-    return titles[game] || game.toUpperCase();
+    return titles[gameType] || gameType.toUpperCase();
 }
 
-async function startGame(sock, from, game, rounds = 10, difficulty = null, customArg = null) {
-    try {
-        let questions = loadQuestions(game);
 
-        if (difficulty) {
-            const filtered = questions.filter(
-                q => String(q.difficulty || '').toLowerCase() === String(difficulty).toLowerCase()
-            );
+// ============================================================
+// START GAME
+// ============================================================
 
-            if (filtered.length > 0) {
-                questions = filtered;
-            }
-        }
+async function startGame(
+    sock,
+    from,
+    gameType,
+    totalRounds,
+    difficulty = 'all',
+    customArg = null
+) {
 
-        questions = shuffle(questions);
-
-        rounds = Math.max(
-            1,
-            Math.min(Number(rounds) || 10, questions.length)
-        );
-
-        const gameData = {
-            game,
-            questions: questions.slice(0, rounds),
-            currentRound: 0,
-            scores: {},
-            timer: null,
-            difficulty,
-            customArg
-        };
-
-        activeGames.set(from, gameData);
-
+    if (activeGames[from]) {
         await sock.sendMessage(from, {
             text:
-                `🎮 *${getGameTitle(game)} STARTED!*\n\n` +
-                `📚 Game: *${getGameTitle(game)}*\n` +
-                `🔢 Rounds: *${rounds}*\n` +
-                (difficulty ? `🎯 Difficulty: *${difficulty}*\n` : '') +
-                `⏱️ You have *30 seconds* per round!\n\n` +
-                `🔥 LET THE GAME BEGIN!`
+                '❌ *A game is already active in this group!*\n\n' +
+                'Use `.game stop` to end the current game first.'
         });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        return;
+    }
 
-        await nextRound(sock, from);
 
-        return true;
-    } catch (error) {
-        console.error('startGame error:', error);
+    const validDifficulty = [
+        'easy',
+        'medium',
+        'hard',
+        'all'
+    ].includes(String(difficulty).toLowerCase())
+        ? String(difficulty).toLowerCase()
+        : 'all';
 
+
+    let allQuestions = loadQuestions(
+        gameType,
+        validDifficulty
+    );
+
+
+    // --------------------------------------------------------
+    // CUSTOM WORD FOR ENDING / STARTING / RHYME
+    // --------------------------------------------------------
+
+    if (
+        ['ending', 'starting', 'rhyme'].includes(gameType) &&
+        customArg
+    ) {
+
+        const custom = normalizeText(customArg);
+
+        if (gameType === 'ending') {
+            allQuestions = allQuestions.filter(
+                q =>
+                    normalizeText(q.ending) === custom
+            );
+        }
+
+        if (gameType === 'starting') {
+            allQuestions = allQuestions.filter(
+                q =>
+                    normalizeText(q.starting) === custom
+            );
+        }
+
+        if (gameType === 'rhyme') {
+            allQuestions = allQuestions.filter(
+                q =>
+                    normalizeText(q.word) === custom
+            );
+        }
+    }
+
+
+    if (allQuestions.length === 0) {
         await sock.sendMessage(from, {
-            text: `❌ Could not start *${game}*.\n\n${error.message}`
+            text:
+                `❌ *No questions found!*\n\n` +
+                `🎮 Game: *${getGameTitle(gameType)}*\n` +
+                `🎚️ Difficulty: *${validDifficulty.toUpperCase()}*`
         });
 
-        return false;
-    }
-}
-
-async function nextRound(sock, from) {
-    const gameData = activeGames.get(from);
-
-    if (!gameData) {
         return;
     }
 
-    if (gameData.timer) {
-        clearTimeout(gameData.timer);
-        gameData.timer = null;
+
+    let rounds = parseInt(totalRounds, 10);
+
+    if (isNaN(rounds)) {
+        rounds = 10;
     }
 
-    gameData.currentRound++;
+    rounds = Math.max(
+        1,
+        Math.min(rounds, allQuestions.length)
+    );
 
-    if (gameData.currentRound > gameData.questions.length) {
-        await endGame(sock, from);
-        return;
-    }
 
-    const qData = gameData.questions[gameData.currentRound - 1];
+    const sessionQuestions = shuffle([
+        ...allQuestions
+    ]).slice(0, rounds);
 
-    let text = '';
 
-    switch (gameData.game) {
-        case 'trivia':
-        case 'quiz': {
-            text =
-                `🧠 *${getGameTitle(gameData.game)} — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `❓ ${qData.question}\n\n`;
+    activeGames[from] = {
+        gameType,
+        difficulty: validDifficulty,
+        customArg,
+        rounds: sessionQuestions.length,
+        currentRound: 0,
+        questions: sessionQuestions,
+        scores: {},
+        activeQuestion: null,
+        timer: null,
+        answeredThisRound: false,
+        sock
+    };
 
-            if (Array.isArray(qData.options)) {
-                qData.options.forEach((option, index) => {
-                    text += `${String.fromCharCode(65 + index)}️⃣ ${option}\n`;
-                });
 
-                text += `\n💬 Reply with the correct option!`;
-            } else {
-                text += `💬 Reply with your answer!`;
-            }
+    const roundDuration =
+        ['trivia', 'quiz'].includes(gameType)
+            ? 25
+            : 45;
 
-            break;
-        }
 
-        case 'scramble':
-            text =
-                `🔤 *WORD SCRAMBLE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `🧩 Unscramble this word:\n\n` +
-                `👉 *${qData.scrambled || qData.word || qData.question}*\n\n` +
-                `💬 Type the correct word!`;
-            break;
+    const difficultyText =
+        ['trivia', 'quiz'].includes(gameType)
+            ? `┃ 🎚️ *Difficulty:* ${
+                validDifficulty === 'all'
+                    ? 'MIXED'
+                    : validDifficulty.toUpperCase()
+            }\n`
+            : '';
 
-        case 'guess':
-            text =
-                `🔢 *NUMBER GUESS — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `🎯 Guess the number!\n\n` +
-                `💡 ${qData.hint || 'Take your best guess!'}\n\n` +
-                `💬 Send a number between ${qData.min || 1} and ${qData.max || 100}.`;
-            break;
 
-        case 'emoji':
-            text =
-                `🤯 *GUESS THE EMOJI — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `${qData.emoji}\n\n` +
-                `🎯 What does this emoji represent?\n` +
-                `💬 Send your answer!`;
-            break;
+    const startMsg =
+`┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
+┃ 🏆 *Game:* ${getGameTitle(gameType)}
+┃ 🔄 *Total Rounds:* ${sessionQuestions.length}
+${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
+┃ 💎 *Reward:* 5 Points / Correct Answer
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🚀 *Game session is starting!*
+┃ 🔥 Get ready...
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
-        case 'findemoji':
-            text =
-                `🔎 *FIND THE EMOJI — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `${qData.emojis || qData.emoji}\n\n` +
-                `🎯 Find the odd/different emoji!\n` +
-                `💬 Reply with your answer.`;
-            break;
-
-        case 'movemoji':
-            text =
-                `🎬 *EMOJI MOVIE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `${qData.emojis || qData.emoji}\n\n` +
-                `🎯 Guess the movie!\n` +
-                `💬 Send the movie title.`;
-            break;
-
-        case 'couples':
-            text =
-                `❤️ *COUPLES CHALLENGE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `💞 ${qData.challenge}\n\n` +
-                `💬 Participate to earn a point!`;
-            break;
-
-        case 'ending':
-            text =
-                `🔚 *WORDS THAT END WITH — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `🎯 Give me *3 words* that end with:\n\n` +
-                `👉 *${qData.ending}*\n\n` +
-                `💬 Example: if the ending is "er" → player, water, tiger\n\n` +
-                `⚡ First correct answer gets the point!`;
-            break;
-
-        case 'starting':
-            text =
-                `🔤 *WORDS THAT START WITH — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `🎯 Give me *3 words* that start with:\n\n` +
-                `👉 *${qData.starting}*\n\n` +
-                `💬 Example: if the starting is "st" → star, stone, story\n\n` +
-                `⚡ First correct answer gets the point!`;
-            break;
-
-        case 'rhyme':
-            text =
-                `🎵 *RHYMING WORDS — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `🎯 Give me *3 words* that rhyme with:\n\n` +
-                `👉 *${qData.word}*\n\n` +
-                `💬 Send exactly 3 words!\n\n` +
-                `⚡ First correct answer gets the point!`;
-            break;
-
-        case '2truth1lie':
-            text =
-                `🕵️ *2 TRUTHS 1 LIE — ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `1️⃣ ${qData.statements?.[0] || ''}\n` +
-                `2️⃣ ${qData.statements?.[1] || ''}\n` +
-                `3️⃣ ${qData.statements?.[2] || ''}\n\n` +
-                `🎯 *Which statement is the LIE?*\n\n` +
-                `💬 Reply with *1*, *2*, or *3*!`;
-            break;
-
-        default:
-            text =
-                `🎮 *ROUND ${gameData.currentRound}/${gameData.questions.length}*\n\n` +
-                `${qData.question || 'Answer this challenge!'}\n\n` +
-                `💬 Reply with your answer!`;
-    }
-
-    await sock.sendMessage(from, { text });
-
-    gameData.timer = setTimeout(async () => {
-        const currentGame = activeGames.get(from);
-
-        if (!currentGame || currentGame !== gameData) {
-            return;
-        }
-
-        let answerText = '';
-
-        if (gameData.game === '2truth1lie') {
-            answerText =
-                `⏰ *TIME'S UP!*\n\n` +
-                `The lie was statement *${qData.lie}*.\n\n` +
-                `😅 Better luck next round!`;
-        } else if (
-            gameData.game === 'emoji' ||
-            gameData.game === 'movemoji' ||
-            gameData.game === 'scramble' ||
-            gameData.game === 'trivia' ||
-            gameData.game === 'quiz'
-        ) {
-            answerText =
-                `⏰ *TIME'S UP!*\n\n` +
-                `✅ Correct answer: *${qData.answer || qData.word || 'See the next round'}*`;
-        } else {
-            answerText =
-                `⏰ *TIME'S UP!*\n\n` +
-                `Nobody got it this round! 😭`;
-        }
-
-        await sock.sendMessage(from, { text: answerText });
-
-        setTimeout(async () => {
-            if (activeGames.get(from) === gameData) {
-                await nextRound(sock, from);
-            }
-        }, 2000);
-    }, 30000);
-}
-
-async function handleGameMessage(sock, m, from, body) {
-    const gameData = activeGames.get(from);
-
-    if (!gameData) {
-        return false;
-    }
-
-    const text = String(body || '').trim();
-
-    if (!text) {
-        return true;
-    }
-
-    const qData = gameData.questions[gameData.currentRound - 1];
-
-    if (!qData) {
-        return true;
-    }
-
-    let correct = false;
-
-    switch (gameData.game) {
-        case 'trivia':
-        case 'quiz': {
-            const answer = normalizeText(qData.answer);
-
-            const userAnswer = normalizeText(text);
-
-            if (
-                userAnswer === answer ||
-                (Array.isArray(qData.options) &&
-                    qData.options.some(
-                        (option, index) =>
-                            userAnswer === String.fromCharCode(97 + index) &&
-                            normalizeText(option) === answer
-                    ))
-            ) {
-                correct = true;
-            }
-
-            break;
-        }
-
-        case 'scramble': {
-            const answer = normalizeText(qData.answer || qData.word);
-            correct = normalizeText(text) === answer;
-            break;
-        }
-
-        case 'guess': {
-            const userNumber = Number(text);
-            const answer = Number(qData.answer);
-
-            if (!Number.isNaN(userNumber) && userNumber === answer) {
-                correct = true;
-            }
-
-            break;
-        }
-
-        case 'emoji':
-        case 'movemoji': {
-            const answer = normalizeText(qData.answer);
-            correct = normalizeText(text) === answer;
-            break;
-        }
-
-        case 'findemoji': {
-            const answer = normalizeText(qData.answer);
-            correct = normalizeText(text) === answer;
-            break;
-        }
-
-        case 'couples':
-            correct = text.length > 0;
-            break;
-
-        case 'ending':
-            correct = checkEndingWords(text, qData.ending);
-            break;
-
-        case 'starting':
-            correct = checkStartingWords(text, qData.starting);
-            break;
-
-        case 'rhyme':
-            correct = checkRhymeWords(text, qData);
-            break;
-
-        case '2truth1lie': {
-            const answer = Number(text);
-
-            if ([1, 2, 3].includes(answer)) {
-                correct = answer === Number(qData.lie);
-            }
-
-            break;
-        }
-
-        default:
-            correct = normalizeText(text) === normalizeText(qData.answer);
-    }
-
-    if (!correct) {
-        return true;
-    }
-
-    if (gameData.timer) {
-        clearTimeout(gameData.timer);
-        gameData.timer = null;
-    }
-
-    const participant =
-        m.pushName ||
-        m.notifyName ||
-        m.sender ||
-        'Player';
-
-    if (!gameData.scores[participant]) {
-        gameData.scores[participant] = 0;
-    }
-
-    gameData.scores[participant]++;
-
-    let answerMessage = '';
-
-    if (gameData.game === '2truth1lie') {
-        answerMessage =
-            `🎯 *CORRECT!*\n\n` +
-            `🕵️ ${participant} found the lie!\n` +
-            `✅ Statement *${qData.lie}* was the lie.\n\n` +
-            `🏆 *+1 POINT*`;
-    } else {
-        answerMessage =
-            `🎉 *CORRECT!*\n\n` +
-            `👑 ${participant} got it first!\n` +
-            `🏆 *+1 POINT*`;
-    }
 
     await sock.sendMessage(from, {
-        text: answerMessage
+        text: startMsg
     });
 
-    setTimeout(async () => {
-        if (activeGames.get(from) === gameData) {
-            await nextRound(sock, from);
-        }
-    }, 2000);
 
-    return true;
+    setTimeout(() => {
+        nextRound(from);
+    }, 2000);
 }
 
-async function stopGame(sock, from) {
-    const gameData = activeGames.get(from);
 
-    if (!gameData) {
+// ============================================================
+// STOP GAME
+// ============================================================
+
+async function stopGame(sock, from) {
+
+    if (!activeGames[from]) {
         await sock.sendMessage(from, {
-            text: `❌ There is no active game in this group.`
+            text:
+                '❌ *No active game session found in this group.*'
         });
 
-        return false;
+        return;
     }
 
-    if (gameData.timer) {
-        clearTimeout(gameData.timer);
+
+    if (activeGames[from].timer) {
+        clearTimeout(activeGames[from].timer);
     }
 
-    activeGames.delete(from);
+
+    delete activeGames[from];
+
 
     await sock.sendMessage(from, {
         text:
-            `🛑 *GAME STOPPED!*\n\n` +
-            `🎮 ${getGameTitle(gameData.game)}\n` +
-            `📊 Round: ${gameData.currentRound}/${gameData.questions.length}`
+            '🛑 *Game session stopped!*\n\n' +
+            'The game has been cancelled by an admin/creator.'
     });
-
-    return true;
 }
 
-async function endGame(sock, from) {
-    const gameData = activeGames.get(from);
 
-    if (!gameData) {
+// ============================================================
+// NEXT ROUND
+// ============================================================
+
+async function nextRound(from) {
+
+    const session = activeGames[from];
+
+    if (!session) {
         return;
     }
 
-    if (gameData.timer) {
-        clearTimeout(gameData.timer);
-        gameData.timer = null;
+
+    if (session.currentRound >= session.rounds) {
+        return endGame(from);
     }
 
-    const scores = Object.entries(gameData.scores)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
 
-    let text =
-        `🏁 *GAME OVER!*\n\n` +
-        `🎮 *${getGameTitle(gameData.game)}*\n` +
-        `📊 ${gameData.questions.length} rounds completed\n\n`;
+    session.currentRound++;
+    session.answeredThisRound = false;
 
-    if (scores.length === 0) {
-        text += `😅 Nobody scored this time!`;
-    } else {
-        text += `🏆 *FINAL LEADERBOARD*\n\n`;
 
-        scores.forEach(([name, score], index) => {
-            const medals = ['🥇', '🥈', '🥉'];
+    const qData =
+        session.questions[
+            session.currentRound - 1
+        ];
 
-            text += `${medals[index] || `${index + 1}.`} *${name}* — ${score} point${score === 1 ? '' : 's'}\n`;
+
+    session.activeQuestion = qData;
+
+
+    let roundText = '';
+
+
+    // --------------------------------------------------------
+    // ROUND TIME
+    // --------------------------------------------------------
+
+    const roundTimeLimit =
+        ['trivia', 'quiz'].includes(session.gameType)
+            ? 25
+            : 45;
+
+
+    // ========================================================
+    // TRIVIA
+    // ========================================================
+
+    if (
+        session.gameType === 'trivia' ||
+        session.gameType === 'quiz'
+    ) {
+
+        const label =
+            session.gameType === 'trivia'
+                ? 'TRIVIA'
+                : 'QUIZ';
+
+        const emoji =
+            session.gameType === 'trivia'
+                ? '🎯'
+                : '🧠';
+
+
+        const difficultyLabel =
+            qData.difficulty
+                ? `┃ 🎚️ *Difficulty:* ${qData.difficulty.toUpperCase()}\n`
+                : '';
+
+
+        roundText =
+`┏━━━ ${emoji} *${label} — ROUND ${session.currentRound}/${session.rounds}* ${emoji} ━━━┓
+${difficultyLabel}┃ ❓ *Question:*
+┃ ${qData.question}
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🅰️ *A)* ${qData.options.A}
+┃ 🅱️ *B)* ${qData.options.B}
+┃ 🅲 *C)* ${qData.options.C}
+┃ 🅳 *D)* ${qData.options.D}
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⏱️ *Reply A, B, C or D*
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // WORD SCRAMBLE
+    // ========================================================
+
+    else if (session.gameType === 'scramble') {
+
+        const word =
+            qData.word ||
+            qData.targetWord ||
+            '';
+
+
+        let scrambled = word
+            .split('')
+            .sort(() => Math.random() - 0.5)
+            .join(' ');
+
+
+        // Make sure scramble isn't identical
+        if (
+            normalizeText(scrambled.replace(/\s/g, '')) ===
+            normalizeText(word)
+        ) {
+            scrambled =
+                word
+                    .split('')
+                    .reverse()
+                    .join(' ');
+        }
+
+
+        session.activeQuestion.targetWord = word;
+
+
+        roundText =
+`┏━━━ 🔤 *WORD SCRAMBLE — ROUND ${session.currentRound}/${session.rounds}* 🔤 ━━━┓
+┃ 🔀 *Scrambled Word:*
+┃ \`${scrambled}\`
+┃
+┃ 💡 *Hint:* ${qData.hint || 'No hint'}
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⏱️ Unscramble it!
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // NUMBER GUESS
+    // ========================================================
+
+    else if (session.gameType === 'guess') {
+
+        const target =
+            qData.target ??
+            qData.answer ??
+            qData.number;
+
+
+        session.activeQuestion.targetNumber =
+            Number(target);
+
+
+        roundText =
+`┏━━━ 🔢 *NUMBER GUESS — ROUND ${session.currentRound}/${session.rounds}* 🔢 ━━━┓
+┃ 🎯 Guess a number between
+┃ *${qData.min}* and *${qData.max}*
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 The bot will tell you
+┃ whether to go HIGHER or LOWER.
+┃
+┃ ⏱️ *${roundTimeLimit} seconds!*
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // GUESS THE EMOJI
+    // ========================================================
+
+    else if (session.gameType === 'emoji') {
+
+        roundText =
+`┏━━━ 🤯 *GUESS THE EMOJI* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ ${qData.emoji}
+┃
+┃ 🤔 *What does this emoji represent?*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💬 Type your answer!
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // COUPLES CHALLENGE
+    // ========================================================
+
+    else if (session.gameType === 'couples') {
+
+        roundText =
+`┏━━━ ❤️ *COUPLES CHALLENGE* — ROUND ${session.currentRound}/${session.rounds} ❤️ ━━━┓
+┃
+┃ 💕 *Challenge:*
+┃ ${qData.challenge}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 👥 Everyone can participate!
+┃ 💬 Drop your answer/vote below.
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // FIND THE EMOJI
+    // ========================================================
+
+    else if (session.gameType === 'findemoji') {
+
+        roundText =
+`┏━━━ 🔎 *FIND THE EMOJI* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ ${qData.emojis}
+┃
+┃ 👀 *Find the odd/different emoji!*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💬 Type the emoji or answer.
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // WORDS ENDING WITH
+    // ========================================================
+
+    else if (session.gameType === 'ending') {
+
+        roundText =
+`┏━━━ 🔚 *WORDS THAT END WITH* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 🔤 *Ending:* \`${qData.ending}\`
+┃
+┃ 🎯 Send *3 different words*
+┃ that end with *${qData.ending}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⚡ First correct player gets 5 points!
+┃ ⏱️ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // WORDS STARTING WITH
+    // ========================================================
+
+    else if (session.gameType === 'starting') {
+
+        roundText =
+`┏━━━ 🔤 *WORDS THAT START WITH* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 🔤 *Starting:* \`${qData.starting}\`
+┃
+┃ 🎯 Send *3 different words*
+┃ that start with *${qData.starting}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⚡ First correct player gets 5 points!
+┃ ⏱️ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // RHYMING WORDS
+    // ========================================================
+
+    else if (session.gameType === 'rhyme') {
+
+        roundText =
+`┏━━━ 🎵 *RHYMING WORDS* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 🎤 *Target Word:* \`${qData.word}\`
+┃
+┃ 🎯 Send *3 different words*
+┃ that rhyme with *${qData.word}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⚡ First correct player gets 5 points!
+┃ ⏱️ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // EMOJI MOVIE
+    // ========================================================
+
+    else if (session.gameType === 'movemoji') {
+
+        roundText =
+`┏━━━ 🎬 *EMOJI MOVIE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 🎞️ *Movie:*
+┃ ${qData.emojis || qData.emoji}
+┃
+┃ 🤔 Guess the movie!
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💬 Type the movie title.
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // 2 TRUTHS 1 LIE
+    // ========================================================
+
+    else if (session.gameType === '2truth1lie') {
+
+        roundText =
+`┏━━━ 🕵️ *2 TRUTHS 1 LIE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 1️⃣ ${qData.statements[0]}
+┃
+┃ 2️⃣ ${qData.statements[1]}
+┃
+┃ 3️⃣ ${qData.statements[2]}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🤔 Which one is the LIE?
+┃
+┃ 💬 Reply *1, 2 or 3*
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // FINISH THE LINE
+    // ========================================================
+
+    else if (session.gameType === 'lyrics') {
+
+        roundText =
+`┏━━━ 🎵 *FINISH THE LINE* — ROUND ${session.currentRound}/${session.rounds} ━━━┓
+┃
+┃ 🎤 *Complete this line:*
+┃
+┃ ${qData.question}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💬 Type the missing word/answer!
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // TABOO
+    // ========================================================
+
+    else if (session.gameType === 'taboo') {
+
+        roundText =
+`┏━━━ 🚫 *TABOO* — ROUND ${session.currentRound}/${session.rounds} 🚫 ━━━┓
+┃
+┃ 🎯 *WORD:*
+┃ *${qData.word}*
+┃
+┃ 🚫 *DO NOT USE:*
+┃ • ${qData.forbidden?.[0] || ''}
+┃ • ${qData.forbidden?.[1] || ''}
+┃ • ${qData.forbidden?.[2] || ''}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 👤 One player describes the word.
+┃ 👥 Everyone else guesses!
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // MEME WAR
+    // ========================================================
+
+    else if (session.gameType === 'memewar') {
+
+        roundText =
+`┏━━━ 😂 *MEME WAR* — ROUND ${session.currentRound}/${session.rounds} 😂 ━━━┓
+┃
+┃ 🎯 *PROMPT:*
+┃ ${qData.prompt || qData.question}
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 😂 Drop your funniest meme/reply!
+┃
+┃ 🏆 Group votes for the winner.
+┃ ⚡ ${roundTimeLimit} seconds!
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+
+    // ========================================================
+    // SEND ROUND
+    // ========================================================
+
+    await session.sock.sendMessage(from, {
+        text: roundText
+    });
+
+
+    // ========================================================
+    // ROUND TIMER
+    // ========================================================
+
+    session.timer = setTimeout(async () => {
+
+        if (
+            !activeGames[from] ||
+            session.answeredThisRound
+        ) {
+            return;
+        }
+
+
+        session.answeredThisRound = true;
+
+
+        let timeOutText =
+            `⏰ *TIME'S UP!*\n\n` +
+            `❌ Nobody got this round.\n`;
+
+
+        // ----------------------------------------------------
+        // ANSWER DISPLAY
+        // ----------------------------------------------------
+
+        if (
+            session.gameType === 'trivia' ||
+            session.gameType === 'quiz'
+        ) {
+
+            const answer =
+                qData.answer;
+
+            const answerText =
+                qData.options?.[answer] ||
+                answer;
+
+
+            timeOutText +=
+                `📌 *Correct Answer:* ` +
+                `*${answer} — ${answerText}*`;
+        }
+
+
+        else if (session.gameType === 'scramble') {
+
+            timeOutText +=
+                `📌 *Correct Word:* ` +
+                `*${qData.word}*`;
+        }
+
+
+        else if (session.gameType === 'guess') {
+
+            timeOutText +=
+                `📌 *Secret Number:* ` +
+                `*${qData.target}*`;
+        }
+
+
+        else if (session.gameType === 'emoji') {
+
+            timeOutText +=
+                `📌 *Answer:* ` +
+                `*${qData.answer}*`;
+        }
+
+
+        else if (session.gameType === 'findemoji') {
+
+            timeOutText +=
+                `📌 *Answer:* ` +
+                `*${qData.answer}*`;
+        }
+
+
+        else if (session.gameType === 'movemoji') {
+
+            timeOutText +=
+                `📌 *Movie:* ` +
+                `*${qData.answer}*`;
+        }
+
+
+        else if (session.gameType === '2truth1lie') {
+
+            timeOutText +=
+                `📌 *The lie was statement:* ` +
+                `*${qData.lie}️⃣*`;
+        }
+
+
+        else if (session.gameType === 'lyrics') {
+
+            timeOutText +=
+                `📌 *Answer:* ` +
+                `*${qData.answer}*`;
+        }
+
+
+        else if (session.gameType === 'ending') {
+
+            timeOutText +=
+                `📌 Send 3 words ending with ` +
+                `*${qData.ending}*`;
+        }
+
+
+        else if (session.gameType === 'starting') {
+
+            timeOutText +=
+                `📌 Send 3 words starting with ` +
+                `*${qData.starting}*`;
+        }
+
+
+        else if (session.gameType === 'rhyme') {
+
+            timeOutText +=
+                `📌 Examples: ` +
+                `*${(qData.rhymes || []).slice(0, 3).join(', ')}*`;
+        }
+
+
+        else if (session.gameType === 'couples') {
+
+            timeOutText +=
+                `📌 *Challenge:* ` +
+                `*${qData.challenge}*`;
+        }
+
+
+        else if (session.gameType === 'taboo') {
+
+            timeOutText +=
+                `📌 *Target Word:* ` +
+                `*${qData.word}*`;
+        }
+
+
+        await session.sock.sendMessage(from, {
+            text: timeOutText
         });
 
-        text += `\n🔥 Thanks for playing!`;
+
+        setTimeout(() => {
+            nextRound(from);
+        }, 3000);
+
+    }, roundTimeLimit * 1000);
+}
+
+
+// ============================================================
+// EXTRACT WORDS
+// ============================================================
+
+function extractWords(text) {
+
+    return String(text || '')
+        .trim()
+        .split(/[\s,]+/)
+        .map(word => normalizeText(word))
+        .filter(Boolean);
+}
+
+
+// ============================================================
+// CHECK ENDING WORDS
+// ============================================================
+
+function checkEndingWords(text, ending) {
+
+    const words = extractWords(text);
+
+    if (words.length !== 3) {
+        return false;
     }
 
-    activeGames.delete(from);
 
-    await sock.sendMessage(from, { text });
+    const uniqueWords =
+        new Set(words);
+
+
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
+
+
+    const suffix =
+        normalizeText(ending);
+
+
+    return words.every(word =>
+        word.endsWith(suffix)
+    );
 }
+
+
+// ============================================================
+// CHECK STARTING WORDS
+// ============================================================
+
+function checkStartingWords(text, starting) {
+
+    const words = extractWords(text);
+
+    if (words.length !== 3) {
+        return false;
+    }
+
+
+    const uniqueWords =
+        new Set(words);
+
+
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
+
+
+    const prefix =
+        normalizeText(starting);
+
+
+    return words.every(word =>
+        word.startsWith(prefix)
+    );
+}
+
+
+// ============================================================
+// CHECK RHYMING WORDS
+// ============================================================
+
+function checkRhymeWords(text, qData) {
+
+    const words =
+        extractWords(text);
+
+
+    if (words.length !== 3) {
+        return false;
+    }
+
+
+    const uniqueWords =
+        new Set(words);
+
+
+    if (uniqueWords.size !== 3) {
+        return false;
+    }
+
+
+    const target =
+        normalizeText(qData.word);
+
+
+    const validRhymes =
+        Array.isArray(qData.rhymes)
+            ? qData.rhymes.map(normalizeText)
+            : [];
+
+
+    return words.every(word =>
+        word !== target &&
+        validRhymes.includes(word)
+    );
+}
+
+
+// ============================================================
+// HANDLE GAME MESSAGES
+// ============================================================
+
+async function handleGameMessage(
+    sock,
+    m,
+    from,
+    text
+) {
+
+    const session =
+        activeGames[from];
+
+
+    if (
+        !session ||
+        session.answeredThisRound ||
+        !session.activeQuestion
+    ) {
+        return false;
+    }
+
+
+    const sender =
+        m.key.participant ||
+        m.key.remoteJid;
+
+
+    const cleanText =
+        normalizeText(text);
+
+
+    const cleanUpper =
+        String(text || '')
+            .trim()
+            .toUpperCase();
+
+
+    const q =
+        session.activeQuestion;
+
+
+    let isCorrect = false;
+
+
+    // ========================================================
+    // TRIVIA / QUIZ
+    // ========================================================
+
+    if (
+        session.gameType === 'trivia' ||
+        session.gameType === 'quiz'
+    ) {
+
+        if (
+            ['A', 'B', 'C', 'D'].includes(cleanUpper) &&
+            cleanUpper === String(q.answer).toUpperCase()
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // SCRAMBLE
+    // ========================================================
+
+    else if (session.gameType === 'scramble') {
+
+        const answer =
+            normalizeText(
+                q.targetWord ||
+                q.word
+            );
+
+
+        if (cleanText === answer) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // NUMBER GUESS
+    // ========================================================
+
+    else if (session.gameType === 'guess') {
+
+        const num =
+            parseInt(
+                String(text).trim(),
+                10
+            );
+
+
+        if (!isNaN(num)) {
+
+            if (
+                num ===
+                Number(q.targetNumber)
+            ) {
+
+                isCorrect = true;
+
+            } else {
+
+                const hintDir =
+                    num < Number(q.targetNumber)
+                        ? '📈 *Higher!*'
+                        : '📉 *Lower!*';
+
+
+                await sock.sendMessage(
+                    from,
+                    {
+                        text:
+                            `❌ *${num}* is wrong!\n` +
+                            `${hintDir} Try again!`
+                    },
+                    {
+                        quoted: m
+                    }
+                );
+
+
+                return true;
+            }
+        }
+    }
+
+
+    // ========================================================
+    // GUESS THE EMOJI
+    // ========================================================
+
+    else if (session.gameType === 'emoji') {
+
+        const answer =
+            normalizeText(q.answer);
+
+
+        if (
+            cleanText === answer ||
+            cleanText.includes(answer) ||
+            answer.includes(cleanText)
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // FIND THE EMOJI
+    // ========================================================
+
+    else if (session.gameType === 'findemoji') {
+
+        const answer =
+            normalizeText(q.answer);
+
+
+        if (
+            cleanText === answer ||
+            cleanText.includes(answer) ||
+            answer.includes(cleanText)
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // EMOJI MOVIE
+    // ========================================================
+
+    else if (session.gameType === 'movemoji') {
+
+        const answer =
+            normalizeText(q.answer);
+
+
+        if (
+            cleanText === answer ||
+            cleanText.includes(answer) ||
+            answer.includes(cleanText)
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // 2 TRUTHS 1 LIE
+    // ========================================================
+
+    else if (session.gameType === '2truth1lie') {
+
+        const choice =
+            parseInt(
+                String(text).trim(),
+                10
+            );
+
+
+        if (
+            [1, 2, 3].includes(choice) &&
+            choice === Number(q.lie)
+        ) {
+            isCorrect = true;
+        }
+
+
+        else if (
+            [1, 2, 3].includes(choice)
+        ) {
+
+            await sock.sendMessage(
+                from,
+                {
+                    text:
+                        `❌ *Wrong!* @${sender.replace(/[^0-9]/g, '')}\n` +
+                        `That wasn't the lie. Keep watching!`,
+                    mentions: [sender]
+                },
+                {
+                    quoted: m
+                }
+            );
+
+
+            return true;
+        }
+    }
+
+
+    // ========================================================
+    // FINISH THE LINE
+    // ========================================================
+
+    else if (session.gameType === 'lyrics') {
+
+        const answer =
+            normalizeText(q.answer);
+
+
+        if (
+            cleanText === answer ||
+            cleanText.includes(answer) ||
+            answer.includes(cleanText)
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // WORDS ENDING WITH
+    // ========================================================
+
+    else if (session.gameType === 'ending') {
+
+        if (
+            checkEndingWords(
+                text,
+                q.ending
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // WORDS STARTING WITH
+    // ========================================================
+
+    else if (session.gameType === 'starting') {
+
+        if (
+            checkStartingWords(
+                text,
+                q.starting
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // RHYMING WORDS
+    // ========================================================
+
+    else if (session.gameType === 'rhyme') {
+
+        if (
+            checkRhymeWords(
+                text,
+                q
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // COUPLES CHALLENGE
+    // ========================================================
+
+    else if (session.gameType === 'couples') {
+
+        if (cleanText.length > 0) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // TABOO
+    // ========================================================
+
+    else if (session.gameType === 'taboo') {
+
+        const target =
+            normalizeText(q.word);
+
+
+        const forbidden =
+            Array.isArray(q.forbidden)
+                ? q.forbidden.map(normalizeText)
+                : [];
+
+
+        const usedForbidden =
+            forbidden.some(word =>
+                cleanText
+                    .split(/\s+/)
+                    .includes(word)
+            );
+
+
+        // In Taboo, the current player is
+        // describing the word, so the bot awards
+        // the point only if the target itself
+        // is guessed by another player.
+        if (
+            cleanText === target &&
+            !usedForbidden
+        ) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // MEME WAR
+    // ========================================================
+
+    else if (session.gameType === 'memewar') {
+
+        // Meme War is voting/participation based.
+        // Any non-empty response counts as participation.
+        if (cleanText.length > 0) {
+            isCorrect = true;
+        }
+    }
+
+
+    // ========================================================
+    // CORRECT ANSWER
+    // ========================================================
+
+    if (isCorrect) {
+
+        session.answeredThisRound = true;
+
+
+        if (session.timer) {
+            clearTimeout(session.timer);
+        }
+
+
+        session.scores[sender] =
+            (session.scores[sender] || 0) + 5;
+
+
+        const sortedScores =
+            Object.entries(session.scores)
+                .sort(
+                    (a, b) =>
+                        b[1] - a[1]
+                );
+
+
+        let winAnnouncement =
+`🎉 *CORRECT!*
+
+🏆 @${sender.replace(/[^0-9]/g, '')}
+💎 *+5 POINTS*
+
+📊 *CURRENT SCORE:*`;
+
+
+        sortedScores.forEach(
+            ([user, points], index) => {
+
+                const medal =
+                    index === 0
+                        ? '🥇'
+                        : index === 1
+                            ? '🥈'
+                            : index === 2
+                                ? '🥉'
+                                : '▪️';
+
+
+                winAnnouncement +=
+                    `\n${medal} ${index + 1}. ` +
+                    `@${user.replace(/[^0-9]/g, '')} — ` +
+                    `*${points} pts*`;
+            }
+        );
+
+
+        await sock.sendMessage(
+            from,
+            {
+                text: winAnnouncement,
+                mentions:
+                    sortedScores.map(
+                        ([user]) => user
+                    )
+            },
+            {
+                quoted: m
+            }
+        );
+
+
+        setTimeout(() => {
+            nextRound(from);
+        }, 3000);
+
+
+        return true;
+    }
+
+
+    return false;
+}
+
+
+// ============================================================
+// END GAME
+// ============================================================
+
+async function endGame(from) {
+
+    const session =
+        activeGames[from];
+
+
+    if (!session) {
+        return;
+    }
+
+
+    if (session.timer) {
+        clearTimeout(session.timer);
+    }
+
+
+    const sortedScores =
+        Object.entries(session.scores)
+            .sort(
+                (a, b) =>
+                    b[1] - a[1]
+            );
+
+
+    let finalDashboard =
+`┏━━━ 🏆 *GAME OVER* 🏆 ━━━┓
+┃ 🎮 *${getGameTitle(session.gameType)}*
+┃
+┃ 🎉 *FINAL LEADERBOARD*
+┣━━━━━━━━━━━━━━━━━━━━━━━`;
+
+
+    if (sortedScores.length === 0) {
+
+        finalDashboard +=
+            `\n┃ ❌ No players scored points.`;
+
+    } else {
+
+        sortedScores.forEach(
+            ([user, points], index) => {
+
+                const medal =
+                    index === 0
+                        ? '🥇'
+                        : index === 1
+                            ? '🥈'
+                            : index === 2
+                                ? '🥉'
+                                : '▪️';
+
+
+                finalDashboard +=
+                    `\n┃ ${medal} ${index + 1}. ` +
+                    `@${user.replace(/[^0-9]/g, '')} — ` +
+                    `*${points} Points*`;
+            }
+        );
+
+
+        const winner =
+            sortedScores[0][0];
+
+
+        finalDashboard +=
+            `\n┣━━━━━━━━━━━━━━━━━━━━━━━` +
+            `\n┃ 👑 *WINNER:* @${winner.replace(/[^0-9]/g, '')} 🎉`;
+    }
+
+
+    finalDashboard +=
+        `\n┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+
+
+    await session.sock.sendMessage(
+        from,
+        {
+            text: finalDashboard,
+            mentions:
+                sortedScores.map(
+                    ([user]) => user
+                )
+        }
+    );
+
+
+    delete activeGames[from];
+}
+
+
+// ============================================================
+// CHECK IF GAME IS ACTIVE
+// ============================================================
 
 function isGameActive(from) {
-    return activeGames.has(from);
+    return !!activeGames[from];
 }
+
+
+// ============================================================
+// EXPORTS
+// ============================================================
 
 module.exports = {
     startGame,
-    nextRound,
-    handleGameMessage,
     stopGame,
-    endGame,
-    isGameActive,
-    getGameTitle
+    handleGameMessage,
+    isGameActive
 };
