@@ -23,7 +23,10 @@ module.exports = {
 
         try {
             if (fs.existsSync(settingsFile)) {
-                const raw = fs.readFileSync(settingsFile, 'utf8');
+                const raw = fs.readFileSync(
+                    settingsFile,
+                    'utf8'
+                );
 
                 if (raw.trim()) {
                     settings = JSON.parse(raw);
@@ -59,6 +62,12 @@ module.exports = {
         const antiSticker =
             settings.antisticker?.[from] || 'off';
 
+        // Auto-reaction is OFF by default.
+        const autoReaction =
+            settings.autoReaction !== undefined
+                ? settings.autoReaction
+                : 'off';
+
         const status = value =>
             String(value).toLowerCase() === 'on'
                 ? '🟢 ON'
@@ -92,6 +101,9 @@ module.exports = {
 ┃
 ┃ 🧩 *ANTI-STICKER*
 ┃ └ Status: ${status(antiSticker)}
+┃
+┃ 🤖 *AUTO-REACTION*
+┃ └ Status: ${status(autoReaction)}
 ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━`;
 
