@@ -40,6 +40,76 @@ function loadQuestions(gameType, difficulty = 'all') {
     }
 }
 
+/*
+ * Clean a player's word list.
+ *
+ * Supports:
+ * river ring right
+ * river, ring, right
+ * river / ring / right
+ * river - ring - right
+ */
+function extractWords(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[^a-z\s,\/-]/g, ' ')
+        .split(/[\s,\/-]+/)
+        .map(word => word.trim())
+        .filter(Boolean);
+}
+
+/*
+ * Check Words Ending With.
+ *
+ * Player must provide at least 3 different words,
+ * and every word must end with the required ending.
+ */
+function checkEndingWords(text, ending) {
+    const words = extractWords(text);
+
+    if (words.length < 3) {
+        return false;
+    }
+
+    const uniqueWords = [...new Set(words)];
+
+    if (uniqueWords.length < 3) {
+        return false;
+    }
+
+    const validWords = uniqueWords.filter(word =>
+        word.endsWith(String(ending).toLowerCase())
+    );
+
+    return validWords.length >= 3;
+}
+
+/*
+ * Check Words Starting With.
+ *
+ * Player must provide at least 3 different words,
+ * and every word must start with the required combination.
+ */
+function checkStartingWords(text, starting) {
+    const words = extractWords(text);
+
+    if (words.length < 3) {
+        return false;
+    }
+
+    const uniqueWords = [...new Set(words)];
+
+    if (uniqueWords.length < 3) {
+        return false;
+    }
+
+    const validWords = uniqueWords.filter(word =>
+        word.startsWith(String(starting).toLowerCase())
+    );
+
+    return validWords.length >= 3;
+}
+
 async function startGame(
     sock,
     from,
@@ -113,7 +183,9 @@ async function startGame(
         scramble: '🔤 WORD SCRAMBLE',
         guess: '🔢 NUMBER GUESSING',
         emoji: '😂 GUESS THE EMOJI',
-        couples: '💑 COUPLES CHALLENGE'
+        couples: '💑 COUPLES CHALLENGE',
+        ending: '🔚 WORDS ENDING WITH',
+        starting: '🔤 WORDS STARTING WITH'
     };
 
     const gameTitle =
@@ -311,6 +383,50 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
+    /*
+     * WORDS ENDING WITH
+     */
+    else if (session.gameType === 'ending') {
+        roundText =
+`┏━━━ 🔚 *WORDS ENDING WITH* 🔚 ━━━┓
+┃ 🔥 *Round ${session.currentRound}/${session.rounds}*
+┃
+┃ 🎯 *Ending:* \`${qData.ending}\`
+┃
+┃ 📝 Give *3 different words*
+┃ that end with *${qData.ending}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 Example format:
+┃ word1 word2 word3
+┃
+┃ 🏆 *First correct player gets +5 points!*
+┃ ⏱️ *Time:* 45s
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+    /*
+     * WORDS STARTING WITH
+     */
+    else if (session.gameType === 'starting') {
+        roundText =
+`┏━━━ 🔤 *WORDS STARTING WITH* 🔤 ━━━┓
+┃ 🔥 *Round ${session.currentRound}/${session.rounds}*
+┃
+┃ 🎯 *Starting:* \`${qData.starting}\`
+┃
+┃ 📝 Give *3 different words*
+┃ that start with *${qData.starting}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 💡 Example format:
+┃ word1 word2 word3
+┃
+┃ 🏆 *First correct player gets +5 points!*
+┃ ⏱️ *Time:* 45s
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
     await session.sock.sendMessage(from, {
         text: roundText
     });
@@ -354,6 +470,18 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
             timeOutText +=
                 `💑 *Challenge closed!*\n` +
                 `🔥 Get ready for the next one!`;
+        }
+
+        else if (session.gameType === 'ending') {
+            timeOutText +=
+                `📌 *Required ending:* \`${qData.ending}\`\n` +
+                `📝 *You needed 3 different words ending with it.*`;
+        }
+
+        else if (session.gameType === 'starting') {
+            timeOutText +=
+                `📌 *Required beginning:* \`${qData.starting}\`\n` +
+                `📝 *You needed 3 different words starting with it.*`;
         }
 
         session.sock.sendMessage(from, {
@@ -503,15 +631,44 @@ async function handleGameMessage(
      *
      * Any meaningful response counts as
      * a participation/vote.
-     *
-     * The first person to respond gets
-     * the round points.
      */
     else if (
         session.gameType === 'couples'
     ) {
         if (
             cleanText.length >= 2
+        ) {
+            isCorrect = true;
+        }
+    }
+
+    /*
+     * WORDS ENDING WITH
+     */
+    else if (
+        session.gameType === 'ending'
+    ) {
+        if (
+            checkEndingWords(
+                cleanText,
+                q.ending
+            )
+        ) {
+            isCorrect = true;
+        }
+    }
+
+    /*
+     * WORDS STARTING WITH
+     */
+    else if (
+        session.gameType === 'starting'
+    ) {
+        if (
+            checkStartingWords(
+                cleanText,
+                q.starting
+            )
         ) {
             isCorrect = true;
         }
@@ -562,6 +719,56 @@ async function handleGameMessage(
 `🔥 *VOTE RECEIVED!*
 
 👤 @${sender.replace(/[^0-9]/g, '')} has voted!
+
+💎 *+5 Points*
+
+🏆 *Current Scores:*`;
+
+            sortedScores.forEach(
+                ([user, pts], index) => {
+                    winAnnouncement +=
+                        `\n${index + 1}. @${user.replace(
+                            /[^0-9]/g,
+                            ''
+                        )} — *${pts} pts*`;
+                }
+            );
+        }
+
+        if (
+            session.gameType === 'ending'
+        ) {
+            winAnnouncement =
+`🔥 *CORRECT!*
+
+👑 @${sender.replace(/[^0-9]/g, '')} gave 3 valid words!
+
+📝 *Ending:* \`${q.ending}\`
+
+💎 *+5 Points*
+
+🏆 *Current Scores:*`;
+
+            sortedScores.forEach(
+                ([user, pts], index) => {
+                    winAnnouncement +=
+                        `\n${index + 1}. @${user.replace(
+                            /[^0-9]/g,
+                            ''
+                        )} — *${pts} pts*`;
+                }
+            );
+        }
+
+        if (
+            session.gameType === 'starting'
+        ) {
+            winAnnouncement =
+`🔥 *CORRECT!*
+
+👑 @${sender.replace(/[^0-9]/g, '')} gave 3 valid words!
+
+📝 *Starting:* \`${q.starting}\`
 
 💎 *+5 Points*
 
