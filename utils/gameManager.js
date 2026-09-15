@@ -30,7 +30,9 @@ function loadQuestions(gameType, difficulty = 'all') {
         if (difficulty === 'all') return questions;
 
         return questions.filter(
-            q => String(q.difficulty || '').toLowerCase() === difficulty
+            q =>
+                String(q.difficulty || '').toLowerCase() ===
+                difficulty
         );
     } catch (e) {
         console.error(`Error loading questions for ${gameType}:`, e);
@@ -54,19 +56,25 @@ async function startGame(
         return;
     }
 
-    const validDifficulty = ['easy', 'medium', 'hard', 'all'].includes(
-        difficulty
-    )
+    const validDifficulty = [
+        'easy',
+        'medium',
+        'hard',
+        'all'
+    ].includes(difficulty)
         ? difficulty
         : 'all';
 
-    const allQuestions = loadQuestions(gameType, validDifficulty);
+    const allQuestions = loadQuestions(
+        gameType,
+        validDifficulty
+    );
 
     if (allQuestions.length === 0) {
         await sock.sendMessage(from, {
             text:
-                `❌ *No questions found for ${gameType.toUpperCase()}!*\n\n` +
-                `📂 Make sure the correct JSON file exists inside the *games* folder.`
+                `❌ No questions found for *${gameType}*` +
+                ` at *${validDifficulty}* difficulty.`
         });
         return;
     }
@@ -82,10 +90,9 @@ async function startGame(
         return;
     }
 
-    const sessionQuestions = shuffle([...allQuestions]).slice(
-        0,
-        totalRounds
-    );
+    const sessionQuestions = shuffle([
+        ...allQuestions
+    ]).slice(0, totalRounds);
 
     activeGames[from] = {
         gameType,
@@ -105,14 +112,18 @@ async function startGame(
         quiz: '🧠 QUIZ CHALLENGE',
         scramble: '🔤 WORD SCRAMBLE',
         guess: '🔢 NUMBER GUESSING',
-        emoji: '😂 GUESS THE EMOJI'
+        emoji: '😂 GUESS THE EMOJI',
+        couples: '💑 COUPLES CHALLENGE'
     };
 
     const gameTitle =
-        gameTitles[gameType] || gameType.toUpperCase();
+        gameTitles[gameType] ||
+        gameType.toUpperCase();
 
     const roundDuration =
-        ['trivia', 'quiz'].includes(gameType) ? 25 : 45;
+        ['trivia', 'quiz'].includes(gameType)
+            ? '25s'
+            : '45s';
 
     const difficultyText =
         ['trivia', 'quiz'].includes(gameType)
@@ -127,11 +138,12 @@ async function startGame(
 `┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
 ┃ 🏆 *Game:* ${gameTitle}
 ┃ 🔄 *Total Rounds:* ${sessionQuestions.length}
-${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
-┃ 💎 *Reward:* +5 Points / Correct Answer
+${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration} Per Round
+┃ 💎 *Reward:* 5 Points / Correct Answer
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 🚀 *Game session is starting now!*
-┃ 👑 *QUEEN VIDA is your host!*
+┃
+┃ 🔥 Get ready everybody!
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
 
     await sock.sendMessage(from, {
@@ -144,7 +156,8 @@ ${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration}s Per Round
 async function stopGame(sock, from) {
     if (!activeGames[from]) {
         await sock.sendMessage(from, {
-            text: '❌ *No active game session found in this group.*'
+            text:
+                '❌ *No active game session found in this group.*'
         });
         return;
     }
@@ -157,8 +170,7 @@ async function stopGame(sock, from) {
 
     await sock.sendMessage(from, {
         text:
-            '🛑 *Game session has been manually stopped!*\n\n' +
-            '👑 Queen Vida is leaving the game table.'
+            '🛑 *Game session has been manually stopped!*'
     });
 }
 
@@ -175,7 +187,9 @@ async function nextRound(from) {
     session.answeredThisRound = false;
 
     const qData =
-        session.questions[session.currentRound - 1];
+        session.questions[
+            session.currentRound - 1
+        ];
 
     session.activeQuestion = qData;
 
@@ -251,10 +265,10 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
 
         roundText =
 `┏━━━ 🔢 *NUMBER GUESS (Round ${session.currentRound}/${session.rounds})* 🔢 ━━━┓
-┃ 🎯 *Guess the number between* ${qData.min} *and* ${qData.max}!
+┃ 🎯 *Guess a number between* ${qData.min} *and* ${qData.max}!
 ┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ ⏱️ *Type your number!* (${roundTimeLimit}s)
 ┃ 💡 Queen Vida will give Higher/Lower hints.
-┃ ⏱️ *Time:* ${roundTimeLimit}s
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
@@ -262,11 +276,6 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
      * GUESS THE EMOJI
      */
     else if (session.gameType === 'emoji') {
-        session.activeQuestion.targetAnswer =
-            String(qData.answer || '')
-                .trim()
-                .toLowerCase();
-
         roundText =
 `┏━━━ 😂 *GUESS THE EMOJI (Round ${session.currentRound}/${session.rounds})* 😂 ━━━┓
 ┃
@@ -276,8 +285,29 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
 ┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━
 ┃ 💡 *Type your answer in the chat!*
-┃ ⏱️ *Time:* ${roundTimeLimit}s
+┃ ⏱️ *Time:* 45s
 ┃ 🏆 *First correct answer gets +5 points!*
+┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    }
+
+    /*
+     * COUPLES CHALLENGE
+     */
+    else if (session.gameType === 'couples') {
+        roundText =
+`┏━━━ 💑 *COUPLES CHALLENGE* 💑 ━━━┓
+┃ 🔥 *Round ${session.currentRound}/${session.rounds}*
+┃
+┃ 💘 *${qData.challenge}*
+┃
+┣━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🗳️ *Vote in the chat!*
+┃
+┃ 👤 Tag the person you choose
+┃ ❤️ Be honest!
+┃ 😂 No fighting!
+┃
+┃ ⏱️ *Time:* 45s
 ┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
     }
 
@@ -288,14 +318,13 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
     session.timer = setTimeout(() => {
         if (
             !activeGames[from] ||
-            session.answeredThisRound
+            activeGames[from].answeredThisRound
         ) {
             return;
         }
 
         let timeOutText =
-            `⏰ *TIME'S UP!*\n\n` +
-            `❌ Nobody got this round correct.\n`;
+            `⏰ *Time's up!*\n\n`;
 
         if (
             session.gameType === 'trivia' ||
@@ -321,11 +350,20 @@ ${difficultyLabel}┃ ❓ *Question:* ${qData.question}
                 `📌 *Answer:* *${qData.answer}*`;
         }
 
+        else if (session.gameType === 'couples') {
+            timeOutText +=
+                `💑 *Challenge closed!*\n` +
+                `🔥 Get ready for the next one!`;
+        }
+
         session.sock.sendMessage(from, {
             text: timeOutText
         });
 
-        setTimeout(() => nextRound(from), 3000);
+        setTimeout(
+            () => nextRound(from),
+            3000
+        );
     }, roundTimeLimit * 1000);
 }
 
@@ -350,11 +388,13 @@ async function handleGameMessage(
         m.key.remoteJid;
 
     const cleanText =
-        String(text || '')
-            .trim()
-            .toUpperCase();
+        String(text || '').trim();
 
-    const q = session.activeQuestion;
+    const upperText =
+        cleanText.toUpperCase();
+
+    const q =
+        session.activeQuestion;
 
     let isCorrect = false;
 
@@ -366,8 +406,10 @@ async function handleGameMessage(
         session.gameType === 'quiz'
     ) {
         if (
-            ['A', 'B', 'C', 'D'].includes(cleanText) &&
-            cleanText ===
+            ['A', 'B', 'C', 'D'].includes(
+                upperText
+            ) &&
+            upperText ===
                 String(q.answer).toUpperCase()
         ) {
             isCorrect = true;
@@ -377,10 +419,14 @@ async function handleGameMessage(
     /*
      * SCRAMBLE
      */
-    else if (session.gameType === 'scramble') {
+    else if (
+        session.gameType === 'scramble'
+    ) {
         if (
-            cleanText ===
-            String(q.targetWord).toUpperCase()
+            upperText ===
+            String(
+                q.targetWord || q.word
+            ).toUpperCase()
         ) {
             isCorrect = true;
         }
@@ -389,15 +435,22 @@ async function handleGameMessage(
     /*
      * NUMBER GUESS
      */
-    else if (session.gameType === 'guess') {
-        const num = parseInt(cleanText, 10);
+    else if (
+        session.gameType === 'guess'
+    ) {
+        const num =
+            parseInt(cleanText, 10);
 
         if (!isNaN(num)) {
-            if (num === q.targetNumber) {
+            if (
+                num ===
+                q.targetNumber
+            ) {
                 isCorrect = true;
             } else {
                 const hintDir =
-                    num < q.targetNumber
+                    num <
+                    q.targetNumber
                         ? '📈 *Higher!*'
                         : '📉 *Lower!*';
 
@@ -419,23 +472,26 @@ async function handleGameMessage(
     /*
      * GUESS THE EMOJI
      */
-    else if (session.gameType === 'emoji') {
-        const playerAnswer =
-            String(text || '')
-                .trim()
-                .toLowerCase();
+    else if (
+        session.gameType === 'emoji'
+    ) {
+        const answer =
+            String(
+                q.answer || ''
+            )
+            .trim()
+            .toLowerCase();
 
-        const correctAnswer =
-            String(q.answer || '')
-                .trim()
-                .toLowerCase();
+        const playerAnswer =
+            cleanText.toLowerCase();
 
         if (
             playerAnswer &&
+            answer &&
             (
-                playerAnswer === correctAnswer ||
-                playerAnswer.includes(correctAnswer) ||
-                correctAnswer.includes(playerAnswer)
+                playerAnswer === answer ||
+                playerAnswer.includes(answer) ||
+                answer.includes(playerAnswer)
             )
         ) {
             isCorrect = true;
@@ -443,7 +499,26 @@ async function handleGameMessage(
     }
 
     /*
-     * CORRECT ANSWER
+     * COUPLES CHALLENGE
+     *
+     * Any meaningful response counts as
+     * a participation/vote.
+     *
+     * The first person to respond gets
+     * the round points.
+     */
+    else if (
+        session.gameType === 'couples'
+    ) {
+        if (
+            cleanText.length >= 2
+        ) {
+            isCorrect = true;
+        }
+    }
+
+    /*
+     * WINNER / SCORE
      */
     if (isCorrect) {
         session.answeredThisRound = true;
@@ -453,19 +528,22 @@ async function handleGameMessage(
         }
 
         session.scores[sender] =
-            (session.scores[sender] || 0) + 5;
-
-        const sortedScores =
-            Object.entries(session.scores)
-                .sort((a, b) => b[1] - a[1]);
+            (session.scores[sender] || 0) +
+            5;
 
         let winAnnouncement =
-`🎉 *CORRECT!* 🎉
+`🎉 *ROUND COMPLETE!*
 
-🏆 @${sender.replace(/[^0-9]/g, '')} got it right!
-💎 *+5 POINTS*
+👑 @${sender.replace(/[^0-9]/g, '')} wins this round and gets *+5 Points!*
 
-📊 *CURRENT SCORE:*`;
+🏆 *Current Scores:*`;
+
+        const sortedScores =
+            Object.entries(
+                session.scores
+            ).sort(
+                (a, b) => b[1] - a[1]
+            );
 
         sortedScores.forEach(
             ([user, pts], index) => {
@@ -477,9 +555,27 @@ async function handleGameMessage(
             }
         );
 
-        if (session.gameType === 'emoji') {
-            winAnnouncement +=
-                `\n\n😂 *Emoji Answer:* *${q.answer}*`;
+        if (
+            session.gameType === 'couples'
+        ) {
+            winAnnouncement =
+`🔥 *VOTE RECEIVED!*
+
+👤 @${sender.replace(/[^0-9]/g, '')} has voted!
+
+💎 *+5 Points*
+
+🏆 *Current Scores:*`;
+
+            sortedScores.forEach(
+                ([user, pts], index) => {
+                    winAnnouncement +=
+                        `\n${index + 1}. @${user.replace(
+                            /[^0-9]/g,
+                            ''
+                        )} — *${pts} pts*`;
+                }
+            );
         }
 
         await sock.sendMessage(
@@ -506,7 +602,8 @@ async function handleGameMessage(
 }
 
 async function endGame(from) {
-    const session = activeGames[from];
+    const session =
+        activeGames[from];
 
     if (!session) return;
 
@@ -515,19 +612,22 @@ async function endGame(from) {
     }
 
     const sortedScores =
-        Object.entries(session.scores)
-            .sort((a, b) => b[1] - a[1]);
+        Object.entries(
+            session.scores
+        ).sort(
+            (a, b) => b[1] - a[1]
+        );
 
     let finalDashboard =
 `┏━━━ 🏆 *GAME OVER* 🏆 ━━━┓
-┃ 🎮 *QUEEN VIDA GAME RESULTS*
-┃
-┃ *Final Leaderboard*
+┃ 🎮 *Game Session Completed!*
 ┣━━━━━━━━━━━━━━━━━━━━━━━`;
 
-    if (sortedScores.length === 0) {
+    if (
+        sortedScores.length === 0
+    ) {
         finalDashboard +=
-            `\n┃ ❌ *Nobody scored any points!*`;
+            `\n┃ ❌ *Nobody scored this game.*`;
     } else {
         sortedScores.forEach(
             ([user, pts], index) => {
