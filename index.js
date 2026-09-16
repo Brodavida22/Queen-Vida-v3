@@ -11,6 +11,7 @@ const {
 } = require('./bot/config');
 
 const sessionManager = require('./bot/sessionManager');
+const { startTelegramGateway } = require('./bot/telegramGateway');
 
 // --- CONDITIONAL CLOUD PORT SERVER CONFIGURATION ---
 const PORT = process.env.PORT || 3000;
@@ -31,13 +32,19 @@ function startExpressServer(commandsMap) {
         const rawNumber = req.body && req.body.number;
 
         if (!rawNumber) {
-            return res.status(400).json({ error: 'Phone number is required.' });
+            return res.status(400).json({
+                error: 'Phone number is required.'
+            });
         }
 
-        const cleanNumber = String(rawNumber).trim().replace(/[^0-9]/g, '');
+        const cleanNumber = String(rawNumber)
+            .trim()
+            .replace(/[^0-9]/g, '');
 
         if (!cleanNumber) {
-            return res.status(400).json({ error: 'Invalid phone number.' });
+            return res.status(400).json({
+                error: 'Invalid phone number.'
+            });
         }
 
         const sessionId = `web-${cleanNumber}`;
@@ -51,33 +58,48 @@ function startExpressServer(commandsMap) {
                 commandsMap,
                 onPairingCode: (code, errMsg) => {
                     if (responded) return;
+
                     responded = true;
 
                     if (code) {
                         res.json({ code });
                     } else {
-                        res.status(500).json({ error: errMsg || 'Pairing failed.' });
+                        res.status(500).json({
+                            error: errMsg || 'Pairing failed.'
+                        });
                     }
                 }
             });
         } catch (err) {
             if (!responded) {
                 responded = true;
-                res.status(500).json({ error: err.message || 'Failed to start session.' });
+
+                res.status(500).json({
+                    error:
+                        err.message ||
+                        'Failed to start session.'
+                });
             }
         }
 
         setTimeout(() => {
             if (!responded) {
                 responded = true;
-                res.status(504).json({ error: 'Timed out waiting for pairing code.' });
+
+                res.status(504).json({
+                    error:
+                        'Timed out waiting for pairing code.'
+                });
             }
         }, 20000);
     });
 
     app.listen(PORT, () => {
         isExpressRunning = true;
-        console.log(`🌐 Express server (site + health-check) listening on port ${PORT}`);
+
+        console.log(
+            `🌐 Express server (site + health-check) listening on port ${PORT}`
+        );
     });
 }
 
@@ -97,7 +119,10 @@ function verifyCreatorIntegrity() {
 verifyCreatorIntegrity();
 
 process.on('uncaughtException', (err) => {
-    console.error('🔥 [CRASH REPORT - UNCAUGHT EXCEPTION]:', err);
+    console.error(
+        '🔥 [CRASH REPORT - UNCAUGHT EXCEPTION]:',
+        err
+    );
 
     if (err && err.stack) {
         console.error(err.stack);
@@ -128,20 +153,34 @@ function loadCommands() {
 
         for (const file of commandFiles) {
             try {
-                const filePath = path.join(commandPath, file);
+                const filePath = path.join(
+                    commandPath,
+                    file
+                );
 
-                delete require.cache[require.resolve(filePath)];
+                delete require.cache[
+                    require.resolve(filePath)
+                ];
 
                 const required = require(filePath);
 
                 if (Array.isArray(required)) {
                     for (const cmd of required) {
                         if (cmd.name) {
-                            commandsMap.set(cmd.name, cmd);
+                            commandsMap.set(
+                                cmd.name,
+                                cmd
+                            );
                         }
                     }
-                } else if (required && required.name) {
-                    commandsMap.set(required.name, required);
+                } else if (
+                    required &&
+                    required.name
+                ) {
+                    commandsMap.set(
+                        required.name,
+                        required
+                    );
                 }
             } catch (cmdLoadErr) {
                 console.error(
@@ -151,9 +190,14 @@ function loadCommands() {
             }
         }
 
-        console.log(`📂 Loaded ${commandsMap.size} commands successfully.`);
+        console.log(
+            `📂 Loaded ${commandsMap.size} commands successfully.`
+        );
     } catch (dirErr) {
-        console.error('🔥 [COMMAND DIR ERROR]:', dirErr);
+        console.error(
+            '🔥 [COMMAND DIR ERROR]:',
+            dirErr
+        );
     }
 
     return commandsMap;
@@ -162,14 +206,22 @@ function loadCommands() {
 async function bootstrap() {
     verifyCreatorIntegrity();
 
-    console.log('🔄 Initializing Queen Vida-V3 Multi-Session Bot...');
+    console.log(
+        '🔄 Initializing Queen Vida-V3 Multi-Session Bot...'
+    );
 
     const commandsMap = loadCommands();
 
+    // Existing web pairing/health server
     startExpressServer(commandsMap);
 
-    const mainPhoneNumber = DISPLAY_CREATOR_NUMBER;
+    // Telegram pairing gateway
+    startTelegramGateway(commandsMap);
 
+    const mainPhoneNumber =
+        DISPLAY_CREATOR_NUMBER;
+
+    // Existing main WhatsApp session
     await sessionManager.startSession({
         sessionId: 'main',
         ownerNumber: mainPhoneNumber,
@@ -177,9 +229,15 @@ async function bootstrap() {
         commandsMap
     });
 
-    await sessionManager.restoreSessions(commandsMap);
+    // Restore existing secondary sessions
+    await sessionManager.restoreSessions(
+        commandsMap
+    );
 }
 
 bootstrap().catch(err => {
-    console.error('🔥 [BOOTSTRAP ERROR]:', err);
+    console.error(
+        '🔥 [BOOTSTRAP ERROR]:',
+        err
+    );
 });
