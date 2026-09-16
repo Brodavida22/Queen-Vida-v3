@@ -3,7 +3,6 @@ const path = require('path');
 
 const riddleFile = path.join(__dirname, '..', 'games', 'riddle.json');
 
-// Active riddles by chat
 const activeRiddles = new Map();
 
 function loadRiddles() {
@@ -12,7 +11,9 @@ function loadRiddles() {
             return [];
         }
 
-        const data = JSON.parse(fs.readFileSync(riddleFile, 'utf8'));
+        const data = JSON.parse(
+            fs.readFileSync(riddleFile, 'utf8')
+        );
 
         if (!Array.isArray(data)) {
             return [];
@@ -25,7 +26,11 @@ function loadRiddles() {
                 typeof r.answer === 'string'
         );
     } catch (error) {
-        console.error('[RIDDLE] Failed to load riddle.json:', error);
+        console.error(
+            '[RIDDLE] Failed to load riddle.json:',
+            error
+        );
+
         return [];
     }
 }
@@ -43,7 +48,11 @@ function shuffle(array) {
 
     for (let i = copy.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
+
+        [copy[i], copy[j]] = [
+            copy[j],
+            copy[i]
+        ];
     }
 
     return copy;
@@ -70,14 +79,23 @@ function getMessageText(m) {
 }
 
 function isGroup(jid) {
-    return typeof jid === 'string' && jid.endsWith('@g.us');
+    return (
+        typeof jid === 'string' &&
+        jid.endsWith('@g.us')
+    );
 }
 
-async function send(sock, chatId, text) {
-    return sock.sendMessage(chatId, { text });
+async function send(sock, chatId, text, options = {}) {
+    return sock.sendMessage(
+        chatId,
+        {
+            text,
+            ...options
+        }
+    );
 }
 
-function startRiddle(sock, chatId, rounds = 1) {
+function startRiddle(sock, chatId, rounds = 5) {
     if (activeRiddles.has(chatId)) {
         return send(
             sock,
@@ -96,7 +114,13 @@ function startRiddle(sock, chatId, rounds = 1) {
         );
     }
 
-    rounds = Math.max(1, Math.min(Number(rounds) || 1, riddles.length));
+    rounds = Math.max(
+        1,
+        Math.min(
+            Number(rounds) || 5,
+            riddles.length
+        )
+    );
 
     const game = {
         riddles: riddles.slice(0, rounds),
@@ -104,109 +128,192 @@ function startRiddle(sock, chatId, rounds = 1) {
         scores: {},
         answered: false,
         timer: null,
+        nextTimer: null,
         sock
     };
 
     activeRiddles.set(chatId, game);
 
-    return sendNextRiddle(sock, chatId);
+    return sendNextRiddle(
+        sock,
+        chatId
+    );
 }
 
 async function sendNextRiddle(sock, chatId) {
     const game = activeRiddles.get(chatId);
 
-    if (!game) return;
-
-    if (game.current >= game.riddles.length) {
-        return finishGame(sock, chatId);
+    if (!game) {
+        return;
     }
 
-    const riddle = game.riddles[game.current];
+    if (
+        game.current >=
+        game.riddles.length
+    ) {
+        return finishGame(
+            sock,
+            chatId
+        );
+    }
+
+    const riddle =
+        game.riddles[
+            game.current
+        ];
 
     game.answered = false;
 
     const difficulty =
         riddle.difficulty
-            ? `\n🎚️ Difficulty: ${String(riddle.difficulty).toUpperCase()}`
+            ? `\n🎚️ Difficulty: ${String(
+                  riddle.difficulty
+              ).toUpperCase()}`
             : '';
 
     const message =
         `🧩 *RIDDLE GAME*\n\n` +
-        `📖 *Riddle ${game.current + 1}/${game.riddles.length}*\n\n` +
+        `📖 *Riddle ${
+            game.current + 1
+        }/${game.riddles.length}*\n\n` +
         `${riddle.question}` +
         `${difficulty}\n\n` +
         `⏱️ You have *30 seconds* to answer!\n` +
         `🏆 First correct answer gets the point!`;
 
-    await send(sock, chatId, message);
+    await send(
+        sock,
+        chatId,
+        message
+    );
 
     if (game.timer) {
         clearTimeout(game.timer);
     }
 
-    game.timer = setTimeout(async () => {
-        const currentGame = activeRiddles.get(chatId);
+    game.timer = setTimeout(
+        async () => {
+            const currentGame =
+                activeRiddles.get(chatId);
 
-        if (!currentGame || currentGame.answered) return;
-
-        currentGame.answered = true;
-
-        await send(
-            sock,
-            chatId,
-            `⏰ *TIME'S UP!*\n\n` +
-            `The answer was: *${riddle.answer}*\n\n` +
-            `➡️ Next riddle coming up...`
-        );
-
-        currentGame.current++;
-
-        setTimeout(() => {
-            if (activeRiddles.has(chatId)) {
-                sendNextRiddle(sock, chatId).catch(console.error);
+            if (
+                !currentGame ||
+                currentGame.answered
+            ) {
+                return;
             }
-        }, 1500);
-    }, 30000);
+
+            currentGame.answered = true;
+
+            await send(
+                sock,
+                chatId,
+                `⏰ *TIME'S UP!*\n\n` +
+                `The answer was: *${riddle.answer}*\n\n` +
+                `➡️ Next riddle coming up...`
+            );
+
+            currentGame.current++;
+
+            currentGame.nextTimer =
+                setTimeout(
+                    () => {
+                        const latest =
+                            activeRiddles.get(
+                                chatId
+                            );
+
+                        if (!latest) {
+                            return;
+                        }
+
+                        latest.nextTimer =
+                            null;
+
+                        sendNextRiddle(
+                            sock,
+                            chatId
+                        ).catch(
+                            console.error
+                        );
+                    },
+                    1500
+                );
+        },
+        30000
+    );
 }
 
-async function handleRiddleMessage(sock, m, chatId) {
-    const game = activeRiddles.get(chatId);
+async function handleRiddleMessage(
+    sock,
+    m,
+    chatId
+) {
+    const game =
+        activeRiddles.get(chatId);
 
-    if (!game || game.answered) {
+    if (
+        !game ||
+        game.answered
+    ) {
         return false;
     }
 
-    const text = getMessageText(m);
+    const text =
+        getMessageText(m);
 
     if (!text) {
         return false;
     }
 
-    const answer = normalize(game.riddles[game.current].answer);
-    const userAnswer = normalize(text);
+    const currentRiddle =
+        game.riddles[
+            game.current
+        ];
+
+    if (!currentRiddle) {
+        return false;
+    }
+
+    const correctAnswer =
+        normalize(
+            currentRiddle.answer
+        );
+
+    const userAnswer =
+        normalize(text);
 
     if (!userAnswer) {
         return false;
     }
 
-    if (userAnswer === answer) {
+    if (
+        userAnswer ===
+        correctAnswer
+    ) {
         game.answered = true;
 
         if (game.timer) {
-            clearTimeout(game.timer);
+            clearTimeout(
+                game.timer
+            );
+
             game.timer = null;
         }
 
-        const userId = getSenderId(m);
+        const userId =
+            getSenderId(m);
 
-        game.scores[userId] = (game.scores[userId] || 0) + 1;
+        game.scores[userId] =
+            (game.scores[userId] || 0) +
+            1;
 
         await send(
             sock,
             chatId,
             `🎉 *CORRECT!*\n\n` +
             `👤 Winner: @${userId.split('@')[0]}\n` +
-            `✅ Answer: *${game.riddles[game.current].answer}*\n` +
+            `✅ Answer: *${currentRiddle.answer}*\n` +
             `🏆 +1 point\n\n` +
             `➡️ Next riddle...`,
             {
@@ -216,11 +323,30 @@ async function handleRiddleMessage(sock, m, chatId) {
 
         game.current++;
 
-        setTimeout(() => {
-            if (activeRiddles.has(chatId)) {
-                sendNextRiddle(sock, chatId).catch(console.error);
-            }
-        }, 1500);
+        game.nextTimer =
+            setTimeout(
+                () => {
+                    const latest =
+                        activeRiddles.get(
+                            chatId
+                        );
+
+                    if (!latest) {
+                        return;
+                    }
+
+                    latest.nextTimer =
+                        null;
+
+                    sendNextRiddle(
+                        sock,
+                        chatId
+                    ).catch(
+                        console.error
+                    );
+                },
+                1500
+            );
 
         return true;
     }
@@ -228,53 +354,99 @@ async function handleRiddleMessage(sock, m, chatId) {
     return false;
 }
 
-async function finishGame(sock, chatId) {
-    const game = activeRiddles.get(chatId);
+async function finishGame(
+    sock,
+    chatId
+) {
+    const game =
+        activeRiddles.get(chatId);
 
-    if (!game) return;
+    if (!game) {
+        return;
+    }
 
     if (game.timer) {
-        clearTimeout(game.timer);
+        clearTimeout(
+            game.timer
+        );
     }
 
-    const scores = Object.entries(game.scores)
-        .sort((a, b) => b[1] - a[1]);
+    if (game.nextTimer) {
+        clearTimeout(
+            game.nextTimer
+        );
+    }
 
-    let result = `🏁 *RIDDLE GAME FINISHED!*\n\n`;
+    const scores =
+        Object.entries(
+            game.scores
+        ).sort(
+            (a, b) =>
+                b[1] - a[1]
+        );
+
+    let result =
+        `🏁 *RIDDLE GAME FINISHED!*\n\n`;
 
     if (!scores.length) {
-        result += `😢 Nobody got a correct answer.`;
+        result +=
+            `😢 Nobody got a correct answer.`;
     } else {
-        result += `🏆 *FINAL SCORES*\n\n`;
+        result +=
+            `🏆 *FINAL SCORES*\n\n`;
 
-        scores.forEach(([userId, score], index) => {
-            const medal =
-                index === 0
-                    ? '🥇'
-                    : index === 1
-                    ? '🥈'
-                    : index === 2
-                    ? '🥉'
-                    : '🏅';
+        scores.forEach(
+            (
+                [userId, score],
+                index
+            ) => {
+                const medal =
+                    index === 0
+                        ? '🥇'
+                        : index === 1
+                        ? '🥈'
+                        : index === 2
+                        ? '🥉'
+                        : '🏅';
 
-            result += `${medal} @${userId.split('@')[0]} — *${score} point${score === 1 ? '' : 's'}*\n`;
-        });
+                result +=
+                    `${medal} @${userId.split('@')[0]} — *${score} point${
+                        score === 1
+                            ? ''
+                            : 's'
+                    }*\n`;
+            }
+        );
 
-        result += `\n🎮 Thanks for playing!`;
+        result +=
+            `\n🎮 Thanks for playing!`;
     }
 
-    const mentions = scores.map(([userId]) => userId);
+    const mentions =
+        scores.map(
+            ([userId]) =>
+                userId
+        );
 
-    activeRiddles.delete(chatId);
+    activeRiddles.delete(
+        chatId
+    );
 
-    await sock.sendMessage(chatId, {
-        text: result,
-        mentions
-    });
+    await sock.sendMessage(
+        chatId,
+        {
+            text: result,
+            mentions
+        }
+    );
 }
 
-async function stopRiddle(sock, chatId) {
-    const game = activeRiddles.get(chatId);
+async function stopRiddle(
+    sock,
+    chatId
+) {
+    const game =
+        activeRiddles.get(chatId);
 
     if (!game) {
         return send(
@@ -285,10 +457,20 @@ async function stopRiddle(sock, chatId) {
     }
 
     if (game.timer) {
-        clearTimeout(game.timer);
+        clearTimeout(
+            game.timer
+        );
     }
 
-    activeRiddles.delete(chatId);
+    if (game.nextTimer) {
+        clearTimeout(
+            game.nextTimer
+        );
+    }
+
+    activeRiddles.delete(
+        chatId
+    );
 
     return send(
         sock,
@@ -299,16 +481,27 @@ async function stopRiddle(sock, chatId) {
 
 module.exports = {
     name: 'riddle',
-    description: 'Play a 100-question interactive riddle game',
 
-    async execute(sock, m, from, args) {
-        const action = String(args?.[0] || '').toLowerCase();
+    description:
+        'Play a 100-question interactive riddle game',
+
+    async execute(
+        sock,
+        m,
+        from,
+        args
+    ) {
+        const action =
+            String(
+                args?.[0] || ''
+            ).toLowerCase();
 
         if (action === 'stop') {
-            return stopRiddle(sock, from);
+            return stopRiddle(
+                sock,
+                from
+            );
         }
-
-        const rounds = Number(args?.[0]) || 5;
 
         if (!isGroup(from)) {
             return send(
@@ -318,13 +511,23 @@ module.exports = {
             );
         }
 
-        return startRiddle(sock, from, rounds);
+        const rounds =
+            Number(args?.[0]) || 5;
+
+        return startRiddle(
+            sock,
+            from,
+            rounds
+        );
     },
 
-    handleMessage: handleRiddleMessage,
+    handleMessage:
+        handleRiddleMessage,
 
     isActive(chatId) {
-        return activeRiddles.has(chatId);
+        return activeRiddles.has(
+            chatId
+        );
     },
 
     stop: stopRiddle
