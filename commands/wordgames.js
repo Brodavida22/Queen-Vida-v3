@@ -1,60 +1,49 @@
 const fs = require('fs');
 const path = require('path');
 
-const activeWordGames = new Map();
+const activeWordGames =
+    new Map();
 
-const GAME_CONFIG = {
-    starting: {
-        file: 'starting.json',
-        title: 'WORDS STARTING WITH',
-        emoji: '🔤',
-        field: 'starting'
-    },
-
-    ending: {
-        file: 'ending.json',
-        title: 'WORDS ENDING WITH',
-        emoji: '🔚',
-        field: 'ending'
-    }
-};
-
-function loadWords(gameType) {
-    const config = GAME_CONFIG[gameType];
-
-    if (!config) return [];
-
-    const filePath = path.join(
-        __dirname,
-        '..',
-        'games',
-        config.file
-    );
+function loadLetters(type) {
+    const file =
+        path.join(
+            __dirname,
+            '..',
+            'games',
+            `${type}.json`
+        );
 
     try {
-        if (!fs.existsSync(filePath)) {
+        if (!fs.existsSync(file)) {
             return [];
         }
 
-        const data = JSON.parse(
-            fs.readFileSync(filePath, 'utf8')
-        );
+        const data =
+            JSON.parse(
+                fs.readFileSync(
+                    file,
+                    'utf8'
+                )
+            );
 
         if (!Array.isArray(data)) {
             return [];
         }
 
         return data
-            .map(item =>
-                String(item?.[config.field] || '')
-                    .trim()
-                    .toLowerCase()
+            .map(
+                item =>
+                    String(
+                        item?.[type] || ''
+                    )
+                        .trim()
+                        .toLowerCase()
             )
             .filter(Boolean);
 
     } catch (error) {
         console.error(
-            `[WORD GAME] Failed to load ${gameType}:`,
+            `[WORDGAME] Failed to load ${type}.json:`,
             error
         );
 
@@ -62,34 +51,40 @@ function loadWords(gameType) {
     }
 }
 
-function shuffle(array) {
-    const copy = [...array];
-
-    for (let i = copy.length - 1; i > 0; i--) {
-        const j =
-            Math.floor(Math.random() * (i + 1));
-
-        [copy[i], copy[j]] =
-            [copy[j], copy[i]];
-    }
-
-    return copy;
+function normalize(text) {
+    return String(text || '')
+        .toLowerCase()
+        .trim()
+        .replace(
+            /[^a-z0-9\s'-]/gi,
+            ''
+        )
+        .replace(
+            /\s+/g,
+            ' '
+        );
 }
 
-function getMessageText(m) {
-    return (
+function getText(
+    m,
+    body = ''
+) {
+    return String(
+        body ||
         m?.message?.conversation ||
         m?.message?.extendedTextMessage?.text ||
         m?.message?.imageMessage?.caption ||
         m?.message?.videoMessage?.caption ||
+        m?.message?.documentMessage?.caption ||
         ''
-    );
+    ).trim();
 }
 
-function getSender(m) {
+function getSenderId(m) {
     return (
         m?.key?.participant ||
         m?.participant ||
+        m?.sender ||
         m?.key?.remoteJid ||
         'unknown'
     );
@@ -101,7 +96,35 @@ function isCommand(text) {
     );
 }
 
-async function send(sock, chatId, text, options = {}) {
+function shuffle(array) {
+    const copy = [...array];
+
+    for (
+        let i = copy.length - 1;
+        i > 0;
+        i--
+    ) {
+        const j =
+            Math.floor(
+                Math.random() * (i + 1)
+            );
+
+        [copy[i], copy[j]] =
+            [
+                copy[j],
+                copy[i]
+            ];
+    }
+
+    return copy;
+}
+
+async function send(
+    sock,
+    chatId,
+    text,
+    options = {}
+) {
     return sock.sendMessage(
         chatId,
         {
@@ -111,139 +134,408 @@ async function send(sock, chatId, text, options = {}) {
     );
 }
 
-async function sendRound(sock, chatId) {
-    const game = activeWordGames.get(chatId);
-
+function clearTimers(game) {
     if (!game) return;
 
-    if (game.round >= game.rounds) {
-        return finishGame(
+    if (game.timer) {
+        clearTimeout(
+            game.timer
+        );
+    }
+
+    if (game.nextTimer) {
+        clearTimeout(
+            game.nextTimer
+        );
+    }
+
+    game.timer = null;
+    game.nextTimer = null;
+}
+
+async function startWordGame(
+    sock,
+    chatId,
+    type,
+    rounds = 5
+) {
+    if (
+        !chatId?.endsWith(
+            '@g.us'
+        )
+    ) {
+        return send(
+            sock,
+            chatId,
+            '❌ This game can only be played inside a group.'
+        );
+    }
+
+    if (
+        activeWordGames.has(
+            chatId
+        )
+    ) {
+        return send(
+            sock,
+            chatId,
+            '❌ A Words Starting/Ending game is already running here.'
+        );
+    }
+
+    const values =
+        shuffle(
+            loadLetters(type)
+        );
+
+    if (!values.length) {
+        return send(
+            sock,
+            chatId,
+            `❌ No ${type} letters were found in games/${type}.json`
+        );
+    }
+
+    const count =
+        Math.max(
+            1,
+            Math.min(
+                Number(rounds) || 5,
+                values.length
+            )
+        );
+
+    const game = {
+        type,
+
+        values:
+            values.slice(
+                0,
+                count
+            ),
+
+        current: 0,
+
+        scores: {},
+
+        answered: false,
+
+        timer: null,
+
+        nextTimer: null,
+
+        sock
+    };
+
+    activeWordGames.set(
+        chatId,
+        game
+    );
+
+    return sendNextWordRound(
+        sock,
+        chatId
+    );
+}
+
+async function sendNextWordRound(
+    sock,
+    chatId
+) {
+    const game =
+        activeWordGames.get(
+            chatId
+        );
+
+    if (!game) {
+        return;
+    }
+
+    if (
+        game.current >=
+        game.values.length
+    ) {
+        return finishWordGame(
             sock,
             chatId
         );
     }
 
-    game.round++;
+    clearTimers(game);
+
     game.answered = false;
 
-    const ending =
-        game.gameType === 'ending';
+    const letters =
+        game.values[
+            game.current
+        ];
 
-    const config =
-        GAME_CONFIG[game.gameType];
+    const starting =
+        game.type ===
+        'starting';
 
-    const word =
-        game.words[game.round - 1];
+    const title =
+        starting
+            ? '🔤 WORDS STARTING WITH 🔤'
+            : '🔚 WORDS ENDING WITH 🔚';
 
-    game.currentWord = word;
-
-    const directionText =
-        ending
-            ? `a word ending with *${word.toUpperCase()}*`
-            : `a word starting with *${word.toUpperCase()}*`;
-
-    const message =
-`╭━━━ ${config.emoji} *${config.title}* ${config.emoji} ━━━╮
-┃
-┃ 🎮 *Round:* ${game.round}/${game.rounds}
-┃
-┃ 📝 Give me ${directionText}.
-┃
-┃ 🏆 First correct answer gets *+5 points*
-┃ ⏱️ Time: *30 seconds*
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+    const instruction =
+        starting
+            ? `Give me a word starting with ${letters.toUpperCase()}.`
+            : `Give me a word ending with ${letters.toUpperCase()}.`;
 
     await send(
         sock,
         chatId,
-        message
+        `┏━━━ ${title} ━━━┓\n` +
+        `┃ 🎮 *Round:* ${game.current + 1}/${game.values.length}\n` +
+        `┃\n` +
+        `┃ 📝 ${instruction}\n` +
+        `┃\n` +
+        `┃ 🏆 First correct answer gets *+5 points*\n` +
+        `┃ ⏱️ Time: *30 seconds*\n` +
+        `┗━━━━━━━━━━━━━━━━━━┛`
     );
 
-    if (!activeWordGames.has(chatId)) {
+    game.timer =
+        setTimeout(
+            async () => {
+                const current =
+                    activeWordGames.get(
+                        chatId
+                    );
+
+                if (
+                    !current ||
+                    current.answered
+                ) {
+                    return;
+                }
+
+                current.answered =
+                    true;
+
+                const required =
+                    current.values[
+                        current.current
+                    ];
+
+                await send(
+                    sock,
+                    chatId,
+                    `⏰ *TIME'S UP!*\n\n` +
+                    `No correct answer this round.\n` +
+                    `📌 Required ${current.type === 'starting' ? 'starting' : 'ending'} letters: *${required.toUpperCase()}*`
+                );
+
+                current.current++;
+
+                current.nextTimer =
+                    setTimeout(
+                        () => {
+                            const latest =
+                                activeWordGames.get(
+                                    chatId
+                                );
+
+                            if (!latest) {
+                                return;
+                            }
+
+                            latest.nextTimer =
+                                null;
+
+                            sendNextWordRound(
+                                latest.sock,
+                                chatId
+                            ).catch(
+                                console.error
+                            );
+                        },
+                        1500
+                    );
+            },
+            30000
+        );
+}
+
+async function handleWordGameMessage(
+    sock,
+    m,
+    chatId,
+    body = ''
+) {
+    const game =
+        activeWordGames.get(
+            chatId
+        );
+
+    if (
+        !game ||
+        game.answered
+    ) {
+        return false;
+    }
+
+    const text =
+        getText(
+            m,
+            body
+        );
+
+    if (!text) {
+        return false;
+    }
+
+    if (isCommand(text)) {
+        return false;
+    }
+
+    const answer =
+        normalize(text);
+
+    const required =
+        normalize(
+            game.values[
+                game.current
+            ]
+        );
+
+    if (
+        !answer ||
+        !required
+    ) {
+        return false;
+    }
+
+    let correct = false;
+
+    if (
+        game.type ===
+        'starting'
+    ) {
+        correct =
+            answer.startsWith(
+                required
+            ) &&
+            answer.length >
+                required.length;
+    } else {
+        correct =
+            answer.endsWith(
+                required
+            ) &&
+            answer.length >
+                required.length;
+    }
+
+    if (!correct) {
+        return false;
+    }
+
+    /*
+     * Mark answered FIRST.
+     */
+    game.answered =
+        true;
+
+    if (game.timer) {
+        clearTimeout(
+            game.timer
+        );
+
+        game.timer = null;
+    }
+
+    const sender =
+        getSenderId(m);
+
+    game.scores[sender] =
+        (game.scores[sender] || 0) +
+        5;
+
+    await send(
+        sock,
+        chatId,
+        `🎉 *CORRECT ANSWER!*\n\n` +
+        `👤 Winner: @${String(sender).split('@')[0]}\n` +
+        `✅ Answer: *${text}*\n` +
+        `🏆 *+5 points!*\n` +
+        `📊 Your game score: *${game.scores[sender]} points*`,
+        {
+            mentions: [sender]
+        }
+    );
+
+    game.current++;
+
+    game.nextTimer =
+        setTimeout(
+            () => {
+                const latest =
+                    activeWordGames.get(
+                        chatId
+                    );
+
+                if (!latest) {
+                    return;
+                }
+
+                latest.nextTimer =
+                    null;
+
+                sendNextWordRound(
+                    latest.sock,
+                    chatId
+                ).catch(
+                    console.error
+                );
+            },
+            1500
+        );
+
+    return true;
+}
+
+async function finishWordGame(
+    sock,
+    chatId
+) {
+    const game =
+        activeWordGames.get(
+            chatId
+        );
+
+    if (!game) {
         return;
     }
 
-    if (game.timer) {
-        clearTimeout(game.timer);
-    }
-
-    game.timer = setTimeout(
-        async () => {
-
-            const current =
-                activeWordGames.get(chatId);
-
-            if (
-                !current ||
-                current.answered
-            ) {
-                return;
-            }
-
-            current.answered = true;
-
-            await send(
-                sock,
-                chatId,
-                `⏰ *TIME'S UP!*\n\n` +
-                `No correct answer this round.\n` +
-                `📌 Required ending/starting letters: *${current.currentWord.toUpperCase()}*`
-            );
-
-            current.nextTimer =
-                setTimeout(() => {
-
-                    const latest =
-                        activeWordGames.get(chatId);
-
-                    if (!latest) return;
-
-                    latest.nextTimer = null;
-
-                    sendRound(
-                        sock,
-                        chatId
-                    ).catch(console.error);
-
-                }, 1500);
-
-        },
-        30000
-    );
-}
-
-async function finishGame(sock, chatId) {
-    const game =
-        activeWordGames.get(chatId);
-
-    if (!game) return;
-
-    if (game.timer) {
-        clearTimeout(game.timer);
-    }
-
-    if (game.nextTimer) {
-        clearTimeout(game.nextTimer);
-    }
+    clearTimers(game);
 
     const scores =
-        Object.entries(game.scores)
-            .sort((a, b) => b[1] - a[1]);
+        Object.entries(
+            game.scores
+        ).sort(
+            (a, b) =>
+                b[1] - a[1]
+        );
 
-    let result =
-`🏁 *${GAME_CONFIG[game.gameType].title} GAME FINISHED!*\n\n`;
+    let text =
+        `🏁 *${
+            game.type === 'starting'
+                ? 'WORDS STARTING'
+                : 'WORDS ENDING'
+        } GAME FINISHED!*\n\n`;
 
     if (!scores.length) {
-        result +=
-            `😢 Nobody scored this game.`;
+        text +=
+            '😢 Nobody scored any points.';
     } else {
-
-        result += `🏆 *FINAL SCORES*\n\n`;
+        text +=
+            '🏆 *FINAL SCORES*\n\n';
 
         scores.forEach(
-            ([user, points], index) => {
-
+            ([user, score], index) => {
                 const medal =
                     index === 0
                         ? '🥇'
@@ -253,245 +545,69 @@ async function finishGame(sock, chatId) {
                         ? '🥉'
                         : '🏅';
 
-                result +=
-                    `${medal} @${user.replace(
-                        /[^0-9]/g,
-                        ''
-                    )} — *${points} pts*\n`;
+                text +=
+                    `${medal} @${String(user).split('@')[0]} — *${score} points*\n`;
             }
         );
     }
 
-    activeWordGames.delete(chatId);
-
-    await sock.sendMessage(
-        chatId,
-        {
-            text: result,
-            mentions: scores.map(
-                ([user]) => user
-            )
-        }
-    );
-}
-
-async function startWordGame(
-    sock,
-    chatId,
-    gameType,
-    rounds = 5
-) {
-    if (!chatId.endsWith('@g.us')) {
-        return send(
-            sock,
-            chatId,
-            '❌ This game can only be played inside a group.'
-        );
-    }
-
-    if (activeWordGames.has(chatId)) {
-        return send(
-            sock,
-            chatId,
-            '❌ A word game is already running here.\n\nUse `.starting stop` or `.ending stop`.'
-        );
-    }
-
-    const words =
-        shuffle(
-            loadWords(gameType)
-        );
-
-    if (!words.length) {
-        return send(
-            sock,
-            chatId,
-            `❌ No words found for the ${gameType} game.`
-        );
-    }
-
-    rounds =
-        Math.max(
-            1,
-            Math.min(
-                Number(rounds) || 5,
-                words.length
-            )
-        );
-
-    activeWordGames.set(
-        chatId,
-        {
-            gameType,
-            words: words.slice(0, rounds),
-            rounds,
-            round: 0,
-            currentWord: null,
-            scores: {},
-            answered: false,
-            timer: null,
-            nextTimer: null
-        }
+    activeWordGames.delete(
+        chatId
     );
 
-    await send(
+    return send(
         sock,
         chatId,
-        `🎮 *${GAME_CONFIG[gameType].title} GAME STARTING!*\n\n` +
-        `🔄 Rounds: *${rounds}*\n` +
-        `🏆 Correct answer: *+5 points*\n` +
-        `⏱️ 30 seconds per round\n\n` +
-        `Get ready! 🔥`
-    );
-
-    setTimeout(() => {
-        if (activeWordGames.has(chatId)) {
-            sendRound(
-                sock,
-                chatId
-            ).catch(console.error);
+        text,
+        {
+            mentions:
+                scores.map(
+                    ([user]) => user
+                )
         }
-    }, 1500);
+    );
 }
 
-async function stopWordGame(sock, chatId) {
+async function stopWordGame(
+    sock,
+    chatId
+) {
     const game =
-        activeWordGames.get(chatId);
+        activeWordGames.get(
+            chatId
+        );
 
     if (!game) {
         return send(
             sock,
             chatId,
-            '❌ No active word game in this group.'
+            '❌ No Words Starting/Ending game is active here.'
         );
     }
 
-    if (game.timer) {
-        clearTimeout(game.timer);
-    }
+    clearTimers(game);
 
-    if (game.nextTimer) {
-        clearTimeout(game.nextTimer);
-    }
-
-    activeWordGames.delete(chatId);
+    activeWordGames.delete(
+        chatId
+    );
 
     return send(
         sock,
         chatId,
-        '🛑 *WORD GAME STOPPED*\n\nThe game has been cancelled.'
+        '🛑 *Words game stopped.*'
     );
 }
-
-async function handleWordGameMessage(
-    sock,
-    m,
-    from,
-    text
-) {
-    const game =
-        activeWordGames.get(from);
-
-    if (!game || game.answered) {
-        return false;
-    }
-
-    const answer =
-        String(
-            getMessageText(m) || text || ''
-        )
-            .trim()
-            .toLowerCase();
-
-    if (!answer) return false;
-
-    if (isCommand(answer)) {
-        return false;
-    }
-
-    const target =
-        String(game.currentWord || '')
-            .toLowerCase();
-
-    let correct = false;
-
-    if (game.gameType === 'starting') {
-        correct =
-            answer.startsWith(target);
-    }
-
-    if (game.gameType === 'ending') {
-        correct =
-            answer.endsWith(target);
-    }
-
-    if (!correct) {
-        return false;
-    }
-
-    game.answered = true;
-
-    if (game.timer) {
-        clearTimeout(game.timer);
-        game.timer = null;
-    }
-
-    const sender =
-        getSender(m);
-
-    game.scores[sender] =
-        (game.scores[sender] || 0) + 5;
-
-    await sock.sendMessage(
-        from,
-        {
-            text:
-                `🎉 *CORRECT!*\n\n` +
-                `👤 @${sender.replace(
-                    /[^0-9]/g,
-                    ''
-                )}\n` +
-                `📝 Answer: *${answer}*\n` +
-                `💎 +5 Points`,
-            mentions: [sender]
-        },
-        {
-            quoted: m
-        }
-    );
-
-    game.nextTimer =
-        setTimeout(() => {
-
-            const latest =
-                activeWordGames.get(from);
-
-            if (!latest) return;
-
-            latest.nextTimer = null;
-
-            sendRound(
-                sock,
-                from
-            ).catch(console.error);
-
-        }, 1500);
-
-    return true;
-}
-
-
-/*
- * ============================================================
- * COMMANDS
- * ============================================================
- */
 
 const startingCommand = {
     name: 'starting',
 
+    aliases: [
+        'wordstarting',
+        'wordsstarting'
+    ],
+
     description:
-        'Play Words Starting With',
+        'Give a word starting with the requested letters',
 
     async execute(
         sock,
@@ -499,11 +615,12 @@ const startingCommand = {
         from,
         args
     ) {
-        const action =
-            String(args?.[0] || '')
-                .toLowerCase();
-
-        if (action === 'stop') {
+        if (
+            String(
+                args?.[0] || ''
+            ).toLowerCase() ===
+            'stop'
+        ) {
             return stopWordGame(
                 sock,
                 from
@@ -514,17 +631,21 @@ const startingCommand = {
             sock,
             from,
             'starting',
-            Number(args?.[0]) || 5
+            args?.[0] || 5
         );
     }
 };
 
-
 const endingCommand = {
     name: 'ending',
 
+    aliases: [
+        'wordending',
+        'wordsending'
+    ],
+
     description:
-        'Play Words Ending With',
+        'Give a word ending with the requested letters',
 
     async execute(
         sock,
@@ -532,11 +653,12 @@ const endingCommand = {
         from,
         args
     ) {
-        const action =
-            String(args?.[0] || '')
-                .toLowerCase();
-
-        if (action === 'stop') {
+        if (
+            String(
+                args?.[0] || ''
+            ).toLowerCase() ===
+            'stop'
+        ) {
             return stopWordGame(
                 sock,
                 from
@@ -547,11 +669,10 @@ const endingCommand = {
             sock,
             from,
             'ending',
-            Number(args?.[0]) || 5
+            args?.[0] || 5
         );
     }
 };
-
 
 module.exports = [
     startingCommand,
@@ -561,9 +682,11 @@ module.exports = [
 module.exports.handleWordGameMessage =
     handleWordGameMessage;
 
-module.exports.isWordGameActive =
+module.exports.isActive =
     chatId =>
-        activeWordGames.has(chatId);
+        activeWordGames.has(
+            chatId
+        );
 
-module.exports.stopWordGame =
+module.exports.stop =
     stopWordGame;
