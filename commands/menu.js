@@ -9,15 +9,14 @@ const { getPrefix } = require('../utils/prefix');
  * PREMIUM COMMAND MENU
  * ============================================================
  *
- * This file controls ONLY the visual menu.
+ * This menu automatically shows:
  *
- * Existing functionality preserved:
- * - Dynamic prefix
- * - Dynamic mode
- * - Dynamic command count
- * - Banner image support
- * - Automatic NEWLY ADDED command detection
- * - Existing command registration
+ * - Normal bot commands
+ * - All game commands
+ * - All JSON-based games in /games
+ * - Newly added commands
+ *
+ * You no longer need to manually add every new game here.
  * ============================================================
  */
 
@@ -38,6 +37,43 @@ function section(title, emoji, prefix, commands) {
 
     return block;
 }
+
+
+/*
+ * ============================================================
+ * GAME COMMANDS
+ * ============================================================
+ *
+ * These are the actual games currently supplied with
+ * Queen Vida-V3.
+ */
+
+const GAME_COMMANDS = [
+    'game',
+
+    'trivia',
+    'quiz',
+    'scramble',
+    'guess',
+    'truthordare',
+
+    'emoji',
+    'movemoji',
+    'findemoji',
+    'lyrics',
+    'rhyme',
+    'taboo',
+    '2truth1lie',
+    'memewar',
+
+    'wyr',
+    'neverhaveiever',
+    'thisorthat',
+    '8ball',
+    'coinflip',
+    'dice'
+];
+
 
 /*
  * ============================================================
@@ -147,11 +183,22 @@ const SECTIONS = [
         ]
     },
 
+    /*
+     * ========================================================
+     * GAMES
+     * ========================================================
+     */
+
     {
-        title: '𝗙𝗨𝗡 & 𝗚𝗔𝗠𝗘𝗦',
+        title: '𝗚𝗔𝗠𝗘𝗦',
         emoji: '🎮',
+        commands: GAME_COMMANDS
+    },
+
+    {
+        title: '𝗙𝗨𝗡',
+        emoji: '😂',
         commands: [
-            'game',
             'reaction',
             'hug',
             'kiss',
@@ -187,15 +234,72 @@ const SECTIONS = [
     }
 ];
 
+
 /*
- * Keep track of commands already displayed above.
- * Any command added later to the bot automatically appears
- * inside NEWLY ADDED.
+ * ============================================================
+ * BUILD LIST OF COMMANDS ALREADY DISPLAYED
+ * ============================================================
  */
 
 const LISTED_COMMANDS = new Set(
     SECTIONS.flatMap(section => section.commands)
 );
+
+
+/*
+ * ============================================================
+ * AUTOMATIC GAME FILE DETECTION
+ * ============================================================
+ *
+ * This checks /games/*.json automatically.
+ *
+ * Therefore, if you later add:
+ *
+ * games/newgame.json
+ *
+ * it can appear in the menu without you having to edit
+ * this file again.
+ */
+
+function getJsonGames() {
+    const gamesDirectory =
+        path.join(__dirname, '../games');
+
+    if (!fs.existsSync(gamesDirectory)) {
+        return [];
+    }
+
+    try {
+        return fs.readdirSync(gamesDirectory)
+            .filter(file =>
+                file.toLowerCase().endsWith('.json')
+            )
+            .map(file =>
+                path.basename(
+                    file,
+                    '.json'
+                )
+            )
+            .filter(name =>
+                ![
+                    'starting',
+                    'ending',
+                    'couples'
+                ].includes(
+                    name.toLowerCase()
+                )
+            )
+            .sort();
+    } catch (error) {
+        console.error(
+            'Error reading games directory:',
+            error
+        );
+
+        return [];
+    }
+}
+
 
 /*
  * ============================================================
@@ -210,6 +314,7 @@ module.exports = {
         'Displays the QUEEN VIDA-V3 command menu and bot information',
 
     async execute(sock, m, from) {
+
         const PREFIX = getPrefix();
 
         const mode = String(
@@ -220,6 +325,7 @@ module.exports = {
             (sock.commands && sock.commands.size) || 0;
 
         let menuText = '';
+
 
         /*
          * ========================================================
@@ -241,13 +347,15 @@ module.exports = {
 
 `;
 
+
         /*
          * ========================================================
-         * MAIN COMMAND SECTIONS
+         * MAIN SECTIONS
          * ========================================================
          */
 
         for (const menuSection of SECTIONS) {
+
             menuText += section(
                 menuSection.title,
                 menuSection.emoji,
@@ -256,25 +364,63 @@ module.exports = {
             );
         }
 
+
         /*
          * ========================================================
-         * NEWLY ADDED COMMANDS
+         * AUTOMATIC JSON GAMES
          * ========================================================
          *
-         * If you add another command file later and forget to
-         * place it in a category, it will automatically appear
-         * here.
+         * Show any game JSON that wasn't already listed.
          */
 
-        if (sock.commands && sock.commands.size) {
-            const unlisted = [...sock.commands.keys()]
-                .filter(
-                    commandName =>
-                        !LISTED_COMMANDS.has(commandName)
-                )
-                .sort();
+        const jsonGames =
+            getJsonGames();
+
+        const listedGames =
+            new Set(GAME_COMMANDS);
+
+        const additionalGames =
+            jsonGames.filter(
+                game => !listedGames.has(game)
+            );
+
+        if (additionalGames.length) {
+
+            menuText += section(
+                '𝗔𝗗𝗗𝗜𝗧𝗜𝗢𝗡𝗔𝗟 𝗚𝗔𝗠𝗘𝗦',
+                '🆕',
+                PREFIX,
+                additionalGames
+            );
+        }
+
+
+        /*
+         * ========================================================
+         * NEW COMMAND DETECTION
+         * ========================================================
+         */
+
+        if (
+            sock.commands &&
+            sock.commands.size
+        ) {
+
+            const unlisted =
+                [...sock.commands.keys()]
+                    .filter(
+                        commandName =>
+                            !LISTED_COMMANDS.has(
+                                commandName
+                            ) &&
+                            !additionalGames.includes(
+                                commandName
+                            )
+                    )
+                    .sort();
 
             if (unlisted.length) {
+
                 menuText += section(
                     '𝗡𝗘𝗪𝗟𝗬 𝗔𝗗𝗗𝗘𝗗',
                     '🆕',
@@ -283,6 +429,35 @@ module.exports = {
                 );
             }
         }
+
+
+        /*
+         * ========================================================
+         * GAME HELP
+         * ========================================================
+         */
+
+        menuText +=
+`╭─〔 🎮 GAME QUICK START 〕
+│ ⟡ ${PREFIX}game
+│ ⟡ ${PREFIX}game start trivia easy 5
+│ ⟡ ${PREFIX}game start quiz medium 5
+│ ⟡ ${PREFIX}game start scramble 5
+│ ⟡ ${PREFIX}game start guess 5
+│ ⟡ ${PREFIX}game start truthordare 5
+│ ⟡ ${PREFIX}game start emoji 5
+│ ⟡ ${PREFIX}game start movemoji 5
+│ ⟡ ${PREFIX}game start findemoji 5
+│ ⟡ ${PREFIX}game start lyrics 5
+│ ⟡ ${PREFIX}game start rhyme 5
+│ ⟡ ${PREFIX}game start taboo 5
+│ ⟡ ${PREFIX}game start 2truth1lie 5
+│ ⟡ ${PREFIX}game start memewar 5
+│ ⟡ ${PREFIX}game stop
+╰────────────────────────
+
+`;
+
 
         /*
          * ========================================================
@@ -296,32 +471,42 @@ module.exports = {
 ┃  💬 Type ${PREFIX}menu for commands
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
 
+
         /*
          * ========================================================
          * SEND MENU
          * ========================================================
-         *
-         * If banner.png exists, send the menu as an image
-         * caption. Otherwise send normal text.
          */
 
-        const bannerImagePath = path.join(
-            __dirname,
-            '../banner.png'
-        );
+        const bannerImagePath =
+            path.join(
+                __dirname,
+                '../banner.png'
+            );
 
-        if (fs.existsSync(bannerImagePath)) {
+        if (
+            fs.existsSync(
+                bannerImagePath
+            )
+        ) {
+
             await sock.sendMessage(
                 from,
                 {
-                    image: fs.readFileSync(bannerImagePath),
-                    caption: menuText
+                    image:
+                        fs.readFileSync(
+                            bannerImagePath
+                        ),
+                    caption:
+                        menuText
                 },
                 {
                     quoted: m
                 }
             );
+
         } else {
+
             await sock.sendMessage(
                 from,
                 {
