@@ -8,17 +8,10 @@ const { getPrefix } = require('../utils/prefix');
  * QUEEN VIDA-V3
  * PREMIUM COMMAND MENU
  * ============================================================
- *
- * This menu automatically shows:
- *
- * - Normal bot commands
- * - All game commands
- * - All JSON-based games in /games
- * - Newly added commands
- *
- * You no longer need to manually add every new game here.
- * ============================================================
  */
+
+const TELEGRAM_PAIRING_URL = 'https://t.me/Vidas_bot';
+const GITHUB_REPO_URL = 'https://github.com/Brodavida22/Queen-Vida-v3';
 
 function commandLine(prefix, command) {
     return `│ ⟡ ${prefix}${command}\n`;
@@ -38,14 +31,10 @@ function section(title, emoji, prefix, commands) {
     return block;
 }
 
-
 /*
  * ============================================================
  * GAME COMMANDS
  * ============================================================
- *
- * These are the actual games currently supplied with
- * Queen Vida-V3.
  */
 
 const GAME_COMMANDS = [
@@ -74,7 +63,6 @@ const GAME_COMMANDS = [
     'dice'
 ];
 
-
 /*
  * ============================================================
  * MENU CATEGORIES
@@ -92,6 +80,7 @@ const SECTIONS = [
             'botcreator',
             'owner',
             'repo',
+            'pair',
             'prefix',
             'mode',
             'individual',
@@ -183,12 +172,6 @@ const SECTIONS = [
         ]
     },
 
-    /*
-     * ========================================================
-     * GAMES
-     * ========================================================
-     */
-
     {
         title: '𝗚𝗔𝗠𝗘𝗦',
         emoji: '🎮',
@@ -234,7 +217,6 @@ const SECTIONS = [
     }
 ];
 
-
 /*
  * ============================================================
  * BUILD LIST OF COMMANDS ALREADY DISPLAYED
@@ -245,20 +227,10 @@ const LISTED_COMMANDS = new Set(
     SECTIONS.flatMap(section => section.commands)
 );
 
-
 /*
  * ============================================================
- * AUTOMATIC GAME FILE DETECTION
+ * AUTOMATIC JSON GAMES
  * ============================================================
- *
- * This checks /games/*.json automatically.
- *
- * Therefore, if you later add:
- *
- * games/newgame.json
- *
- * it can appear in the menu without you having to edit
- * this file again.
  */
 
 function getJsonGames() {
@@ -275,19 +247,14 @@ function getJsonGames() {
                 file.toLowerCase().endsWith('.json')
             )
             .map(file =>
-                path.basename(
-                    file,
-                    '.json'
-                )
+                path.basename(file, '.json')
             )
             .filter(name =>
                 ![
                     'starting',
                     'ending',
                     'couples'
-                ].includes(
-                    name.toLowerCase()
-                )
+                ].includes(name.toLowerCase())
             )
             .sort();
     } catch (error) {
@@ -299,7 +266,6 @@ function getJsonGames() {
         return [];
     }
 }
-
 
 /*
  * ============================================================
@@ -326,7 +292,6 @@ module.exports = {
 
         let menuText = '';
 
-
         /*
          * ========================================================
          * HEADER
@@ -347,6 +312,24 @@ module.exports = {
 
 `;
 
+        /*
+         * ========================================================
+         * PAIRING + REPOSITORY
+         * ========================================================
+         */
+
+        menuText +=
+`╭━━〔 🔗 𝗤𝗨𝗜𝗖𝗞 𝗟𝗜𝗡𝗞𝗦 〕━━╮
+┃
+┃ 📱 𝗧𝗘𝗟𝗘𝗚𝗥𝗔𝗠 𝗣𝗔𝗜𝗥𝗜𝗡𝗚
+┃ ${TELEGRAM_PAIRING_URL}
+┃
+┃ 📦 𝗚𝗜𝗧𝗛𝗨𝗕 𝗥𝗘𝗣𝗢𝗦𝗜𝗧𝗢𝗥𝗬
+┃ ${GITHUB_REPO_URL}
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+
+`;
 
         /*
          * ========================================================
@@ -355,7 +338,6 @@ module.exports = {
          */
 
         for (const menuSection of SECTIONS) {
-
             menuText += section(
                 menuSection.title,
                 menuSection.emoji,
@@ -364,17 +346,13 @@ module.exports = {
             );
         }
 
-
         /*
          * ========================================================
          * AUTOMATIC JSON GAMES
          * ========================================================
-         *
-         * Show any game JSON that wasn't already listed.
          */
 
-        const jsonGames =
-            getJsonGames();
+        const jsonGames = getJsonGames();
 
         const listedGames =
             new Set(GAME_COMMANDS);
@@ -385,7 +363,6 @@ module.exports = {
             );
 
         if (additionalGames.length) {
-
             menuText += section(
                 '𝗔𝗗𝗗𝗜𝗧𝗜𝗢𝗡𝗔𝗟 𝗚𝗔𝗠𝗘𝗦',
                 '🆕',
@@ -393,7 +370,6 @@ module.exports = {
                 additionalGames
             );
         }
-
 
         /*
          * ========================================================
@@ -405,22 +381,16 @@ module.exports = {
             sock.commands &&
             sock.commands.size
         ) {
-
             const unlisted =
                 [...sock.commands.keys()]
                     .filter(
                         commandName =>
-                            !LISTED_COMMANDS.has(
-                                commandName
-                            ) &&
-                            !additionalGames.includes(
-                                commandName
-                            )
+                            !LISTED_COMMANDS.has(commandName) &&
+                            !additionalGames.includes(commandName)
                     )
                     .sort();
 
             if (unlisted.length) {
-
                 menuText += section(
                     '𝗡𝗘𝗪𝗟𝗬 𝗔𝗗𝗗𝗘𝗗',
                     '🆕',
@@ -429,7 +399,6 @@ module.exports = {
                 );
             }
         }
-
 
         /*
          * ========================================================
@@ -458,7 +427,6 @@ module.exports = {
 
 `;
 
-
         /*
          * ========================================================
          * FOOTER
@@ -467,10 +435,13 @@ module.exports = {
 
         menuText +=
 `╭━━〔 👑 𝑸𝑼𝑬𝑬𝑵 𝑽𝑰𝑫𝑨 〕━━╮
+┃
+┃  📱 𝗣𝗔𝗜𝗥 : ${TELEGRAM_PAIRING_URL}
+┃  📦 𝗥𝗘𝗣𝗢 : ${GITHUB_REPO_URL}
+┃
 ┃  ⚡ 𝗣𝗢𝗪𝗘𝗥 • 𝗦𝗣𝗘𝗘𝗗 • 𝗖𝗢𝗡𝗧𝗥𝗢𝗟
 ┃  💬 Type ${PREFIX}menu for commands
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
-
 
         /*
          * ========================================================
@@ -489,24 +460,19 @@ module.exports = {
                 bannerImagePath
             )
         ) {
-
             await sock.sendMessage(
                 from,
                 {
-                    image:
-                        fs.readFileSync(
-                            bannerImagePath
-                        ),
-                    caption:
-                        menuText
+                    image: fs.readFileSync(
+                        bannerImagePath
+                    ),
+                    caption: menuText
                 },
                 {
                     quoted: m
                 }
             );
-
         } else {
-
             await sock.sendMessage(
                 from,
                 {
