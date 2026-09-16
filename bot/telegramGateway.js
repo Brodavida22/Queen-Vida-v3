@@ -2,22 +2,66 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const { TELEGRAM_BOT_TOKEN } = require('./telegramConfig');
-const sessionManager = require('./sessionManager');
+const {
+    TELEGRAM_BOT_TOKEN
+} = require('./telegramConfig');
 
-const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+const sessionManager =
+    require('./sessionManager');
 
-const PENDING_FILE = path.join(__dirname, '..', 'telegram_sessions.json');
+const TELEGRAM_API =
+    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-const pendingPairings = new Map();
-const telegramSessions = loadTelegramSessions();
+const PENDING_FILE =
+    path.join(
+        __dirname,
+        '..',
+        'telegram_sessions.json'
+    );
+
+const pendingPairings =
+    new Map();
+
+const telegramSessions =
+    loadTelegramSessions();
+
+
+// ============================================================
+// TELEGRAM SESSION STORAGE
+// ============================================================
 
 function loadTelegramSessions() {
-    if (!fs.existsSync(PENDING_FILE)) return {};
+    if (
+        !fs.existsSync(
+            PENDING_FILE
+        )
+    ) {
+        return {};
+    }
 
     try {
-        return JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8'));
-    } catch (e) {
+        const data =
+            fs.readFileSync(
+                PENDING_FILE,
+                'utf8'
+            );
+
+        if (!data.trim()) {
+            return {};
+        }
+
+        const parsed =
+            JSON.parse(data);
+
+        return parsed &&
+            typeof parsed === 'object'
+            ? parsed
+            : {};
+    } catch (error) {
+        console.error(
+            '⚠️ [TELEGRAM] Invalid telegram_sessions.json. Starting empty.'
+        );
+
         return {};
     }
 }
@@ -26,127 +70,356 @@ function saveTelegramSessions() {
     try {
         fs.writeFileSync(
             PENDING_FILE,
-            JSON.stringify(telegramSessions, null, 2)
+            JSON.stringify(
+                telegramSessions,
+                null,
+                2
+            )
         );
-    } catch (e) {
-        console.error('🔥 [TELEGRAM] Failed to save sessions:', e);
+    } catch (error) {
+        console.error(
+            '🔥 [TELEGRAM] Failed to save sessions:',
+            error.message
+        );
     }
 }
 
-async function telegram(method, data = {}) {
-    const response = await axios.post(
-        `${TELEGRAM_API}/${method}`,
-        data,
-        {
-            timeout: 30000
-        }
-    );
 
-    if (!response.data || !response.data.ok) {
+// ============================================================
+// TELEGRAM API
+// ============================================================
+
+async function telegram(
+    method,
+    data = {}
+) {
+    const response =
+        await axios.post(
+            `${TELEGRAM_API}/${method}`,
+            data,
+            {
+                timeout: 30000
+            }
+        );
+
+    if (
+        !response.data ||
+        !response.data.ok
+    ) {
         throw new Error(
-            response.data?.description || `Telegram API error: ${method}`
+            response.data?.description ||
+            `Telegram API error: ${method}`
         );
     }
 
     return response.data.result;
 }
 
-async function sendMessage(chatId, text, extra = {}) {
+async function sendMessage(
+    chatId,
+    text,
+    extra = {}
+) {
     try {
-        return await telegram('sendMessage', {
-            chat_id: chatId,
-            text,
-            ...extra
-        });
-    } catch (e) {
+        return await telegram(
+            'sendMessage',
+            {
+                chat_id: chatId,
+                text,
+                ...extra
+            }
+        );
+    } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Failed to send message:',
-            e.message
+            error.message
         );
+
+        return null;
     }
 }
 
-function cleanPhoneNumber(value) {
-    return String(value || '')
+
+// ============================================================
+// PHONE HELPERS
+// ============================================================
+
+function cleanPhoneNumber(
+    value
+) {
+    return String(
+        value || ''
+    )
         .trim()
-        .replace(/[^0-9]/g, '');
+        .replace(
+            /[^0-9]/g,
+            ''
+        );
 }
 
-function getSessionId(number) {
+function getSessionId(
+    number
+) {
     return `tg-${number}`;
 }
 
-function getConnectedSession(sessionId) {
+
+// ============================================================
+// SESSION HELPERS
+// ============================================================
+
+function getConnectedSession(
+    sessionId
+) {
     return sessionManager
         .getActiveSessions()
-        .find(session => session.sessionId === sessionId);
+        .find(
+            session =>
+                session.sessionId ===
+                sessionId
+        );
 }
 
-async function startPairing(chatId, number, commandsMap) {
-    const cleanNumber = cleanPhoneNumber(number);
+function isConnected(
+    sessionId
+) {
+    const session =
+        getConnectedSession(
+            sessionId
+        );
+
+    return !!(
+        session &&
+        session.connected
+    );
+}
+
+
+// ============================================================
+// STALE SESSION CHECK
+// ============================================================
+
+function cleanupStalePairingSession(
+    sessionId
+) {
+    try {
+        /*
+         * cleanupStaleSession() only removes
+         * incomplete/broken sessions.
+         *
+         * It does NOT remove a valid registered
+         * WhatsApp account.
+         */
+        return sessionManager
+            .cleanupStaleSession(
+                sessionId,
+                false
+            );
+    } catch (error) {
+        console.error(
+            `🔥 [TELEGRAM] Stale session cleanup failed for ${sessionId}:`,
+            error.message
+        );
+
+        return false;
+    }
+}
+
+
+// ============================================================
+// START PAIRING
+// ============================================================
+
+async function startPairing(
+    chatId,
+    number,
+    commandsMap
+) {
+    const cleanNumber =
+        cleanPhoneNumber(
+            number
+        );
+
+    // --------------------------------------------------------
+    // Validate number
+    // --------------------------------------------------------
 
     if (!cleanNumber) {
         await sendMessage(
             chatId,
             '❌ Invalid phone number.\n\nSend your WhatsApp number using country code.\nExample: 2348012345678'
         );
+
         return;
     }
 
-    if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+    if (
+        cleanNumber.length < 10 ||
+        cleanNumber.length > 15
+    ) {
         await sendMessage(
             chatId,
             '❌ Invalid phone number length.\n\nSend the number with country code.\nExample: 2348012345678'
         );
+
         return;
     }
 
-    if (pendingPairings.has(chatId)) {
+    // --------------------------------------------------------
+    // Existing Telegram pairing
+    // --------------------------------------------------------
+
+    if (
+        pendingPairings.has(
+            chatId
+        )
+    ) {
         await sendMessage(
             chatId,
             '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
         );
+
         return;
     }
 
-    const sessionId = getSessionId(cleanNumber);
+    const sessionId =
+        getSessionId(
+            cleanNumber
+        );
 
-    if (sessionManager.sessionExists(sessionId)) {
-        const existing = getConnectedSession(sessionId);
+    // --------------------------------------------------------
+    // Clean stale session FIRST
+    // --------------------------------------------------------
 
-        if (existing && existing.connected) {
-            await sendMessage(
-                chatId,
-                '✅ This WhatsApp number is already connected to QUEEN VIDA through Telegram.'
+    cleanupStalePairingSession(
+        sessionId
+    );
+
+    // --------------------------------------------------------
+    // Check active session
+    // --------------------------------------------------------
+
+    if (
+        isConnected(
+            sessionId
+        )
+    ) {
+        await sendMessage(
+            chatId,
+            '✅ This WhatsApp number is already connected to QUEEN VIDA through Telegram.'
+        );
+
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Check existing registered session
+    // --------------------------------------------------------
+
+    if (
+        sessionManager.sessionExists(
+            sessionId
+        )
+    ) {
+        /*
+         * There is a real saved WhatsApp session.
+         * Don't destroy it.
+         *
+         * Try restoring it if it isn't currently active.
+         */
+        await sendMessage(
+            chatId,
+            '🔄 A saved WhatsApp session was found. Attempting to restore it...'
+        );
+
+        try {
+            await sessionManager.startSession({
+                sessionId,
+                ownerNumber:
+                    cleanNumber,
+                isMain: false,
+                commandsMap
+            });
+
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        2500
+                    )
             );
-        } else {
+
+            if (
+                isConnected(
+                    sessionId
+                )
+            ) {
+                await sendMessage(
+                    chatId,
+                    '✅ Your existing WhatsApp session has been restored.'
+                );
+            } else {
+                await sendMessage(
+                    chatId,
+                    '⚠️ A valid saved session exists, but WhatsApp has not connected yet.\n\nWait a moment and use /status.'
+                );
+            }
+        } catch (error) {
             await sendMessage(
                 chatId,
-                '⏳ A session for this WhatsApp number already exists or is being restored.'
+                `❌ Could not restore the saved session.\n\n${error.message || 'Unknown error'}`
             );
         }
 
         return;
     }
 
-    // Prevent the same WhatsApp number from being paired
-    // through another existing session type.
+    // --------------------------------------------------------
+    // Other possible session IDs
+    // --------------------------------------------------------
+
     if (
-        sessionManager.sessionExists(cleanNumber) ||
-        sessionManager.sessionExists(`web-${cleanNumber}`)
+        sessionManager.sessionExists(
+            cleanNumber
+        )
     ) {
         await sendMessage(
             chatId,
-            '⚠️ This WhatsApp number already has a QUEEN VIDA session.\n\nUse the existing session instead of creating another one.'
+            '⚠️ This WhatsApp number already has an active QUEEN VIDA session.'
         );
+
         return;
     }
 
-    pendingPairings.set(chatId, {
-        number: cleanNumber,
-        sessionId,
-        startedAt: Date.now()
-    });
+    if (
+        sessionManager.sessionExists(
+            `web-${cleanNumber}`
+        )
+    ) {
+        await sendMessage(
+            chatId,
+            '⚠️ This WhatsApp number already has a QUEEN VIDA web session.'
+        );
+
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Mark pairing as pending
+    // --------------------------------------------------------
+
+    pendingPairings.set(
+        chatId,
+        {
+            number:
+                cleanNumber,
+            sessionId,
+            startedAt:
+                Date.now(),
+            waitingForCode:
+                false
+        }
+    );
 
     await sendMessage(
         chatId,
@@ -155,163 +428,443 @@ async function startPairing(chatId, number, commandsMap) {
 
     let codeSent = false;
 
+    let connectionWatcher =
+        null;
+
+    let completed =
+        false;
+
+    const finishPairing =
+        () => {
+            if (
+                connectionWatcher
+            ) {
+                clearInterval(
+                    connectionWatcher
+                );
+
+                connectionWatcher =
+                    null;
+            }
+
+            pendingPairings.delete(
+                chatId
+            );
+        };
+
     try {
         await sessionManager.startSession({
             sessionId,
-            ownerNumber: cleanNumber,
+            ownerNumber:
+                cleanNumber,
             isMain: false,
             commandsMap,
 
-            onPairingCode: async (code, errorMessage) => {
-                if (!pendingPairings.has(chatId)) return;
+            // ================================================
+            // PAIRING CODE
+            // ================================================
 
-                if (!code) {
-                    pendingPairings.delete(chatId);
+            onPairingCode:
+                async (
+                    code,
+                    errorMessage
+                ) => {
+                    const pending =
+                        pendingPairings.get(
+                            chatId
+                        );
 
-                    await sendMessage(
-                        chatId,
-                        `❌ Pairing failed.\n\n${errorMessage || 'Unknown pairing error.'}`
-                    );
-
-                    return;
-                }
-
-                codeSent = true;
-
-                await sendMessage(
-                    chatId,
-                    `🔐 *QUEEN VIDA PAIRING CODE*\n\n*${code}*\n\nOpen WhatsApp on the number you entered and use *Linked Devices → Link a Device → Link with phone number*.\n\n⏳ Complete the pairing now.`,
-                    {
-                        parse_mode: 'Markdown'
+                    if (
+                        !pending ||
+                        completed
+                    ) {
+                        return;
                     }
-                );
 
-                // Check connection status for up to 2 minutes.
-                let checks = 0;
-
-                const connectionWatcher = setInterval(async () => {
-                    checks++;
-
-                    const session = getConnectedSession(sessionId);
-
-                    if (session && session.connected) {
-                        clearInterval(connectionWatcher);
-
-                        telegramSessions[String(chatId)] = {
-                            whatsappNumber: cleanNumber,
-                            sessionId,
-                            pairedAt: Date.now()
-                        };
-
-                        saveTelegramSessions();
-
-                        pendingPairings.delete(chatId);
+                    if (!code) {
+                        finishPairing();
 
                         await sendMessage(
                             chatId,
-                            `✅ *PAIRING SUCCESSFUL!*\n\nWhatsApp number: +${cleanNumber}\n\n👑 QUEEN VIDA is now connected and active on your WhatsApp.\n\nType /status anytime to check your connection.`,
-                            {
-                                parse_mode: 'Markdown'
-                            }
+                            `❌ Pairing failed.\n\n${errorMessage || 'Unknown pairing error.'}\n\nUse /pair to try again.`
                         );
 
                         return;
                     }
 
-                    if (checks >= 24) {
-                        clearInterval(connectionWatcher);
+                    codeSent =
+                        true;
 
-                        if (pendingPairings.has(chatId)) {
-                            pendingPairings.delete(chatId);
+                    pending.waitingForCode =
+                        true;
 
-                            await sendMessage(
-                                chatId,
-                                '⌛ Pairing window expired.\n\nIf you did not complete the WhatsApp pairing, use /pair to try again.'
-                            );
+                    pendingPairings.set(
+                        chatId,
+                        pending
+                    );
+
+                    await sendMessage(
+                        chatId,
+                        `🔐 *QUEEN VIDA PAIRING CODE*\n\n*${code}*\n\nOpen WhatsApp on the number you entered and use:\n\n*Linked Devices → Link a Device → Link with phone number*\n\n⏳ Enter the code now.`,
+                        {
+                            parse_mode:
+                                'Markdown'
                         }
-                    }
-                }, 5000);
-            }
+                    );
+
+                    // ========================================
+                    // CONNECTION WATCHER
+                    // ========================================
+
+                    let checks = 0;
+
+                    connectionWatcher =
+                        setInterval(
+                            async () => {
+                                checks++;
+
+                                if (
+                                    completed
+                                ) {
+                                    clearInterval(
+                                        connectionWatcher
+                                    );
+
+                                    connectionWatcher =
+                                        null;
+
+                                    return;
+                                }
+
+                                const session =
+                                    getConnectedSession(
+                                        sessionId
+                                    );
+
+                                if (
+                                    session &&
+                                    session.connected
+                                ) {
+                                    completed =
+                                        true;
+
+                                    clearInterval(
+                                        connectionWatcher
+                                    );
+
+                                    connectionWatcher =
+                                        null;
+
+                                    telegramSessions[
+                                        String(
+                                            chatId
+                                        )
+                                    ] = {
+                                        whatsappNumber:
+                                            cleanNumber,
+
+                                        sessionId,
+
+                                        pairedAt:
+                                            Date.now()
+                                    };
+
+                                    saveTelegramSessions();
+
+                                    pendingPairings.delete(
+                                        chatId
+                                    );
+
+                                    await sendMessage(
+                                        chatId,
+                                        `✅ *PAIRING SUCCESSFUL!*\n\nWhatsApp: +${cleanNumber}\n\n👑 QUEEN VIDA is now connected and active.\n\nUse /status anytime to check your connection.`,
+                                        {
+                                            parse_mode:
+                                                'Markdown'
+                                        }
+                                    );
+
+                                    return;
+                                }
+
+                                /*
+                                 * 3 minutes.
+                                 */
+                                if (
+                                    checks >=
+                                    36
+                                ) {
+                                    clearInterval(
+                                        connectionWatcher
+                                    );
+
+                                    connectionWatcher =
+                                        null;
+
+                                    if (
+                                        pendingPairings.has(
+                                            chatId
+                                        )
+                                    ) {
+                                        pendingPairings.delete(
+                                            chatId
+                                        );
+
+                                        /*
+                                         * Clean the incomplete
+                                         * pairing session so the
+                                         * next /pair works.
+                                         */
+                                        cleanupStalePairingSession(
+                                            sessionId
+                                        );
+
+                                        await sendMessage(
+                                            chatId,
+                                            '⌛ Pairing expired.\n\nThe incomplete session has been cleaned automatically.\n\nUse /pair to try again.'
+                                        );
+                                    }
+                                }
+                            },
+                            5000
+                        );
+                }
         });
     } catch (error) {
-        pendingPairings.delete(chatId);
+        finishPairing();
+
+        cleanupStalePairingSession(
+            sessionId
+        );
 
         await sendMessage(
             chatId,
-            `❌ Failed to start pairing.\n\n${error.message || 'Unknown error.'}`
+            `❌ Failed to start pairing.\n\n${error.message || 'Unknown error.'}\n\nThe incomplete session was cleaned. You can use /pair again.`
         );
 
         return;
     }
 
-    // Safety timeout if no pairing code arrives.
-    setTimeout(async () => {
-        if (!pendingPairings.has(chatId)) return;
+    // --------------------------------------------------------
+    // Safety timeout for pairing code
+    // --------------------------------------------------------
 
-        if (!codeSent) {
-            pendingPairings.delete(chatId);
+    setTimeout(
+        async () => {
+            const pending =
+                pendingPairings.get(
+                    chatId
+                );
 
-            await sendMessage(
-                chatId,
-                '⌛ No pairing code was generated in time.\n\nUse /pair to try again.'
-            );
-        }
-    }, 30000);
+            if (
+                !pending ||
+                completed
+            ) {
+                return;
+            }
+
+            if (
+                !codeSent
+            ) {
+                finishPairing();
+
+                cleanupStalePairingSession(
+                    sessionId
+                );
+
+                await sendMessage(
+                    chatId,
+                    '⌛ No pairing code was generated.\n\nThe incomplete session was cleaned automatically.\n\nUse /pair to try again.'
+                );
+            }
+        },
+        45000
+    );
 }
 
-async function handleUpdate(update, commandsMap) {
-    if (!update || !update.message) return;
 
-    const message = update.message;
-    const chatId = message.chat?.id;
+// ============================================================
+// UPDATE HANDLER
+// ============================================================
 
-    if (!chatId) return;
+async function handleUpdate(
+    update,
+    commandsMap
+) {
+    if (
+        !update ||
+        !update.message
+    ) {
+        return;
+    }
 
-    const text = String(message.text || '').trim();
+    const message =
+        update.message;
 
-    if (!text) return;
+    const chatId =
+        message.chat?.id;
 
-    if (text === '/start') {
+    if (!chatId) {
+        return;
+    }
+
+    const text =
+        String(
+            message.text || ''
+        ).trim();
+
+    if (!text) {
+        return;
+    }
+
+    // ========================================================
+    // /start
+    // ========================================================
+
+    if (
+        text === '/start'
+    ) {
         await sendMessage(
             chatId,
             `👑 *QUEEN VIDA-V3*\n\nWhatsApp Pairing Gateway\n\nUse /pair to connect your WhatsApp number to QUEEN VIDA.\n\nCommands:\n/pair - Pair WhatsApp\n/status - Check your connection\n/cancel - Cancel a pending pairing\n/help - Show help`,
             {
-                parse_mode: 'Markdown'
+                parse_mode:
+                    'Markdown'
             }
         );
 
         return;
     }
 
-    if (text === '/help') {
+    // ========================================================
+    // /help
+    // ========================================================
+
+    if (
+        text === '/help'
+    ) {
         await sendMessage(
             chatId,
             `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nStart WhatsApp pairing.\n\n/status\nCheck your Telegram/WhatsApp connection.\n\n/cancel\nCancel a pending pairing.\n\n/help\nShow this help message.`,
             {
-                parse_mode: 'Markdown'
+                parse_mode:
+                    'Markdown'
             }
         );
 
         return;
     }
 
-    if (text === '/pair') {
+    // ========================================================
+    // /pair
+    // ========================================================
+
+    if (
+        text === '/pair'
+    ) {
+        const existing =
+            telegramSessions[
+                String(chatId)
+            ];
+
+        /*
+         * If Telegram already has a saved pairing,
+         * check it first.
+         */
+        if (
+            existing &&
+            existing.sessionId
+        ) {
+            if (
+                isConnected(
+                    existing.sessionId
+                )
+            ) {
+                await sendMessage(
+                    chatId,
+                    `✅ Your WhatsApp is already connected.\n\nWhatsApp: +${existing.whatsappNumber}\n\nUse /status to check the connection.`
+                );
+
+                return;
+            }
+
+            /*
+             * If the saved Telegram mapping points
+             * to a stale session, remove the mapping
+             * so /pair can start fresh.
+             */
+            if (
+                !sessionManager.sessionExists(
+                    existing.sessionId
+                )
+            ) {
+                delete telegramSessions[
+                    String(chatId)
+                ];
+
+                saveTelegramSessions();
+            }
+        }
+
+        if (
+            pendingPairings.has(
+                chatId
+            )
+        ) {
+            await sendMessage(
+                chatId,
+                '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
+            );
+
+            return;
+        }
+
+        pendingPairings.set(
+            chatId,
+            {
+                waitingForNumber:
+                    true,
+                startedAt:
+                    Date.now()
+            }
+        );
+
         await sendMessage(
             chatId,
             '📱 Send your WhatsApp number with country code.\n\nExample:\n2348012345678'
         );
 
-        pendingPairings.set(chatId, {
-            waitingForNumber: true,
-            startedAt: Date.now()
-        });
-
         return;
     }
 
-    if (text === '/cancel') {
-        if (pendingPairings.has(chatId)) {
-            pendingPairings.delete(chatId);
+    // ========================================================
+    // /cancel
+    // ========================================================
+
+    if (
+        text === '/cancel'
+    ) {
+        const pending =
+            pendingPairings.get(
+                chatId
+            );
+
+        if (pending) {
+            pendingPairings.delete(
+                chatId
+            );
+
+            /*
+             * Clean incomplete session if one
+             * was already created.
+             */
+            if (
+                pending.sessionId
+            ) {
+                cleanupStalePairingSession(
+                    pending.sessionId
+                );
+            }
 
             await sendMessage(
                 chatId,
@@ -327,8 +880,17 @@ async function handleUpdate(update, commandsMap) {
         return;
     }
 
-    if (text === '/status') {
-        const saved = telegramSessions[String(chatId)];
+    // ========================================================
+    // /status
+    // ========================================================
+
+    if (
+        text === '/status'
+    ) {
+        const saved =
+            telegramSessions[
+                String(chatId)
+            ];
 
         if (!saved) {
             await sendMessage(
@@ -339,22 +901,30 @@ async function handleUpdate(update, commandsMap) {
             return;
         }
 
-        const session = getConnectedSession(saved.sessionId);
+        const session =
+            getConnectedSession(
+                saved.sessionId
+            );
 
-        if (session && session.connected) {
+        if (
+            session &&
+            session.connected
+        ) {
             await sendMessage(
                 chatId,
                 `🟢 *CONNECTED*\n\nWhatsApp: +${saved.whatsappNumber}\n\n👑 QUEEN VIDA is active.`,
                 {
-                    parse_mode: 'Markdown'
+                    parse_mode:
+                        'Markdown'
                 }
             );
         } else {
             await sendMessage(
                 chatId,
-                `🔴 *NOT CURRENTLY CONNECTED*\n\nWhatsApp: +${saved.whatsappNumber}\n\nThe session may be reconnecting.`,
+                `🟡 *RECONNECTING / OFFLINE*\n\nWhatsApp: +${saved.whatsappNumber}\n\nThe saved session is not currently connected.`,
                 {
-                    parse_mode: 'Markdown'
+                    parse_mode:
+                        'Markdown'
                 }
             );
         }
@@ -362,10 +932,22 @@ async function handleUpdate(update, commandsMap) {
         return;
     }
 
-    const pending = pendingPairings.get(chatId);
+    // ========================================================
+    // WAITING FOR PHONE NUMBER
+    // ========================================================
 
-    if (pending && pending.waitingForNumber) {
-        pendingPairings.delete(chatId);
+    const pending =
+        pendingPairings.get(
+            chatId
+        );
+
+    if (
+        pending &&
+        pending.waitingForNumber
+    ) {
+        pendingPairings.delete(
+            chatId
+        );
 
         await startPairing(
             chatId,
@@ -376,26 +958,47 @@ async function handleUpdate(update, commandsMap) {
         return;
     }
 
+    // ========================================================
+    // UNKNOWN COMMAND
+    // ========================================================
+
     await sendMessage(
         chatId,
         '👑 I did not understand that command.\n\nUse /pair to connect WhatsApp or /help for available commands.'
     );
 }
 
-async function startTelegramGateway(commandsMap) {
-    if (!TELEGRAM_BOT_TOKEN) {
+
+// ============================================================
+// START TELEGRAM GATEWAY
+// ============================================================
+
+async function startTelegramGateway(
+    commandsMap
+) {
+    if (
+        !TELEGRAM_BOT_TOKEN
+    ) {
         console.error(
             '❌ [TELEGRAM] TELEGRAM_BOT_TOKEN is missing.'
         );
+
         return;
     }
 
     try {
-        await telegram('deleteWebhook', {
-            drop_pending_updates: false
-        });
+        await telegram(
+            'deleteWebhook',
+            {
+                drop_pending_updates:
+                    false
+            }
+        );
 
-        const me = await telegram('getMe');
+        const me =
+            await telegram(
+                'getMe'
+            );
 
         console.log(
             `🤖 [TELEGRAM] Gateway connected as @${me.username || me.first_name}`
@@ -405,42 +1008,70 @@ async function startTelegramGateway(commandsMap) {
 
         while (true) {
             try {
-                const updates = await telegram('getUpdates', {
-                    offset,
-                    timeout: 30,
-                    allowed_updates: ['message']
-                });
+                const updates =
+                    await telegram(
+                        'getUpdates',
+                        {
+                            offset,
+                            timeout: 30,
+                            allowed_updates: [
+                                'message'
+                            ]
+                        }
+                    );
 
-                for (const update of updates) {
-                    offset = update.update_id + 1;
+                for (
+                    const update of updates
+                ) {
+                    offset =
+                        update.update_id +
+                        1;
 
                     try {
-                        await handleUpdate(update, commandsMap);
-                    } catch (handlerError) {
+                        await handleUpdate(
+                            update,
+                            commandsMap
+                        );
+                    } catch (
+                        handlerError
+                    ) {
                         console.error(
                             '🔥 [TELEGRAM] Update handler error:',
                             handlerError
                         );
                     }
                 }
-            } catch (pollError) {
+            } catch (
+                pollingError
+            ) {
                 console.error(
                     '🔥 [TELEGRAM] Polling error:',
-                    pollError.message
+                    pollingError.message
                 );
 
-                await new Promise(resolve =>
-                    setTimeout(resolve, 5000)
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            5000
+                        )
                 );
             }
         }
-    } catch (error) {
+    } catch (
+        startupError
+    ) {
         console.error(
             '🔥 [TELEGRAM] Gateway startup failed:',
-            error.message
+            startupError.message
         );
     }
 }
+
+
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = {
     startTelegramGateway
