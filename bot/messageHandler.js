@@ -1,72 +1,80 @@
 const fs = require('fs');
+
 const { getMode } = require('../utils/mode');
 const { getPrefix } = require('../utils/prefix');
-const { handleGameMessage } = require('../utils/gameManager');
-const { CREATOR_NUMBERS } = require('./config');
+const {
+    handleGameMessage
+} = require('../utils/gameManager');
 
-// Per-session in-memory spam tracker
+const {
+    CREATOR_NUMBERS
+} = require('./config');
+
+
+/*
+ * ============================================================
+ * PER-SESSION SPAM TRACKER
+ * ============================================================
+ */
+
 const spamTrackerBySession = {};
 
 
-// ============================================================
-// CONTEXT EMOJI
-// ============================================================
+/*
+ * ============================================================
+ * CONTEXT EMOJI
+ * ============================================================
+ */
 
 function getContextEmoji(text = '') {
-    const lower = String(text).toLowerCase();
+    const lower =
+        String(text || '').toLowerCase();
 
     if (
-        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i.test(
-            lower
-        )
+        /(lol|lmao|funny|haha|😂|🤣|giggle|joke|comedy)/i
+            .test(lower)
     ) {
         return '😂';
     }
 
     if (
-        /(congrats|congratulations|welldone|bravo|party|🎉|🎈|win|victory|success)/i.test(
-            lower
-        )
+        /(congrats|congratulations|welldone|bravo|party|🎉|🎈|win|victory|success)/i
+            .test(lower)
     ) {
         return '🥳';
     }
 
     if (
-        /(sad|sorry|rip|pain|crying|😭|😢|pity)/i.test(
-            lower
-        )
+        /(sad|sorry|rip|pain|crying|😭|😢|pity)/i
+            .test(lower)
     ) {
         return '😢';
     }
 
     if (
-        /(love|heart|babe|sweet|❤️|😍|kiss)/i.test(
-            lower
-        )
+        /(love|heart|babe|sweet|❤️|😍|kiss)/i
+            .test(lower)
     ) {
         return '❤️';
     }
 
     if (
-        /(fire|lit|amazing|cool|🔥|awesome|best)/i.test(
-            lower
-        )
+        /(fire|lit|amazing|cool|🔥|awesome|best)/i
+            .test(lower)
     ) {
         return '🔥';
     }
 
     if (
-        /(wow|omg|shock|damn|surprised|😮)/i.test(
-            lower
-        )
+        /(wow|omg|shock|damn|surprised|😮)/i
+            .test(lower)
     ) {
         return '😮';
     }
 
     if (
-        /(money|cash|rich|wealth|naira|dollar|lagos)/i.test(
-            lower
-        )
+        /(money|cash|rich|wealth|naira|dollar|lagos)/i
+            .test(lower)
     ) {
         return '💰';
     }
@@ -89,12 +97,20 @@ function getContextEmoji(text = '') {
 }
 
 
-// ============================================================
-// GLOBAL SETTINGS
-// ============================================================
+/*
+ * ============================================================
+ * SETTINGS
+ * ============================================================
+ */
 
-function getGlobalSettings(settingsFile) {
-    if (fs.existsSync(settingsFile)) {
+function getGlobalSettings(
+    settingsFile
+) {
+    if (
+        fs.existsSync(
+            settingsFile
+        )
+    ) {
         try {
             const data =
                 JSON.parse(
@@ -106,17 +122,20 @@ function getGlobalSettings(settingsFile) {
 
             return {
                 autoViewStatus:
-                    data.autoViewStatus !== undefined
+                    data.autoViewStatus !==
+                    undefined
                         ? data.autoViewStatus
                         : 'on',
 
                 autoReaction:
-                    data.autoReaction !== undefined
+                    data.autoReaction !==
+                    undefined
                         ? data.autoReaction
                         : 'off',
 
                 statusReaction:
-                    data.statusReaction !== undefined
+                    data.statusReaction !==
+                    undefined
                         ? data.statusReaction
                         : 'off'
             };
@@ -138,9 +157,29 @@ function getGlobalSettings(settingsFile) {
 }
 
 
-// ============================================================
-// MESSAGE HANDLER
-// ============================================================
+/*
+ * ============================================================
+ * MESSAGE TEXT
+ * ============================================================
+ */
+
+function getMessageBody(m) {
+    return String(
+        m?.message?.conversation ||
+        m?.message?.extendedTextMessage?.text ||
+        m?.message?.imageMessage?.caption ||
+        m?.message?.videoMessage?.caption ||
+        m?.message?.documentMessage?.caption ||
+        ''
+    ).trim();
+}
+
+
+/*
+ * ============================================================
+ * CREATE MESSAGE HANDLER
+ * ============================================================
+ */
 
 function createMessageHandler(
     sock,
@@ -160,6 +199,11 @@ function createMessageHandler(
             ? 'activity.json'
             : `activity_${sessionId}.json`;
 
+
+    /*
+     * Create session spam tracker.
+     */
+
     if (
         !spamTrackerBySession[
             sessionId
@@ -175,8 +219,14 @@ function createMessageHandler(
             sessionId
         ];
 
+
+    /*
+     * Session owners.
+     */
+
     const SESSION_OWNER_NUMBERS = [
         ...CREATOR_NUMBERS,
+
         ...(ownerNumber
             ? [
                   ownerNumber.replace(
@@ -187,24 +237,25 @@ function createMessageHandler(
             : [])
     ];
 
+
+    /*
+     * ========================================================
+     * UPSERT HANDLER
+     * ========================================================
+     */
+
     return async ({
         messages
     }) => {
         try {
-
-            // =================================================
-            // BASIC MESSAGE VALIDATION
-            // =================================================
-
-            if (
-                !Array.isArray(messages) ||
-                !messages.length
-            ) {
-                return;
-            }
+            /*
+             * ------------------------------------------------
+             * Basic message validation
+             * ------------------------------------------------
+             */
 
             const m =
-                messages[0];
+                messages?.[0];
 
             if (!m) {
                 return;
@@ -215,18 +266,27 @@ function createMessageHandler(
             }
 
             /*
-             * IMPORTANT FIX:
-             * Some Baileys events may not contain remoteJid.
-             * Never call .endsWith() on an undefined value.
+             * IMPORTANT:
+             * remoteJid can occasionally be missing in
+             * Baileys system/stream messages.
+             *
+             * Never call .endsWith() until this is checked.
              */
 
             const from =
-                m.key?.remoteJid ||
-                '';
+                m?.key?.remoteJid;
 
-            if (!from) {
+            if (
+                !from ||
+                typeof from !== 'string'
+            ) {
                 return;
             }
+
+
+            /*
+             * Settings.
+             */
 
             const settings =
                 getGlobalSettings(
@@ -234,18 +294,21 @@ function createMessageHandler(
                 );
 
 
-            // =================================================
-            // STATUS HANDLER
-            // =================================================
+            /*
+             * =================================================
+             * STATUS HANDLER
+             * =================================================
+             */
 
             if (
                 from ===
                 'status@broadcast'
             ) {
-
-                // =============================================
-                // ANTI-GROUP-MENTION
-                // =============================================
+                /*
+                 * ---------------------------------------------
+                 * ANTI-GROUP-MENTION
+                 * ---------------------------------------------
+                 */
 
                 (async () => {
                     try {
@@ -303,13 +366,15 @@ function createMessageHandler(
 
                         if (
                             !linkMatches ||
-                            !linkMatches.length
+                            linkMatches.length ===
+                                0
                         ) {
                             return;
                         }
 
                         const posterJid =
-                            m.key?.participant ||
+                            m.key
+                                ?.participant ||
                             m.participant;
 
                         if (!posterJid) {
@@ -341,7 +406,9 @@ function createMessageHandler(
                                     await sock.groupInviteCode(
                                         groupId
                                     );
-                            } catch (e) {
+                            } catch (
+                                e
+                            ) {
                                 continue;
                             }
 
@@ -368,7 +435,9 @@ function createMessageHandler(
                                     await sock.groupMetadata(
                                         groupId
                                     );
-                            } catch (e) {
+                            } catch (
+                                e
+                            ) {
                                 continue;
                             }
 
@@ -410,8 +479,7 @@ function createMessageHandler(
                                     groupId
                                 ]
                             ) {
-                                groupSettings
-                                    .agmWarns[
+                                groupSettings.agmWarns[
                                     groupId
                                 ] = {};
                             }
@@ -420,24 +488,32 @@ function createMessageHandler(
                                 !groupSettings
                                     .agmWarns[
                                     groupId
-                                ][posterJid]
+                                ][
+                                    posterJid
+                                ]
                             ) {
                                 groupSettings
                                     .agmWarns[
                                     groupId
-                                ][posterJid] = 0;
+                                ][
+                                    posterJid
+                                ] = 0;
                             }
 
                             groupSettings
                                 .agmWarns[
                                 groupId
-                            ][posterJid] += 1;
+                            ][
+                                posterJid
+                            ] += 1;
 
                             const warnCount =
                                 groupSettings
                                     .agmWarns[
                                     groupId
-                                ][posterJid];
+                                ][
+                                    posterJid
+                                ];
 
                             fs.writeFileSync(
                                 SETTINGS_FILE,
@@ -449,7 +525,8 @@ function createMessageHandler(
                             );
 
                             if (
-                                warnCount < 3
+                                warnCount <
+                                3
                             ) {
                                 await sock.sendMessage(
                                     groupId,
@@ -465,7 +542,9 @@ function createMessageHandler(
                                 groupSettings
                                     .agmWarns[
                                     groupId
-                                ][posterJid] = 0;
+                                ][
+                                    posterJid
+                                ] = 0;
 
                                 fs.writeFileSync(
                                     SETTINGS_FILE,
@@ -495,11 +574,15 @@ function createMessageHandler(
                                         ],
                                         'remove'
                                     );
-                                } catch (e) {}
+                                } catch (
+                                    e
+                                ) {}
                             }
                         }
 
-                    } catch (agmErr) {
+                    } catch (
+                        agmErr
+                    ) {
                         console.error(
                             '🔥 [AGM ERROR]:',
                             agmErr
@@ -508,9 +591,11 @@ function createMessageHandler(
                 })();
 
 
-                // =============================================
-                // AUTO VIEW / STATUS REACTION
-                // =============================================
+                /*
+                 * ---------------------------------------------
+                 * AUTO VIEW / STATUS REACTION
+                 * ---------------------------------------------
+                 */
 
                 if (
                     settings.autoViewStatus ===
@@ -519,73 +604,77 @@ function createMessageHandler(
                     (async () => {
                         try {
                             if (
-                                m.key &&
-                                m.key.remoteJid
+                                m.key
+                                    ?.remoteJid
                             ) {
                                 await sock.readMessages(
-                                    [m.key]
+                                    [
+                                        m.key
+                                    ]
                                 );
                             }
 
                             if (
-                                settings.statusReaction ===
-                                    'on' &&
-                                m.message
+                                settings.statusReaction !==
+                                    'on' ||
+                                !m.message
                             ) {
-                                const targetParticipant =
-                                    m.key
-                                        ?.participant ||
-                                    m.participant;
-
-                                if (
-                                    !targetParticipant ||
-                                    !targetParticipant.endsWith(
-                                        '@s.whatsapp.net'
-                                    )
-                                ) {
-                                    return;
-                                }
-
-                                const statusText =
-                                    m.message
-                                        ?.conversation ||
-                                    m.message
-                                        ?.extendedTextMessage
-                                        ?.text ||
-                                    m.message
-                                        ?.imageMessage
-                                        ?.caption ||
-                                    m.message
-                                        ?.videoMessage
-                                        ?.caption ||
-                                    '';
-
-                                const emoji =
-                                    getContextEmoji(
-                                        statusText
-                                    );
-
-                                try {
-                                    await sock.sendMessage(
-                                        'status@broadcast',
-                                        {
-                                            react: {
-                                                text: emoji,
-                                                key: m.key
-                                            }
-                                        },
-                                        {
-                                            statusJidList: [
-                                                targetParticipant
-                                            ],
-                                            broadcast: true
-                                        }
-                                    );
-                                } catch (
-                                    statusReactErr
-                                ) {}
+                                return;
                             }
 
+                            const targetParticipant =
+                                m.key
+                                    ?.participant ||
+                                m.participant;
+
+                            if (
+                                !targetParticipant ||
+                                !targetParticipant.endsWith(
+                                    '@s.whatsapp.net'
+                                )
+                            ) {
+                                return;
+                            }
+
+                            const statusText =
+                                m.message
+                                    ?.conversation ||
+                                m.message
+                                    ?.extendedTextMessage
+                                    ?.text ||
+                                m.message
+                                    ?.imageMessage
+                                    ?.caption ||
+                                m.message
+                                    ?.videoMessage
+                                    ?.caption ||
+                                '';
+
+                            const emoji =
+                                getContextEmoji(
+                                    statusText
+                                );
+
+                            try {
+                                await sock.sendMessage(
+                                    'status@broadcast',
+                                    {
+                                        react: {
+                                            text: emoji,
+                                            key: m.key
+                                        }
+                                    },
+                                    {
+                                        statusJidList: [
+                                            targetParticipant
+                                        ],
+                                        broadcast:
+                                            true
+                                    }
+                                );
+                            } catch (
+                                statusReactErr
+                            ) {}
                         } catch (
                             statusHandlerErr
                         ) {}
@@ -596,9 +685,11 @@ function createMessageHandler(
             }
 
 
-            // =================================================
-            // SENDER / OWNER
-            // =================================================
+            /*
+             * =================================================
+             * SENDER / OWNER
+             * =================================================
+             */
 
             const sender =
                 m.key?.participant ||
@@ -620,9 +711,14 @@ function createMessageHandler(
                 m.key?.fromMe === true;
 
 
-            // =================================================
-            // ACTIVITY TRACKER
-            // =================================================
+            /*
+             * =================================================
+             * MESSAGE BODY
+             * =================================================
+             */
+
+            const body =
+                getMessageBody(m);
 
             const isGroup =
                 from.endsWith(
@@ -633,6 +729,13 @@ function createMessageHandler(
                 from.endsWith(
                     '@newsletter'
                 );
+
+
+            /*
+             * =================================================
+             * ACTIVITY TRACKER
+             * =================================================
+             */
 
             if (
                 isGroup &&
@@ -668,13 +771,17 @@ function createMessageHandler(
                     }
 
                     const existing =
-                        act[from][sender];
+                        act[from][
+                            sender
+                        ];
 
                     if (
                         typeof existing ===
                         'number'
                     ) {
-                        act[from][sender] = {
+                        act[from][
+                            sender
+                        ] = {
                             messages:
                                 existing,
                             lastActive:
@@ -685,21 +792,28 @@ function createMessageHandler(
                         typeof existing !==
                             'object'
                     ) {
-                        act[from][sender] = {
+                        act[from][
+                            sender
+                        ] = {
                             messages: 0,
                             lastActive:
                                 Date.now()
                         };
                     }
 
-                    act[from][sender].messages =
+                    act[from][
+                        sender
+                    ].messages =
                         Number(
-                            act[from][sender]
-                                .messages ||
+                            act[from][
+                                sender
+                            ].messages ||
                                 0
                         ) + 1;
 
-                    act[from][sender].lastActive =
+                    act[from][
+                        sender
+                    ].lastActive =
                         Date.now();
 
                     fs.writeFileSync(
@@ -722,75 +836,55 @@ function createMessageHandler(
             }
 
 
-            // =================================================
-            // MESSAGE BODY
-            // =================================================
-
-            const body =
-                m.message
-                    ?.conversation ||
-                m.message
-                    ?.extendedTextMessage
-                    ?.text ||
-                m.message
-                    ?.imageMessage
-                    ?.caption ||
-                m.message
-                    ?.videoMessage
-                    ?.caption ||
-                m.message
-                    ?.documentMessage
-                    ?.caption ||
-                '';
-
-            if (!body) {
-                /*
-                 * Don't process empty messages.
-                 */
-                return;
-            }
-
-
-            // =================================================
-            // GAME MANAGER
-            // =================================================
             /*
-             * IMPORTANT:
+             * =================================================
+             * IMPORTANT: GAME MANAGER
+             * =================================================
              *
-             * Game handling happens BEFORE group security.
+             * GAME ANSWERS ARE PROCESSED HERE BEFORE:
              *
-             * This prevents anti-link, anti-spam or another
-             * group feature from interfering with game answers.
+             * - Anti-spam
+             * - Badwords
+             * - Anti-link
+             * - Other group security
+             *
+             * This prevents the security system from preventing
+             * a valid game answer from reaching the game.
              */
 
-            try {
-                const isGameHandled =
-                    await handleGameMessage(
-                        sock,
-                        m,
-                        from,
-                        body
-                    );
+            if (body) {
+                try {
+                    const isGameHandled =
+                        await handleGameMessage(
+                            sock,
+                            m,
+                            from,
+                            body
+                        );
 
-                if (
-                    isGameHandled
-                ) {
-                    return;
-                }
+                    if (
+                        isGameHandled ===
+                        true
+                    ) {
+                        return;
+                    }
 
-            } catch (
-                gameErr
-            ) {
-                console.error(
-                    '🔥 [GAME MESSAGE ERROR]:',
+                } catch (
                     gameErr
-                );
+                ) {
+                    console.error(
+                        '🔥 [GAME HANDLER ERROR]:',
+                        gameErr
+                    );
+                }
             }
 
 
-            // =================================================
-            // ANTISTICKER
-            // =================================================
+            /*
+             * =================================================
+             * ANTISTICKER
+             * =================================================
+             */
 
             if (
                 isGroup &&
@@ -813,11 +907,9 @@ function createMessageHandler(
 
                     const isAntiStickerOn =
                         groupSettings
-                            .antisticker
-                            ?.[
-                                from
-                            ] ===
-                        'on';
+                            .antisticker?.[
+                            from
+                        ] === 'on';
 
                     if (
                         isAntiStickerOn
@@ -850,10 +942,13 @@ function createMessageHandler(
                                 await sock.sendMessage(
                                     from,
                                     {
-                                        delete: m.key
+                                        delete:
+                                            m.key
                                     }
                                 );
-                            } catch (e) {}
+                            } catch (
+                                e
+                            ) {}
 
                             await sock.sendMessage(
                                 from,
@@ -881,9 +976,11 @@ function createMessageHandler(
             }
 
 
-            // =================================================
-            // AUTO REACTION
-            // =================================================
+            /*
+             * =================================================
+             * AUTO REACTION
+             * =================================================
+             */
 
             if (
                 settings.autoReaction ===
@@ -906,7 +1003,8 @@ function createMessageHandler(
                             react: {
                                 text:
                                     reactionEmoji,
-                                key: m.key
+                                key:
+                                    m.key
                             }
                         }
                     );
@@ -922,9 +1020,20 @@ function createMessageHandler(
             }
 
 
-            // =================================================
-            // GROUP SECURITY
-            // =================================================
+            /*
+             * Nothing else to process.
+             */
+
+            if (!body) {
+                return;
+            }
+
+
+            /*
+             * =================================================
+             * GROUP SECURITY
+             * =================================================
+             */
 
             if (
                 isGroup &&
@@ -937,9 +1046,7 @@ function createMessageHandler(
                         );
 
                     const participants =
-                        groupMetadata
-                            .participants ||
-                        [];
+                        groupMetadata.participants;
 
                     const senderParticipant =
                         participants.find(
@@ -971,17 +1078,17 @@ function createMessageHandler(
                                 : {};
 
 
-                        // =====================================
-                        // ANTI-SPAM
-                        // =====================================
+                        /*
+                         * -------------------------------------
+                         * ANTI-SPAM
+                         * -------------------------------------
+                         */
 
                         const isAntiSpamOn =
                             groupSettings
-                                .antispam
-                                ?.[
-                                    from
-                                ] ===
-                            'on';
+                                .antispam?.[
+                                from
+                            ] === 'on';
 
                         if (
                             isAntiSpamOn
@@ -1029,9 +1136,11 @@ function createMessageHandler(
                                     userSpam.lastTime <
                                 3000
                             ) {
-                                userSpam.count++;
+                                userSpam.count +=
+                                    1;
                             } else {
-                                userSpam.count = 1;
+                                userSpam.count =
+                                    1;
                             }
 
                             userSpam.lastTime =
@@ -1041,16 +1150,20 @@ function createMessageHandler(
                                 userSpam.count >=
                                 5
                             ) {
-                                userSpam.count = 0;
+                                userSpam.count =
+                                    0;
 
                                 try {
                                     await sock.sendMessage(
                                         from,
                                         {
-                                            delete: m.key
+                                            delete:
+                                                m.key
                                         }
                                     );
-                                } catch (e) {}
+                                } catch (
+                                    e
+                                ) {}
 
                                 if (
                                     !groupSettings.spamWarns
@@ -1092,7 +1205,7 @@ function createMessageHandler(
                                     from
                                 ][
                                     sender
-                                ]++;
+                                ] += 1;
 
                                 const spamWarnCount =
                                     groupSettings
@@ -1161,7 +1274,9 @@ function createMessageHandler(
                                             ],
                                             'remove'
                                         );
-                                    } catch (e) {}
+                                    } catch (
+                                        e
+                                    ) {}
 
                                     return;
                                 }
@@ -1169,16 +1284,17 @@ function createMessageHandler(
                         }
 
 
-                        // =====================================
-                        // BADWORDS
-                        // =====================================
+                        /*
+                         * -------------------------------------
+                         * BADWORDS
+                         * -------------------------------------
+                         */
 
                         const badWordsConfig =
                             groupSettings
-                                .badwords
-                                ?.[
-                                    from
-                                ];
+                                .badwords?.[
+                                from
+                            ];
 
                         if (
                             badWordsConfig &&
@@ -1195,9 +1311,7 @@ function createMessageHandler(
                                 badWordsConfig.list.some(
                                     word =>
                                         lowerBody.includes(
-                                            String(
-                                                word
-                                            ).toLowerCase()
+                                            word.toLowerCase()
                                         )
                                 );
 
@@ -1208,10 +1322,13 @@ function createMessageHandler(
                                     await sock.sendMessage(
                                         from,
                                         {
-                                            delete: m.key
+                                            delete:
+                                                m.key
                                         }
                                     );
-                                } catch (e) {}
+                                } catch (
+                                    e
+                                ) {}
 
                                 await sock.sendMessage(
                                     from,
@@ -1229,16 +1346,17 @@ function createMessageHandler(
                         }
 
 
-                        // =====================================
-                        // ANTILINK
-                        // =====================================
+                        /*
+                         * -------------------------------------
+                         * ANTILINK
+                         * -------------------------------------
+                         */
 
                         const antiLinkConfig =
                             groupSettings
-                                .antilink
-                                ?.[
-                                    from
-                                ];
+                                .antilink?.[
+                                from
+                            ];
 
                         if (
                             antiLinkConfig &&
@@ -1271,10 +1389,13 @@ function createMessageHandler(
                                     await sock.sendMessage(
                                         from,
                                         {
-                                            delete: m.key
+                                            delete:
+                                                m.key
                                         }
                                     );
-                                } catch (e) {}
+                                } catch (
+                                    e
+                                ) {}
 
                                 if (
                                     antiLinkConfig.instant ===
@@ -1299,7 +1420,9 @@ function createMessageHandler(
                                             ],
                                             'remove'
                                         );
-                                    } catch (e) {}
+                                    } catch (
+                                        e
+                                    ) {}
 
                                     return;
                                 }
@@ -1348,7 +1471,7 @@ function createMessageHandler(
                                         from
                                     ][
                                         sender
-                                    ]++;
+                                    ] += 1;
 
                                     const warnCount =
                                         groupSettings
@@ -1368,7 +1491,8 @@ function createMessageHandler(
                                     );
 
                                     if (
-                                        warnCount < 3
+                                        warnCount <
+                                        3
                                     ) {
                                         await sock.sendMessage(
                                             from,
@@ -1416,7 +1540,9 @@ function createMessageHandler(
                                                 ],
                                                 'remove'
                                             );
-                                        } catch (e) {}
+                                        } catch (
+                                            e
+                                        ) {}
 
                                         return;
                                     }
@@ -1436,9 +1562,11 @@ function createMessageHandler(
             }
 
 
-            // =================================================
-            // COMMAND SYSTEM
-            // =================================================
+            /*
+             * =================================================
+             * COMMAND SYSTEM
+             * =================================================
+             */
 
             const PREFIX =
                 getPrefix();
@@ -1482,14 +1610,12 @@ function createMessageHandler(
                     commandName
                 );
 
-            if (
-                command
-            ) {
+            if (command) {
                 try {
                     await command.execute(
                         sock,
                         m,
-                        from,
+                        m.key.remoteJid,
                         args,
                         isOwner,
                         {
