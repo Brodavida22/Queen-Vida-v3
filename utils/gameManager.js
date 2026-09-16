@@ -9,20 +9,25 @@
  * - Existing gameManagerCore games
  */
 
-const gameManagerCore = require('./gameManagerCore');
+const gameManagerCore =
+    require('./gameManagerCore');
 
-const riddleGame = require('../commands/riddle');
-const wordGames = require('../commands/wordgames');
+const riddleGame =
+    require('../commands/riddle');
+
+const wordGames =
+    require('../commands/wordgames');
 
 
 /*
  * ============================================================
- * HELPERS
+ * GET MESSAGE TEXT
  * ============================================================
  */
 
-function getText(m) {
-    return (
+function getText(m, body = '') {
+    return String(
+        body ||
         m?.message?.conversation ||
         m?.message?.extendedTextMessage?.text ||
         m?.message?.imageMessage?.caption ||
@@ -33,21 +38,22 @@ function getText(m) {
 }
 
 
-function isCommand(text) {
-    const value = String(text || '').trim();
+/*
+ * ============================================================
+ * CHECK COMMAND
+ * ============================================================
+ */
 
-    return (
-        value.startsWith('.') ||
-        value.startsWith('!') ||
-        value.startsWith('/') ||
-        value.startsWith('#')
+function isCommand(text) {
+    return /^[.!/#]/.test(
+        String(text || '').trim()
     );
 }
 
 
 /*
  * ============================================================
- * RIDDLE ANSWERS
+ * RIDDLE
  * ============================================================
  */
 
@@ -57,44 +63,56 @@ async function handleRiddle(
     from,
     text
 ) {
+    if (!riddleGame) {
+        return false;
+    }
+
     if (
-        !riddleGame ||
-        typeof riddleGame.isActive !== 'function'
+        typeof riddleGame.isActive !==
+        'function'
     ) {
         return false;
     }
 
-    if (!riddleGame.isActive(from)) {
+    if (
+        !riddleGame.isActive(from)
+    ) {
         return false;
     }
 
     /*
-     * Don't consume normal bot commands as answers.
+     * Let normal bot commands pass through.
      */
     if (isCommand(text)) {
         return false;
     }
 
     if (
-        typeof riddleGame.handleMessage !== 'function'
+        typeof riddleGame.handleMessage !==
+        'function'
     ) {
+        console.error(
+            '[GAME MANAGER] riddleGame.handleMessage is missing'
+        );
+
         return false;
     }
 
-    await riddleGame.handleMessage(
-        sock,
-        m,
-        from,
-        text
-    );
+    const handled =
+        await riddleGame.handleMessage(
+            sock,
+            m,
+            from,
+            text
+        );
 
-    return true;
+    return handled === true;
 }
 
 
 /*
  * ============================================================
- * STARTING / ENDING ANSWERS
+ * STARTING / ENDING
  * ============================================================
  */
 
@@ -109,14 +127,28 @@ async function handleWordGames(
     }
 
     /*
-     * Never consume commands while a game is active.
+     * Never treat commands as game answers.
      */
     if (isCommand(text)) {
         return false;
     }
 
     /*
-     * Preferred handler.
+     * Make sure a word game is actually active.
+     */
+    if (
+        typeof wordGames.isActive ===
+        'function'
+    ) {
+        if (
+            !wordGames.isActive(from)
+        ) {
+            return false;
+        }
+    }
+
+    /*
+     * Main handler.
      */
     if (
         typeof wordGames.handleWordGameMessage ===
@@ -133,10 +165,8 @@ async function handleWordGames(
         return handled === true;
     }
 
-
     /*
-     * Fallback handler if wordgames.js
-     * exports handleMessage instead.
+     * Fallback for older wordgames.js.
      */
     if (
         typeof wordGames.handleMessage ===
@@ -153,13 +183,17 @@ async function handleWordGames(
         return handled === true;
     }
 
+    console.error(
+        '[GAME MANAGER] No word game answer handler found'
+    );
+
     return false;
 }
 
 
 /*
  * ============================================================
- * EXISTING GAME MANAGER
+ * ORIGINAL GAME MANAGER
  * ============================================================
  */
 
@@ -173,9 +207,6 @@ async function handleOriginalGames(
         return false;
     }
 
-    /*
-     * Most versions use handleGameMessage.
-     */
     if (
         typeof gameManagerCore.handleGameMessage ===
         'function'
@@ -190,10 +221,6 @@ async function handleOriginalGames(
         );
     }
 
-
-    /*
-     * Some versions use handleMessage.
-     */
     if (
         typeof gameManagerCore.handleMessage ===
         'function'
@@ -222,17 +249,14 @@ async function handleGameMessage(
     sock,
     m,
     from,
-    body
+    body = ''
 ) {
     try {
-
-        /*
-         * Always get the actual message text.
-         */
         const text =
-            String(
-                body || getText(m) || ''
-            ).trim();
+            getText(
+                m,
+                body
+            );
 
         if (!text) {
             return false;
@@ -243,35 +267,43 @@ async function handleGameMessage(
          * ----------------------------------------------------
          * 1. RIDDLE
          * ----------------------------------------------------
-         *
-         * If this group has an active riddle,
-         * the member's message is treated as the answer.
          */
 
         if (
             riddleGame &&
-            typeof riddleGame.isActive === 'function' &&
+            typeof riddleGame.isActive ===
+                'function' &&
             riddleGame.isActive(from)
         ) {
+            /*
+             * Commands must continue to the
+             * normal command processor.
+             */
+            if (isCommand(text)) {
+                return false;
+            }
+
+            const handled =
+                await handleRiddle(
+                    sock,
+                    m,
+                    from,
+                    text
+                );
 
             /*
-             * Commands are allowed to pass through
-             * to the normal command handler.
+             * If the riddle handler processed
+             * the answer, stop here.
              */
-            if (!isCommand(text)) {
-
-                const handled =
-                    await handleRiddle(
-                        sock,
-                        m,
-                        from,
-                        text
-                    );
-
-                if (handled) {
-                    return true;
-                }
+            if (handled) {
+                return true;
             }
+
+            /*
+             * Do NOT send the same message into
+             * another game while a riddle is active.
+             */
+            return true;
         }
 
 
@@ -281,7 +313,19 @@ async function handleGameMessage(
          * ----------------------------------------------------
          */
 
-        if (!isCommand(text)) {
+        if (
+            wordGames &&
+            typeof wordGames.isActive ===
+                'function' &&
+            wordGames.isActive(from)
+        ) {
+            /*
+             * Commands must continue to the
+             * normal command processor.
+             */
+            if (isCommand(text)) {
+                return false;
+            }
 
             const handled =
                 await handleWordGames(
@@ -291,9 +335,19 @@ async function handleGameMessage(
                     text
                 );
 
+            /*
+             * Correct answer was processed.
+             */
             if (handled) {
                 return true;
             }
+
+            /*
+             * The game is active, so this message
+             * belongs to the current game even if
+             * the answer is wrong.
+             */
+            return true;
         }
 
 
@@ -311,7 +365,6 @@ async function handleGameMessage(
         );
 
     } catch (error) {
-
         console.error(
             '🔥 [GAME MESSAGE ROUTER ERROR]',
             error
@@ -324,8 +377,7 @@ async function handleGameMessage(
 
 /*
  * ============================================================
- * EXPORT EVERYTHING FROM ORIGINAL GAME MANAGER
- * PLUS OUR NEW ROUTER
+ * EXPORTS
  * ============================================================
  */
 
@@ -335,5 +387,6 @@ module.exports = {
     handleGameMessage,
 
     handleRiddle,
+
     handleWordGames
 };
