@@ -1,4 +1,8 @@
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const {
+    downloadMediaMessage,
+    StatusHelper
+} = require('@whiskeysockets/baileys');
+
 const { getPrefix } = require('../utils/prefix');
 
 function getQuotedMessage(m) {
@@ -19,6 +23,7 @@ function unwrapMediaMessage(message) {
 
     let current = message;
 
+    // Unwrap WhatsApp containers
     if (current.ephemeralMessage?.message) {
         current = current.ephemeralMessage.message;
     }
@@ -59,7 +64,7 @@ module.exports = {
     async execute(sock, m, from, args, isOwner) {
         const prefix = getPrefix();
 
-        // Creator only
+        // Owner only
         if (!isOwner) {
             return sock.sendMessage(
                 from,
@@ -90,7 +95,8 @@ module.exports = {
                 {
                     text:
                         `❌ Reply to an image or video with ${prefix}gcstatus.\n\n` +
-                        `Example: Reply to a picture and send ${prefix}gcstatus`
+                        `Example:\n` +
+                        `Reply to a picture and send ${prefix}gcstatus`
                 },
                 { quoted: m }
             );
@@ -104,7 +110,7 @@ module.exports = {
                 from,
                 {
                     text:
-                        `❌ The message you replied to is not an image or video.\n\n` +
+                        `❌ The replied message is not an image or video.\n\n` +
                         `Reply to an image/video and send ${prefix}gcstatus.`
                 },
                 { quoted: m }
@@ -114,19 +120,21 @@ module.exports = {
         try {
             const contextInfo = getQuotedContext(m);
 
-            const quotedKey = {
-                remoteJid: from,
-                id: contextInfo.stanzaId,
-                participant: contextInfo.participant
-            };
-
-            if (!quotedKey.id) {
+            if (!contextInfo.stanzaId) {
                 throw new Error(
                     'Could not identify the replied message.'
                 );
             }
 
-            // Download replied media
+            // Rebuild the quoted message key
+            const quotedKey = {
+                remoteJid: from,
+                id: contextInfo.stanzaId,
+                participant: contextInfo.participant,
+                fromMe: false
+            };
+
+            // Download media
             const buffer = await downloadMediaMessage(
                 {
                     key: quotedKey,
@@ -140,18 +148,17 @@ module.exports = {
             );
 
             if (!buffer || !buffer.length) {
-                throw new Error(
-                    'Downloaded media is empty.'
-                );
+                throw new Error('Downloaded media is empty.');
             }
 
-            // Optional custom caption
+            // Optional custom caption:
+            // .gcstatus My caption
             const customCaption = Array.isArray(args)
                 ? args.join(' ').trim()
                 : '';
 
             const originalCaption =
-                media.message.caption || '';
+                media.message?.caption || '';
 
             const caption =
                 customCaption ||
@@ -159,44 +166,37 @@ module.exports = {
                 undefined;
 
             /*
-             * ============================================
-             * TRUE GROUP STATUS
-             * ============================================
-             *
              * IMPORTANT:
-             * Do NOT use status@broadcast here.
              *
-             * @innovatorssoft/baileys supports:
+             * StatusHelper is used here instead of manually sending
+             * groupStatus:true.
              *
-             * groupStatus: true
-             *
-             * This causes the library to wrap the message
-             * as a groupStatusMessageV2.
+             * The InnovatorsSoft Baileys fork specifically supports
+             * group JIDs through StatusHelper.send().
              */
 
-            let statusContent;
+            let status;
 
             if (media.type === 'image') {
-                statusContent = {
-                    image: buffer,
-                    ...(caption ? { caption } : {}),
-                    groupStatus: true
-                };
+                status = StatusHelper.image(
+                    buffer,
+                    caption
+                );
             } else {
-                statusContent = {
-                    video: buffer,
-                    ...(caption ? { caption } : {}),
-                    groupStatus: true
-                };
+                status = StatusHelper.video(
+                    buffer,
+                    caption
+                );
             }
 
-            // Send TRUE GROUP STATUS
-            await sock.sendMessage(
-                from,
-                statusContent
+            // Send specifically to THIS group.
+            await StatusHelper.send(
+                sock,
+                status,
+                [from]
             );
 
-            // Confirmation
+            // Success message
             await sock.sendMessage(
                 from,
                 {
@@ -218,7 +218,7 @@ module.exports = {
                 {
                     text:
                         `❌ Group Status failed.\n\n` +
-                        `Error: ${error.message || 'Unknown error'}`
+                        `Error: ${error?.message || 'Unknown error'}`
                 },
                 { quoted: m }
             ).catch(() => {});
