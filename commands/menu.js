@@ -3,93 +3,205 @@ const path = require('path');
 const { getMode } = require('../utils/mode');
 const { getPrefix } = require('../utils/prefix');
 
+/*
+ * ============================================================
+ * QUEEN VIDA-V3
+ * PREMIUM COMMAND MENU
+ * ============================================================
+ *
+ * This file controls ONLY the visual menu.
+ *
+ * Existing functionality preserved:
+ * - Dynamic prefix
+ * - Dynamic mode
+ * - Dynamic command count
+ * - Banner image support
+ * - Automatic NEWLY ADDED command detection
+ * - Existing command registration
+ * ============================================================
+ */
+
 function commandLine(prefix, command) {
-    return `│ ❯ ${prefix}${command}\n`;
+    return `│ ⟡ ${prefix}${command}\n`;
 }
 
 function section(title, emoji, prefix, commands) {
-    let block = `╭─〔 ${emoji} ${title} 〕\n`;
+    let block =
+        `╭─〔 ${emoji} ${title} 〕\n`;
 
-    for (const cmd of commands) {
-        block += commandLine(prefix, cmd);
+    for (const command of commands) {
+        block += commandLine(prefix, command);
     }
 
-    block += `╰──────────────────────────\n\n`;
+    block +=
+        `╰────────────────────────\n\n`;
 
     return block;
 }
 
-// Every command name already covered by a section below.
-// Used so any newly added command file automatically appears
-// under "NEWLY ADDED" instead of staying invisible forever.
+/*
+ * ============================================================
+ * MENU CATEGORIES
+ * ============================================================
+ */
+
 const SECTIONS = [
     {
-        title: 'SYSTEM',
+        title: '𝗦𝗬𝗦𝗧𝗘𝗠',
         emoji: '⚙️',
         commands: [
-            'menu', 'ping', 'runtime', 'botcreator', 'owner',
-            'repo', 'prefix', 'mode', 'individual', 'profile', 'deploy'
+            'menu',
+            'ping',
+            'runtime',
+            'botcreator',
+            'owner',
+            'repo',
+            'prefix',
+            'mode',
+            'individual',
+            'profile',
+            'deploy'
         ]
     },
+
     {
-        title: 'GROUP POWER',
+        title: '𝗚𝗥𝗢𝗨𝗣 𝗣𝗢𝗪𝗘𝗥',
         emoji: '👥',
         commands: [
-            'add', 'kick', 'promote', 'demote', 'tagall', 'hidetag',
-            'tagadmins', 'mute', 'unmute', 'groupinfo', 'gcstatus',
-            'del', 'poll', 'vcf', 'admins', 'approve', 'requests',
-            'revoke', 'rules', 'link', 'members', 'groupstats',
-            'afk', 'setpp', 'getpp', 'setgroupname', 'setgroupdesc',
-            'active', 'topmembers', 'welcome', 'setwelcome',
-            'goodbye', 'setgoodbye'
+            'add',
+            'kick',
+            'promote',
+            'demote',
+            'tagall',
+            'hidetag',
+            'tagadmins',
+            'mute',
+            'unmute',
+            'groupinfo',
+            'gcstatus',
+            'del',
+            'poll',
+            'vcf',
+            'admins',
+            'approve',
+            'requests',
+            'revoke',
+            'rules',
+            'link',
+            'members',
+            'groupstats',
+            'afk',
+            'setpp',
+            'getpp',
+            'setgroupname',
+            'setgroupdesc',
+            'active',
+            'topmembers',
+            'welcome',
+            'setwelcome',
+            'goodbye',
+            'setgoodbye'
         ]
     },
+
     {
-        title: 'SECURITY',
+        title: '𝗦𝗘𝗖𝗨𝗥𝗜𝗧𝗬',
         emoji: '🛡️',
         commands: [
-            'antilink', 'antispam', 'antisticker', 'badwords',
-            'agm', 'warn', 'warnings', 'clearwarnings'
+            'antilink',
+            'antispam',
+            'antisticker',
+            'badwords',
+            'agm',
+            'warn',
+            'warnings',
+            'clearwarnings'
         ]
     },
+
     {
-        title: 'AI & TOOLS',
+        title: '𝗔𝗜 & 𝗧𝗢𝗢𝗟𝗦',
         emoji: '🤖',
         commands: [
-            'ai', 'calc', 'weather', 'define', 'quote', 'tts'
+            'ai',
+            'calc',
+            'weather',
+            'define',
+            'quote',
+            'tts'
         ]
     },
+
     {
-        title: 'MEDIA',
+        title: '𝗠𝗘𝗗𝗜𝗔',
         emoji: '🎵',
         commands: [
-            'music', 'tik', 'lyrics', 'sticker', 'save',
-            'viewstatus', 'vv', 'vv2'
+            'music',
+            'tik',
+            'lyrics',
+            'sticker',
+            'save',
+            'viewstatus',
+            'vv',
+            'vv2'
         ]
     },
+
     {
-        title: 'ENTERTAINMENT',
+        title: '𝗙𝗨𝗡 & 𝗚𝗔𝗠𝗘𝗦',
         emoji: '🎮',
         commands: [
-            'game', 'reaction', 'hug', 'kiss', 'slap', 'ship',
-            'match', 'roast', 'rate', 'compliment', 'flirt',
-            'truth', 'dare'
+            'game',
+            'reaction',
+            'hug',
+            'kiss',
+            'slap',
+            'ship',
+            'match',
+            'roast',
+            'rate',
+            'compliment',
+            'flirt',
+            'truth',
+            'dare'
         ]
     },
+
     {
-        title: 'OWNER ZONE',
+        title: '𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘',
         emoji: '👑',
         commands: [
-            'block', 'unblock', 'broadcast', 'changename',
-            'changebio', 'changeprofile', 'creategroup', 'join',
-            'leave', 'update', 'statusreactions', 'sessions'
+            'block',
+            'unblock',
+            'broadcast',
+            'changename',
+            'changebio',
+            'changeprofile',
+            'creategroup',
+            'join',
+            'leave',
+            'update',
+            'statusreactions',
+            'sessions'
         ]
     }
 ];
 
+/*
+ * Keep track of commands already displayed above.
+ * Any command added later to the bot automatically appears
+ * inside NEWLY ADDED.
+ */
+
 const LISTED_COMMANDS = new Set(
-    SECTIONS.flatMap(s => s.commands)
+    SECTIONS.flatMap(section => section.commands)
 );
+
+/*
+ * ============================================================
+ * MENU COMMAND
+ * ============================================================
+ */
 
 module.exports = {
     name: 'menu',
@@ -109,53 +221,62 @@ module.exports = {
 
         let menuText = '';
 
-        // ==============================
-        // HEADER
-        // ==============================
+        /*
+         * ========================================================
+         * HEADER
+         * ========================================================
+         */
 
         menuText +=
-`╭━━━〔 👑 QUEEN VIDA-V3 〕━━━╮
+`╭━━━〔 👑 𝑸𝑼𝑬𝑬𝑵 𝑽𝑰𝑫𝑨-𝑽𝟑 〕━━━╮
 ┃
-┃  ✦ STATUS     : 🟢 ONLINE
-┃  ✦ MODE       : ${mode}
-┃  ✦ PREFIX     : ${PREFIX}
-┃  ✦ VERSION    : V3.0
-┃  ✦ COMMANDS   : ${commandCount}
+┃  🟢 𝗦𝗧𝗔𝗧𝗨𝗦  : 𝗢𝗡𝗟𝗜𝗡𝗘
+┃  🔐 𝗠𝗢𝗗𝗘    : ${mode}
+┃  ⚡ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡 : 𝟯.𝟬
+┃  📦 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 : ${commandCount}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
 
-        ✨ COMMAND CENTER ✨
+       ✦ 𝑪𝑶𝑴𝑴𝑨𝑵𝑫 𝑪𝑬𝑵𝑻𝑬𝑹 ✦
 
 `;
 
-        // ==============================
-        // SECTIONS
-        // ==============================
+        /*
+         * ========================================================
+         * MAIN COMMAND SECTIONS
+         * ========================================================
+         */
 
-        for (const s of SECTIONS) {
+        for (const menuSection of SECTIONS) {
             menuText += section(
-                s.title,
-                s.emoji,
+                menuSection.title,
+                menuSection.emoji,
                 PREFIX,
-                s.commands
+                menuSection.commands
             );
         }
 
-        // ==============================
-        // NEWLY ADDED (auto-detected)
-        // ==============================
-        // Safety net: any command registered in sock.commands that
-        // isn't in LISTED_COMMANDS above shows up here automatically,
-        // so a new command file is never silently missing from /menu.
+        /*
+         * ========================================================
+         * NEWLY ADDED COMMANDS
+         * ========================================================
+         *
+         * If you add another command file later and forget to
+         * place it in a category, it will automatically appear
+         * here.
+         */
 
         if (sock.commands && sock.commands.size) {
             const unlisted = [...sock.commands.keys()]
-                .filter(name => !LISTED_COMMANDS.has(name))
+                .filter(
+                    commandName =>
+                        !LISTED_COMMANDS.has(commandName)
+                )
                 .sort();
 
             if (unlisted.length) {
                 menuText += section(
-                    'NEWLY ADDED',
+                    '𝗡𝗘𝗪𝗟𝗬 𝗔𝗗𝗗𝗘𝗗',
                     '🆕',
                     PREFIX,
                     unlisted
@@ -163,17 +284,26 @@ module.exports = {
             }
         }
 
-        // ==============================
-        // FOOTER
-        // ==============================
+        /*
+         * ========================================================
+         * FOOTER
+         * ========================================================
+         */
 
         menuText +=
-`╭━━━━━━━━━━━━━━━━━━━━━━━━━━╮
-┃ 👑 QUEEN VIDA-V3
-┃ ⚡ POWER • SPEED • CONTROL
-┃
-┃ 💬 Type ${PREFIX}menu for commands
+`╭━━〔 👑 𝑸𝑼𝑬𝑬𝑵 𝑽𝑰𝑫𝑨 〕━━╮
+┃  ⚡ 𝗣𝗢𝗪𝗘𝗥 • 𝗦𝗣𝗘𝗘𝗗 • 𝗖𝗢𝗡𝗧𝗥𝗢𝗟
+┃  💬 Type ${PREFIX}menu for commands
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+
+        /*
+         * ========================================================
+         * SEND MENU
+         * ========================================================
+         *
+         * If banner.png exists, send the menu as an image
+         * caption. Otherwise send normal text.
+         */
 
         const bannerImagePath = path.join(
             __dirname,
@@ -187,7 +317,9 @@ module.exports = {
                     image: fs.readFileSync(bannerImagePath),
                     caption: menuText
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         } else {
             await sock.sendMessage(
@@ -195,7 +327,9 @@ module.exports = {
                 {
                     text: menuText
                 },
-                { quoted: m }
+                {
+                    quoted: m
+                }
             );
         }
     }
