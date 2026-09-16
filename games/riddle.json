@@ -1,0 +1,542 @@
+[
+  {
+    "question": "I have keys but no locks. I have space but no room. You can enter, but you cannot go inside. What am I?",
+    "answer": "keyboard",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I’m tall when I’m young and short when I’m old. What am I?",
+    "answer": "candle",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have a face and two hands but no arms or legs. What am I?",
+    "answer": "clock",
+    "difficulty": "easy"
+  },
+  {
+    "question": "The more you take away from me, the bigger I become. What am I?",
+    "answer": "hole",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I can travel around the world while staying in one corner. What am I?",
+    "answer": "stamp",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have many teeth but I cannot bite. What am I?",
+    "answer": "comb",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I’m full of holes, but I can still hold water. What am I?",
+    "answer": "sponge",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What gets wetter the more it dries?",
+    "answer": "towel",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have a neck but no head, and I wear a cap. What am I?",
+    "answer": "bottle",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have one eye but cannot see. What am I?",
+    "answer": "needle",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What comes down but never goes up?",
+    "answer": "rain",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have hands but cannot clap. What am I?",
+    "answer": "clock",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have words but I never speak. What am I?",
+    "answer": "book",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can you catch but never throw?",
+    "answer": "cold",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have four legs but I cannot walk. What am I?",
+    "answer": "table",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I’m always in front of you but can never be seen. What am I?",
+    "answer": "future",
+    "difficulty": "easy"
+  },
+  {
+    "question": "I have a thumb and four fingers but I am not alive. What am I?",
+    "answer": "glove",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What goes up and down but never moves?",
+    "answer": "stairs",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What belongs to you but other people use it more than you do?",
+    "answer": "name",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a head and a tail but no body?",
+    "answer": "coin",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has ears but cannot hear?",
+    "answer": "corn",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a ring but no finger?",
+    "answer": "telephone",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a bed but never sleeps?",
+    "answer": "river",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a mouth but cannot eat?",
+    "answer": "river",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has an eye but cannot see?",
+    "answer": "potato",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can run but never walks, has a mouth but never talks, and has a bed but never sleeps?",
+    "answer": "river",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has cities, roads, and rivers but no people, cars, or water?",
+    "answer": "map",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can fill a room but takes up no space?",
+    "answer": "light",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What breaks when you say its name?",
+    "answer": "silence",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is always coming but never arrives?",
+    "answer": "tomorrow",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a spine but no bones?",
+    "answer": "book",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has branches but no leaves, no fruit, and no trunk?",
+    "answer": "bank",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be cracked, made, told, and played?",
+    "answer": "joke",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has 13 hearts but no other organs?",
+    "answer": "deck of cards",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has many keys but cannot open a single door?",
+    "answer": "piano",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a tongue but cannot talk?",
+    "answer": "shoe",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a foot but no legs?",
+    "answer": "ruler",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a bottom at the top?",
+    "answer": "leg",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a head, a tail, is brown, and has no legs?",
+    "answer": "penny",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What is black when clean and white when dirty?",
+    "answer": "blackboard",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a lot of eyes but cannot see?",
+    "answer": "potato",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has no life but can die?",
+    "answer": "battery",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has four wheels and flies?",
+    "answer": "garbage truck",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can you hold without ever touching it?",
+    "answer": "conversation",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is easy to get into but hard to get out of?",
+    "answer": "trouble",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has no beginning, end, or middle?",
+    "answer": "circle",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What goes through cities and fields but never moves?",
+    "answer": "road",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can you serve but never eat?",
+    "answer": "tennis ball",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be seen once in a minute, twice in a moment, but never in a thousand years?",
+    "answer": "letter m",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What occurs once in every year, twice in every week, but never in a day?",
+    "answer": "letter e",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What word becomes shorter when you add two letters to it?",
+    "answer": "short",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What five-letter word becomes shorter when you add two letters to it?",
+    "answer": "short",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What starts with T, ends with T, and has T in it?",
+    "answer": "teapot",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What begins with E but contains only one letter?",
+    "answer": "envelope",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has an endless supply of letters but starts empty?",
+    "answer": "mailbox",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be measured but has no length, width, or height?",
+    "answer": "time",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What flies without wings and cries without eyes?",
+    "answer": "cloud",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can you hear but not see or touch?",
+    "answer": "sound",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can you see but never touch, and disappears when you close your eyes?",
+    "answer": "dream",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has no voice but can tell you a story?",
+    "answer": "picture",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What gets bigger the more you take from it?",
+    "answer": "hole",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a face but no eyes, nose, or mouth?",
+    "answer": "clock",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a lock but no door?",
+    "answer": "hair",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a bark but no bite?",
+    "answer": "tree",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has roots nobody sees and is taller than trees?",
+    "answer": "mountain",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has leaves but is not a tree?",
+    "answer": "book",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a crown but is not a king?",
+    "answer": "tooth",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a head but never thinks?",
+    "answer": "nail",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a neck but no head and two arms but no hands?",
+    "answer": "shirt",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a waist but no body?",
+    "answer": "hourglass",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a face, hands, and numbers but cannot talk?",
+    "answer": "clock",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has teeth but cannot eat and helps you cut things?",
+    "answer": "saw",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a shell but is not a turtle?",
+    "answer": "egg",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can be opened but has no door?",
+    "answer": "book",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has pages but is not a book?",
+    "answer": "calendar",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a screen but cannot watch television?",
+    "answer": "phone",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has buttons but cannot button a shirt?",
+    "answer": "remote",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a charger but is not a car?",
+    "answer": "phone",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can be switched on but cannot be switched off?",
+    "answer": "alarm",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be lost without being stolen?",
+    "answer": "time",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be spent but never saved?",
+    "answer": "time",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be wasted but never eaten?",
+    "answer": "time",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can be broken without being touched?",
+    "answer": "promise",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be given but never held?",
+    "answer": "advice",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be kept but cannot be seen?",
+    "answer": "promise",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be stolen but never taken from your hands?",
+    "answer": "identity",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What gets lighter the longer it burns?",
+    "answer": "candle",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What disappears as soon as you say its name?",
+    "answer": "silence",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can run forever but never gets tired?",
+    "answer": "water",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What goes up when rain comes down?",
+    "answer": "umbrella",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can you make but cannot see?",
+    "answer": "noise",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can be broken, even if you never pick it up or touch it?",
+    "answer": "promise",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has a lot of money but cannot spend it?",
+    "answer": "bank",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What has no legs but can travel thousands of miles?",
+    "answer": "sound",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What can go through glass without breaking it?",
+    "answer": "light",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What can pass through a door without opening it?",
+    "answer": "keyhole",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What can be caught in a net but cannot be held in your hands?",
+    "answer": "fish",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a tail but no body and can fly?",
+    "answer": "kite",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has wings but cannot fly?",
+    "answer": "airplane",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has a horn but does not make music?",
+    "answer": "rhinoceros",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What animal can jump higher than a building?",
+    "answer": "any animal",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What has four legs in the morning, two legs at noon, and three legs in the evening?",
+    "answer": "human",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is so fragile that saying its name breaks it?",
+    "answer": "silence",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What question can you never answer yes to?",
+    "answer": "are you asleep",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What is always behind you but you can never see it?",
+    "answer": "past",
+    "difficulty": "medium"
+  },
+  {
+    "question": "What is always in front of you but you cannot see it?",
+    "answer": "future",
+    "difficulty": "easy"
+  },
+  {
+    "question": "What has an end but no beginning, a home but no family, and a space without a room?",
+    "answer": "keyboard",
+    "difficulty": "hard"
+  },
+  {
+    "question": "What can you never put in a saucepan?",
+    "answer": "its lid",
+    "difficulty": "hard"
+  }
+    ]
