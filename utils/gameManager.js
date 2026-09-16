@@ -21,26 +21,55 @@ const wordGames =
 
 /*
  * ============================================================
- * GET MESSAGE TEXT
+ * MESSAGE TEXT
  * ============================================================
  */
 
 function getText(m, body = '') {
-    return String(
-        body ||
-        m?.message?.conversation ||
-        m?.message?.extendedTextMessage?.text ||
-        m?.message?.imageMessage?.caption ||
-        m?.message?.videoMessage?.caption ||
-        m?.message?.documentMessage?.caption ||
-        ''
-    ).trim();
+    const message =
+        m?.message || {};
+
+    /*
+     * Normal WhatsApp text
+     */
+    const directText =
+        message.conversation ||
+        message.extendedTextMessage?.text ||
+        message.imageMessage?.caption ||
+        message.videoMessage?.caption ||
+        message.documentMessage?.caption ||
+        message.buttonsResponseMessage?.selectedButtonId ||
+        message.listResponseMessage?.singleSelectReply
+            ?.selectedRowId ||
+        '';
+
+    if (
+        typeof directText === 'string' &&
+        directText.trim()
+    ) {
+        return directText.trim();
+    }
+
+    /*
+     * Fallback to body supplied by messageHandler.
+     *
+     * IMPORTANT:
+     * Never String() an object here.
+     */
+    if (
+        typeof body === 'string' &&
+        body.trim()
+    ) {
+        return body.trim();
+    }
+
+    return '';
 }
 
 
 /*
  * ============================================================
- * CHECK COMMAND
+ * COMMAND CHECK
  * ============================================================
  */
 
@@ -53,7 +82,7 @@ function isCommand(text) {
 
 /*
  * ============================================================
- * RIDDLE
+ * RIDDLE HANDLER
  * ============================================================
  */
 
@@ -63,56 +92,69 @@ async function handleRiddle(
     from,
     text
 ) {
-    if (!riddleGame) {
-        return false;
-    }
+    try {
+        if (!riddleGame) {
+            return false;
+        }
 
-    if (
-        typeof riddleGame.isActive !==
-        'function'
-    ) {
-        return false;
-    }
+        if (
+            typeof riddleGame.isActive !==
+            'function'
+        ) {
+            return false;
+        }
 
-    if (
-        !riddleGame.isActive(from)
-    ) {
-        return false;
-    }
+        if (
+            !riddleGame.isActive(from)
+        ) {
+            return false;
+        }
 
-    /*
-     * Let normal bot commands pass through.
-     */
-    if (isCommand(text)) {
-        return false;
-    }
+        /*
+         * Commands are NOT game answers.
+         */
+        if (isCommand(text)) {
+            return false;
+        }
 
-    if (
-        typeof riddleGame.handleMessage !==
-        'function'
-    ) {
+        if (
+            typeof riddleGame.handleMessage !==
+            'function'
+        ) {
+            console.error(
+                '❌ [RIDDLE] handleMessage() is missing'
+            );
+
+            return false;
+        }
+
+        /*
+         * Pass the actual answer text.
+         */
+        const result =
+            await riddleGame.handleMessage(
+                sock,
+                m,
+                from,
+                text
+            );
+
+        return result === true;
+
+    } catch (error) {
         console.error(
-            '[GAME MANAGER] riddleGame.handleMessage is missing'
+            '🔥 [RIDDLE ANSWER ERROR]:',
+            error
         );
 
         return false;
     }
-
-    const handled =
-        await riddleGame.handleMessage(
-            sock,
-            m,
-            from,
-            text
-        );
-
-    return handled === true;
 }
 
 
 /*
  * ============================================================
- * STARTING / ENDING
+ * STARTING / ENDING HANDLER
  * ============================================================
  */
 
@@ -122,78 +164,91 @@ async function handleWordGames(
     from,
     text
 ) {
-    if (!wordGames) {
-        return false;
-    }
-
-    /*
-     * Never treat commands as game answers.
-     */
-    if (isCommand(text)) {
-        return false;
-    }
-
-    /*
-     * Make sure a word game is actually active.
-     */
-    if (
-        typeof wordGames.isActive ===
-        'function'
-    ) {
-        if (
-            !wordGames.isActive(from)
-        ) {
+    try {
+        if (!wordGames) {
             return false;
         }
+
+        /*
+         * Commands are handled by the command system.
+         */
+        if (isCommand(text)) {
+            return false;
+        }
+
+        /*
+         * IMPORTANT:
+         * Check whether a word game is active
+         * BEFORE trying to process the answer.
+         */
+        if (
+            typeof wordGames.isActive ===
+            'function'
+        ) {
+            const active =
+                wordGames.isActive(from);
+
+            if (!active) {
+                return false;
+            }
+        }
+
+        /*
+         * Current wordgames.js handler.
+         */
+        if (
+            typeof wordGames.handleWordGameMessage ===
+            'function'
+        ) {
+            const result =
+                await wordGames.handleWordGameMessage(
+                    sock,
+                    m,
+                    from,
+                    text
+                );
+
+            return result === true;
+        }
+
+        /*
+         * Compatibility fallback.
+         */
+        if (
+            typeof wordGames.handleMessage ===
+            'function'
+        ) {
+            const result =
+                await wordGames.handleMessage(
+                    sock,
+                    m,
+                    from,
+                    text
+                );
+
+            return result === true;
+        }
+
+        console.error(
+            '❌ [WORD GAME] No answer handler found'
+        );
+
+        return false;
+
+    } catch (error) {
+        console.error(
+            '🔥 [WORD GAME ANSWER ERROR]:',
+            error
+        );
+
+        return false;
     }
-
-    /*
-     * Main handler.
-     */
-    if (
-        typeof wordGames.handleWordGameMessage ===
-        'function'
-    ) {
-        const handled =
-            await wordGames.handleWordGameMessage(
-                sock,
-                m,
-                from,
-                text
-            );
-
-        return handled === true;
-    }
-
-    /*
-     * Fallback for older wordgames.js.
-     */
-    if (
-        typeof wordGames.handleMessage ===
-        'function'
-    ) {
-        const handled =
-            await wordGames.handleMessage(
-                sock,
-                m,
-                from,
-                text
-            );
-
-        return handled === true;
-    }
-
-    console.error(
-        '[GAME MANAGER] No word game answer handler found'
-    );
-
-    return false;
 }
 
 
 /*
  * ============================================================
- * ORIGINAL GAME MANAGER
+ * ORIGINAL GAMES
  * ============================================================
  */
 
@@ -203,45 +258,55 @@ async function handleOriginalGames(
     from,
     text
 ) {
-    if (!gameManagerCore) {
+    try {
+        if (!gameManagerCore) {
+            return false;
+        }
+
+        if (
+            typeof gameManagerCore.handleGameMessage ===
+            'function'
+        ) {
+            return !!(
+                await gameManagerCore.handleGameMessage(
+                    sock,
+                    m,
+                    from,
+                    text
+                )
+            );
+        }
+
+        if (
+            typeof gameManagerCore.handleMessage ===
+            'function'
+        ) {
+            return !!(
+                await gameManagerCore.handleMessage(
+                    sock,
+                    m,
+                    from,
+                    text
+                )
+            );
+        }
+
+        return false;
+
+    } catch (error) {
+        console.error(
+            '🔥 [ORIGINAL GAME ERROR]:',
+            error
+        );
+
         return false;
     }
-
-    if (
-        typeof gameManagerCore.handleGameMessage ===
-        'function'
-    ) {
-        return !!(
-            await gameManagerCore.handleGameMessage(
-                sock,
-                m,
-                from,
-                text
-            )
-        );
-    }
-
-    if (
-        typeof gameManagerCore.handleMessage ===
-        'function'
-    ) {
-        return !!(
-            await gameManagerCore.handleMessage(
-                sock,
-                m,
-                from,
-                text
-            )
-        );
-    }
-
-    return false;
 }
 
 
 /*
  * ============================================================
- * MAIN GAME MESSAGE ROUTER
+ * MAIN ROUTER
  * ============================================================
  */
 
@@ -252,6 +317,13 @@ async function handleGameMessage(
     body = ''
 ) {
     try {
+        if (!from) {
+            return false;
+        }
+
+        /*
+         * Get the REAL WhatsApp message text.
+         */
         const text =
             getText(
                 m,
@@ -262,11 +334,10 @@ async function handleGameMessage(
             return false;
         }
 
-
         /*
-         * ----------------------------------------------------
-         * 1. RIDDLE
-         * ----------------------------------------------------
+         * ====================================================
+         * RIDDLE HAS PRIORITY
+         * ====================================================
          */
 
         if (
@@ -276,8 +347,7 @@ async function handleGameMessage(
             riddleGame.isActive(from)
         ) {
             /*
-             * Commands must continue to the
-             * normal command processor.
+             * Let commands through.
              */
             if (isCommand(text)) {
                 return false;
@@ -292,25 +362,18 @@ async function handleGameMessage(
                 );
 
             /*
-             * If the riddle handler processed
-             * the answer, stop here.
+             * Whether correct or incorrect,
+             * this message belongs to the
+             * active riddle.
              */
-            if (handled) {
-                return true;
-            }
-
-            /*
-             * Do NOT send the same message into
-             * another game while a riddle is active.
-             */
-            return true;
+            return handled || true;
         }
 
 
         /*
-         * ----------------------------------------------------
-         * 2. WORD STARTING / WORD ENDING
-         * ----------------------------------------------------
+         * ====================================================
+         * WORD STARTING / ENDING HAS PRIORITY
+         * ====================================================
          */
 
         if (
@@ -320,8 +383,7 @@ async function handleGameMessage(
             wordGames.isActive(from)
         ) {
             /*
-             * Commands must continue to the
-             * normal command processor.
+             * Commands go to normal command handler.
              */
             if (isCommand(text)) {
                 return false;
@@ -336,25 +398,17 @@ async function handleGameMessage(
                 );
 
             /*
-             * Correct answer was processed.
+             * Consume the message because a
+             * word game is active.
              */
-            if (handled) {
-                return true;
-            }
-
-            /*
-             * The game is active, so this message
-             * belongs to the current game even if
-             * the answer is wrong.
-             */
-            return true;
+            return handled || true;
         }
 
 
         /*
-         * ----------------------------------------------------
-         * 3. ORIGINAL GAMES
-         * ----------------------------------------------------
+         * ====================================================
+         * EXISTING QUEEN VIDA GAMES
+         * ====================================================
          */
 
         return await handleOriginalGames(
@@ -366,7 +420,7 @@ async function handleGameMessage(
 
     } catch (error) {
         console.error(
-            '🔥 [GAME MESSAGE ROUTER ERROR]',
+            '🔥 [GAME MESSAGE ROUTER ERROR]:',
             error
         );
 
