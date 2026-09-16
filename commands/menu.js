@@ -13,23 +13,24 @@ const { getPrefix } = require('../utils/prefix');
 const TELEGRAM_PAIRING_URL = 'https://t.me/Vidas_bot';
 const GITHUB_REPO_URL = 'https://github.com/Brodavida22/Queen-Vida-v3';
 
+
 function commandLine(prefix, command) {
     return `│ ⟡ ${prefix}${command}\n`;
 }
 
+
 function section(title, emoji, prefix, commands) {
-    let block =
-        `╭─〔 ${emoji} ${title} 〕\n`;
+    let block = `╭─〔 ${emoji} ${title} 〕\n`;
 
     for (const command of commands) {
         block += commandLine(prefix, command);
     }
 
-    block +=
-        `╰────────────────────────\n\n`;
+    block += `╰────────────────────────\n\n`;
 
     return block;
 }
+
 
 /*
  * ============================================================
@@ -60,8 +61,13 @@ const GAME_COMMANDS = [
     'thisorthat',
     '8ball',
     'coinflip',
-    'dice'
+    'dice',
+
+    // WORD GAMES
+    'starting',
+    'ending'
 ];
+
 
 /*
  * ============================================================
@@ -70,6 +76,11 @@ const GAME_COMMANDS = [
  */
 
 const SECTIONS = [
+
+    /*
+     * SYSTEM
+     */
+
     {
         title: '𝗦𝗬𝗦𝗧𝗘𝗠',
         emoji: '⚙️',
@@ -88,6 +99,11 @@ const SECTIONS = [
             'deploy'
         ]
     },
+
+
+    /*
+     * GROUP POWER
+     */
 
     {
         title: '𝗚𝗥𝗢𝗨𝗣 𝗣𝗢𝗪𝗘𝗥',
@@ -129,6 +145,11 @@ const SECTIONS = [
         ]
     },
 
+
+    /*
+     * SECURITY
+     */
+
     {
         title: '𝗦𝗘𝗖𝗨𝗥𝗜𝗧𝗬',
         emoji: '🛡️',
@@ -144,6 +165,11 @@ const SECTIONS = [
         ]
     },
 
+
+    /*
+     * AI & TOOLS
+     */
+
     {
         title: '𝗔𝗜 & 𝗧𝗢𝗢𝗟𝗦',
         emoji: '🤖',
@@ -156,6 +182,11 @@ const SECTIONS = [
             'tts'
         ]
     },
+
+
+    /*
+     * MEDIA
+     */
 
     {
         title: '𝗠𝗘𝗗𝗜𝗔',
@@ -172,11 +203,21 @@ const SECTIONS = [
         ]
     },
 
+
+    /*
+     * GAMES
+     */
+
     {
         title: '𝗚𝗔𝗠𝗘𝗦',
         emoji: '🎮',
         commands: GAME_COMMANDS
     },
+
+
+    /*
+     * FUN
+     */
 
     {
         title: '𝗙𝗨𝗡',
@@ -196,6 +237,11 @@ const SECTIONS = [
             'dare'
         ]
     },
+
+
+    /*
+     * OWNER ZONE
+     */
 
     {
         title: '𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘',
@@ -217,6 +263,7 @@ const SECTIONS = [
     }
 ];
 
+
 /*
  * ============================================================
  * BUILD LIST OF COMMANDS ALREADY DISPLAYED
@@ -227,13 +274,15 @@ const LISTED_COMMANDS = new Set(
     SECTIONS.flatMap(section => section.commands)
 );
 
+
 /*
  * ============================================================
- * AUTOMATIC JSON GAMES
+ * AUTOMATIC JSON GAME DETECTION
  * ============================================================
  */
 
 function getJsonGames() {
+
     const gamesDirectory =
         path.join(__dirname, '../games');
 
@@ -242,22 +291,24 @@ function getJsonGames() {
     }
 
     try {
+
         return fs.readdirSync(gamesDirectory)
+
             .filter(file =>
                 file.toLowerCase().endsWith('.json')
             )
+
             .map(file =>
-                path.basename(file, '.json')
+                path.basename(
+                    file,
+                    '.json'
+                )
             )
-            .filter(name =>
-                ![
-                    'starting',
-                    'ending',
-                    'couples'
-                ].includes(name.toLowerCase())
-            )
+
             .sort();
+
     } catch (error) {
+
         console.error(
             'Error reading games directory:',
             error
@@ -267,6 +318,7 @@ function getJsonGames() {
     }
 }
 
+
 /*
  * ============================================================
  * MENU COMMAND
@@ -274,10 +326,12 @@ function getJsonGames() {
  */
 
 module.exports = {
+
     name: 'menu',
 
     description:
         'Displays the QUEEN VIDA-V3 command menu and bot information',
+
 
     async execute(sock, m, from) {
 
@@ -287,10 +341,13 @@ module.exports = {
             getMode() || 'public'
         ).toUpperCase();
 
+
         const commandCount =
             (sock.commands && sock.commands.size) || 0;
 
+
         let menuText = '';
+
 
         /*
          * ========================================================
@@ -312,24 +369,26 @@ module.exports = {
 
 `;
 
+
         /*
          * ========================================================
-         * PAIRING + REPOSITORY
+         * QUICK LINKS
          * ========================================================
          */
 
         menuText +=
-`╭━━〔 🔗 𝗤𝗨𝗜𝗖𝗞 𝗟𝗜𝗡𝗞𝗦 〕━━╮
-┃
-┃ 📱 𝗧𝗘𝗟𝗘𝗚𝗥𝗔𝗠 𝗣𝗔𝗜𝗥𝗜𝗡𝗚
-┃ ${TELEGRAM_PAIRING_URL}
-┃
-┃ 📦 𝗚𝗜𝗧𝗛𝗨𝗕 𝗥𝗘𝗣𝗢𝗦𝗜𝗧𝗢𝗥𝗬
-┃ ${GITHUB_REPO_URL}
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
+`╭─〔 🔗 𝗤𝗨𝗜𝗖𝗞 𝗟𝗜𝗡𝗞𝗦 〕
+│
+│ 📱 𝗧𝗘𝗟𝗘𝗚𝗥𝗔𝗠 𝗣𝗔𝗜𝗥𝗜𝗡𝗚
+│ ${TELEGRAM_PAIRING_URL}
+│
+│ 📦 𝗚𝗜𝗧𝗛𝗨𝗕 𝗥𝗘𝗣𝗢𝗦𝗜𝗧𝗢𝗥𝗬
+│ ${GITHUB_REPO_URL}
+│
+╰────────────────────────
 
 `;
+
 
         /*
          * ========================================================
@@ -338,6 +397,7 @@ module.exports = {
          */
 
         for (const menuSection of SECTIONS) {
+
             menuText += section(
                 menuSection.title,
                 menuSection.emoji,
@@ -346,23 +406,29 @@ module.exports = {
             );
         }
 
+
         /*
          * ========================================================
          * AUTOMATIC JSON GAMES
          * ========================================================
          */
 
-        const jsonGames = getJsonGames();
+        const jsonGames =
+            getJsonGames();
+
 
         const listedGames =
             new Set(GAME_COMMANDS);
+
 
         const additionalGames =
             jsonGames.filter(
                 game => !listedGames.has(game)
             );
 
+
         if (additionalGames.length) {
+
             menuText += section(
                 '𝗔𝗗𝗗𝗜𝗧𝗜𝗢𝗡𝗔𝗟 𝗚𝗔𝗠𝗘𝗦',
                 '🆕',
@@ -370,6 +436,7 @@ module.exports = {
                 additionalGames
             );
         }
+
 
         /*
          * ========================================================
@@ -381,16 +448,26 @@ module.exports = {
             sock.commands &&
             sock.commands.size
         ) {
+
             const unlisted =
                 [...sock.commands.keys()]
+
                     .filter(
                         commandName =>
-                            !LISTED_COMMANDS.has(commandName) &&
-                            !additionalGames.includes(commandName)
+                            !LISTED_COMMANDS.has(
+                                commandName
+                            ) &&
+
+                            !additionalGames.includes(
+                                commandName
+                            )
                     )
+
                     .sort();
 
+
             if (unlisted.length) {
+
                 menuText += section(
                     '𝗡𝗘𝗪𝗟𝗬 𝗔𝗗𝗗𝗘𝗗',
                     '🆕',
@@ -400,14 +477,16 @@ module.exports = {
             }
         }
 
+
         /*
          * ========================================================
-         * GAME HELP
+         * GAME QUICK START
          * ========================================================
          */
 
         menuText +=
 `╭─〔 🎮 GAME QUICK START 〕
+│
 │ ⟡ ${PREFIX}game
 │ ⟡ ${PREFIX}game start trivia easy 5
 │ ⟡ ${PREFIX}game start quiz medium 5
@@ -422,10 +501,15 @@ module.exports = {
 │ ⟡ ${PREFIX}game start taboo 5
 │ ⟡ ${PREFIX}game start 2truth1lie 5
 │ ⟡ ${PREFIX}game start memewar 5
+│
+│ 🔤 ${PREFIX}starting
+│ 🔚 ${PREFIX}ending
+│
 │ ⟡ ${PREFIX}game stop
 ╰────────────────────────
 
 `;
+
 
         /*
          * ========================================================
@@ -436,12 +520,18 @@ module.exports = {
         menuText +=
 `╭━━〔 👑 𝑸𝑼𝑬𝑬𝑵 𝑽𝑰𝑫𝑨 〕━━╮
 ┃
-┃  📱 𝗣𝗔𝗜𝗥 : ${TELEGRAM_PAIRING_URL}
-┃  📦 𝗥𝗘𝗣𝗢 : ${GITHUB_REPO_URL}
-┃
 ┃  ⚡ 𝗣𝗢𝗪𝗘𝗥 • 𝗦𝗣𝗘𝗘𝗗 • 𝗖𝗢𝗡𝗧𝗥𝗢𝗟
+┃
+┃  📱 𝗣𝗔𝗜𝗥𝗜𝗡𝗚:
+┃  ${TELEGRAM_PAIRING_URL}
+┃
+┃  📦 𝗚𝗜𝗧𝗛𝗨𝗕:
+┃  ${GITHUB_REPO_URL}
+┃
 ┃  💬 Type ${PREFIX}menu for commands
+┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+
 
         /*
          * ========================================================
@@ -455,29 +545,43 @@ module.exports = {
                 '../banner.png'
             );
 
+
         if (
             fs.existsSync(
                 bannerImagePath
             )
         ) {
+
             await sock.sendMessage(
+
                 from,
+
                 {
-                    image: fs.readFileSync(
-                        bannerImagePath
-                    ),
-                    caption: menuText
+                    image:
+                        fs.readFileSync(
+                            bannerImagePath
+                        ),
+
+                    caption:
+                        menuText
                 },
+
                 {
                     quoted: m
                 }
             );
+
         } else {
+
             await sock.sendMessage(
+
                 from,
+
                 {
-                    text: menuText
+                    text:
+                        menuText
                 },
+
                 {
                     quoted: m
                 }
