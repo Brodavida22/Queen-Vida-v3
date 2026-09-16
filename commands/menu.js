@@ -11,22 +11,41 @@ const { getPrefix } = require('../utils/prefix');
  */
 
 const TELEGRAM_PAIRING_URL = 'https://t.me/Vidas_bot';
-const GITHUB_REPO_URL = 'https://github.com/Brodavida22/Queen-Vida-v3';
+const GITHUB_REPO_URL =
+    'https://github.com/Brodavida22/Queen-Vida-v3';
 
+
+/*
+ * ============================================================
+ * COMMAND LINE
+ * ============================================================
+ */
 
 function commandLine(prefix, command) {
     return `│ ⟡ ${prefix}${command}\n`;
 }
 
 
+/*
+ * ============================================================
+ * SECTION BUILDER
+ * ============================================================
+ */
+
 function section(title, emoji, prefix, commands) {
-    let block = `╭─〔 ${emoji} ${title} 〕\n`;
+
+    let block =
+        `╭─〔 ${emoji} ${title} 〕\n`;
 
     for (const command of commands) {
-        block += commandLine(prefix, command);
+        block += commandLine(
+            prefix,
+            command
+        );
     }
 
-    block += `╰────────────────────────\n\n`;
+    block +=
+        `╰────────────────────────\n\n`;
 
     return block;
 }
@@ -36,17 +55,23 @@ function section(title, emoji, prefix, commands) {
  * ============================================================
  * GAME COMMANDS
  * ============================================================
+ *
+ * These are explicitly listed so they ALWAYS appear in menu.
  */
 
 const GAME_COMMANDS = [
+
+    // MAIN GAME SYSTEM
     'game',
 
+    // CLASSIC GAMES
     'trivia',
     'quiz',
     'scramble',
     'guess',
     'truthordare',
 
+    // EXTRA GAMES
     'emoji',
     'movemoji',
     'findemoji',
@@ -56,6 +81,7 @@ const GAME_COMMANDS = [
     '2truth1lie',
     'memewar',
 
+    // FUN GAMES
     'wyr',
     'neverhaveiever',
     'thisorthat',
@@ -63,7 +89,8 @@ const GAME_COMMANDS = [
     'coinflip',
     'dice',
 
-    // WORD GAMES
+    // WORD / RIDDLE GAMES
+    'riddle',
     'starting',
     'ending'
 ];
@@ -71,7 +98,7 @@ const GAME_COMMANDS = [
 
 /*
  * ============================================================
- * MENU CATEGORIES
+ * MENU SECTIONS
  * ============================================================
  */
 
@@ -84,6 +111,7 @@ const SECTIONS = [
     {
         title: '𝗦𝗬𝗦𝗧𝗘𝗠',
         emoji: '⚙️',
+
         commands: [
             'menu',
             'ping',
@@ -108,6 +136,7 @@ const SECTIONS = [
     {
         title: '𝗚𝗥𝗢𝗨𝗣 𝗣𝗢𝗪𝗘𝗥',
         emoji: '👥',
+
         commands: [
             'add',
             'kick',
@@ -153,6 +182,7 @@ const SECTIONS = [
     {
         title: '𝗦𝗘𝗖𝗨𝗥𝗜𝗧𝗬',
         emoji: '🛡️',
+
         commands: [
             'antilink',
             'antispam',
@@ -173,6 +203,7 @@ const SECTIONS = [
     {
         title: '𝗔𝗜 & 𝗧𝗢𝗢𝗟𝗦',
         emoji: '🤖',
+
         commands: [
             'ai',
             'calc',
@@ -191,6 +222,7 @@ const SECTIONS = [
     {
         title: '𝗠𝗘𝗗𝗜𝗔',
         emoji: '🎵',
+
         commands: [
             'music',
             'tik',
@@ -211,6 +243,7 @@ const SECTIONS = [
     {
         title: '𝗚𝗔𝗠𝗘𝗦',
         emoji: '🎮',
+
         commands: GAME_COMMANDS
     },
 
@@ -222,6 +255,7 @@ const SECTIONS = [
     {
         title: '𝗙𝗨𝗡',
         emoji: '😂',
+
         commands: [
             'reaction',
             'hug',
@@ -246,6 +280,7 @@ const SECTIONS = [
     {
         title: '𝗢𝗪𝗡𝗘𝗥 𝗭𝗢𝗡𝗘',
         emoji: '👑',
+
         commands: [
             'block',
             'unblock',
@@ -266,12 +301,14 @@ const SECTIONS = [
 
 /*
  * ============================================================
- * BUILD LIST OF COMMANDS ALREADY DISPLAYED
+ * LISTED COMMANDS
  * ============================================================
  */
 
 const LISTED_COMMANDS = new Set(
-    SECTIONS.flatMap(section => section.commands)
+    SECTIONS.flatMap(
+        menuSection => menuSection.commands
+    )
 );
 
 
@@ -284,7 +321,10 @@ const LISTED_COMMANDS = new Set(
 function getJsonGames() {
 
     const gamesDirectory =
-        path.join(__dirname, '../games');
+        path.join(
+            __dirname,
+            '../games'
+        );
 
     if (!fs.existsSync(gamesDirectory)) {
         return [];
@@ -292,17 +332,23 @@ function getJsonGames() {
 
     try {
 
-        return fs.readdirSync(gamesDirectory)
+        return fs.readdirSync(
+            gamesDirectory
+        )
 
-            .filter(file =>
-                file.toLowerCase().endsWith('.json')
+            .filter(
+                file =>
+                    file
+                        .toLowerCase()
+                        .endsWith('.json')
             )
 
-            .map(file =>
-                path.basename(
-                    file,
-                    '.json'
-                )
+            .map(
+                file =>
+                    path.basename(
+                        file,
+                        '.json'
+                    )
             )
 
             .sort();
@@ -335,15 +381,21 @@ module.exports = {
 
     async execute(sock, m, from) {
 
-        const PREFIX = getPrefix();
+        const PREFIX =
+            getPrefix();
 
-        const mode = String(
-            getMode() || 'public'
-        ).toUpperCase();
+
+        const mode =
+            String(
+                getMode() || 'public'
+            ).toUpperCase();
 
 
         const commandCount =
-            (sock.commands && sock.commands.size) || 0;
+            (
+                sock.commands &&
+                sock.commands.size
+            ) || 0;
 
 
         let menuText = '';
@@ -358,9 +410,9 @@ module.exports = {
         menuText +=
 `╭━━━〔 👑 𝑸𝑼𝑬𝑬𝑵 𝑽𝑰𝑫𝑨-𝑽𝟑 〕━━━╮
 ┃
-┃  🟢 𝗦𝗧𝗔𝗧𝗨𝗦  : 𝗢𝗡𝗟𝗜𝗡𝗘
-┃  🔐 𝗠𝗢𝗗𝗘    : ${mode}
-┃  ⚡ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡 : 𝟯.𝟬
+┃  🟢 𝗦𝗧𝗔𝗧𝗨𝗦   : 𝗢𝗡𝗟𝗜𝗡𝗘
+┃  🔐 𝗠𝗢𝗗𝗘     : ${mode}
+┃  ⚡ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡  : 𝟯.𝟬
 ┃  📦 𝗖𝗢𝗠𝗠𝗔𝗡𝗗𝗦 : ${commandCount}
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
@@ -396,7 +448,10 @@ module.exports = {
          * ========================================================
          */
 
-        for (const menuSection of SECTIONS) {
+        for (
+            const menuSection
+            of SECTIONS
+        ) {
 
             menuText += section(
                 menuSection.title,
@@ -411,6 +466,9 @@ module.exports = {
          * ========================================================
          * AUTOMATIC JSON GAMES
          * ========================================================
+         *
+         * Any JSON game that is NOT already listed above
+         * will appear here.
          */
 
         const jsonGames =
@@ -418,16 +476,23 @@ module.exports = {
 
 
         const listedGames =
-            new Set(GAME_COMMANDS);
+            new Set(
+                GAME_COMMANDS
+            );
 
 
         const additionalGames =
             jsonGames.filter(
-                game => !listedGames.has(game)
+                game =>
+                    !listedGames.has(
+                        game
+                    )
             );
 
 
-        if (additionalGames.length) {
+        if (
+            additionalGames.length
+        ) {
 
             menuText += section(
                 '𝗔𝗗𝗗𝗜𝗧𝗜𝗢𝗡𝗔𝗟 𝗚𝗔𝗠𝗘𝗦',
@@ -450,13 +515,18 @@ module.exports = {
         ) {
 
             const unlisted =
-                [...sock.commands.keys()]
+                [
+                    ...sock.commands.keys()
+                ]
 
                     .filter(
                         commandName =>
+
                             !LISTED_COMMANDS.has(
                                 commandName
-                            ) &&
+                            )
+
+                            &&
 
                             !additionalGames.includes(
                                 commandName
@@ -466,7 +536,9 @@ module.exports = {
                     .sort();
 
 
-            if (unlisted.length) {
+            if (
+                unlisted.length
+            ) {
 
                 menuText += section(
                     '𝗡𝗘𝗪𝗟𝗬 𝗔𝗗𝗗𝗘𝗗',
@@ -488,24 +560,27 @@ module.exports = {
 `╭─〔 🎮 GAME QUICK START 〕
 │
 │ ⟡ ${PREFIX}game
-│ ⟡ ${PREFIX}game start trivia easy 5
-│ ⟡ ${PREFIX}game start quiz medium 5
-│ ⟡ ${PREFIX}game start scramble 5
-│ ⟡ ${PREFIX}game start guess 5
-│ ⟡ ${PREFIX}game start truthordare 5
-│ ⟡ ${PREFIX}game start emoji 5
-│ ⟡ ${PREFIX}game start movemoji 5
-│ ⟡ ${PREFIX}game start findemoji 5
-│ ⟡ ${PREFIX}game start lyrics 5
-│ ⟡ ${PREFIX}game start rhyme 5
-│ ⟡ ${PREFIX}game start taboo 5
-│ ⟡ ${PREFIX}game start 2truth1lie 5
-│ ⟡ ${PREFIX}game start memewar 5
 │
-│ 🔤 ${PREFIX}starting
-│ 🔚 ${PREFIX}ending
+│ 🧠 ${PREFIX}game start trivia easy 5
+│ 📝 ${PREFIX}game start quiz medium 5
+│ 🔀 ${PREFIX}game start scramble 5
+│ 🎯 ${PREFIX}game start guess 5
+│ 🎲 ${PREFIX}game start truthordare 5
 │
-│ ⟡ ${PREFIX}game stop
+│ 😀 ${PREFIX}game start emoji 5
+│ 🎬 ${PREFIX}game start movemoji 5
+│ 🔎 ${PREFIX}game start findemoji 5
+│ 🎵 ${PREFIX}game start lyrics 5
+│ 🎤 ${PREFIX}game start rhyme 5
+│ 🚫 ${PREFIX}game start taboo 5
+│ 🤥 ${PREFIX}game start 2truth1lie 5
+│ 🧠 ${PREFIX}game start memewar 5
+│
+│ 🧩 ${PREFIX}riddle 5
+│ 🔤 ${PREFIX}starting 5
+│ 🔚 ${PREFIX}ending 5
+│
+│ ⛔ ${PREFIX}game stop
 ╰────────────────────────
 
 `;
@@ -553,9 +628,7 @@ module.exports = {
         ) {
 
             await sock.sendMessage(
-
                 from,
-
                 {
                     image:
                         fs.readFileSync(
@@ -565,7 +638,6 @@ module.exports = {
                     caption:
                         menuText
                 },
-
                 {
                     quoted: m
                 }
@@ -574,14 +646,11 @@ module.exports = {
         } else {
 
             await sock.sendMessage(
-
                 from,
-
                 {
                     text:
                         menuText
                 },
-
                 {
                     quoted: m
                 }
