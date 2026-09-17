@@ -31,11 +31,7 @@ const telegramSessions =
 // ============================================================
 
 function loadTelegramSessions() {
-    if (
-        !fs.existsSync(
-            PENDING_FILE
-        )
-    ) {
+    if (!fs.existsSync(PENDING_FILE)) {
         return {};
     }
 
@@ -145,23 +141,10 @@ async function sendMessage(
 // PHONE HELPERS
 // ============================================================
 
-function cleanPhoneNumber(
-    value
-) {
-    return String(
-        value || ''
-    )
+function cleanPhoneNumber(value) {
+    return String(value || '')
         .trim()
-        .replace(
-            /[^0-9]/g,
-            ''
-        );
-}
-
-function getSessionId(
-    number
-) {
-    return `tg-${number}`;
+        .replace(/[^0-9]/g, '');
 }
 
 
@@ -169,25 +152,18 @@ function getSessionId(
 // SESSION HELPERS
 // ============================================================
 
-function getConnectedSession(
-    sessionId
-) {
+function getConnectedSession(sessionId) {
     return sessionManager
         .getActiveSessions()
         .find(
             session =>
-                session.sessionId ===
-                sessionId
+                session.sessionId === sessionId
         );
 }
 
-function isConnected(
-    sessionId
-) {
+function isConnected(sessionId) {
     const session =
-        getConnectedSession(
-            sessionId
-        );
+        getConnectedSession(sessionId);
 
     return !!(
         session &&
@@ -197,25 +173,19 @@ function isConnected(
 
 
 // ============================================================
-// STALE SESSION CHECK
+// STALE SESSION CLEANUP
 // ============================================================
 
-function cleanupStalePairingSession(
-    sessionId
-) {
+function cleanupStalePairingSession(sessionId) {
+    if (!sessionId) {
+        return false;
+    }
+
     try {
-        /*
-         * cleanupStaleSession() only removes
-         * incomplete/broken sessions.
-         *
-         * It does NOT remove a valid registered
-         * WhatsApp account.
-         */
-        return sessionManager
-            .cleanupStaleSession(
-                sessionId,
-                false
-            );
+        return sessionManager.cleanupStaleSession(
+            sessionId,
+            false
+        );
     } catch (error) {
         console.error(
             `🔥 [TELEGRAM] Stale session cleanup failed for ${sessionId}:`,
@@ -224,6 +194,42 @@ function cleanupStalePairingSession(
 
         return false;
     }
+}
+
+
+// ============================================================
+// CHECK WHETHER A SESSION IS ACTUALLY CONNECTED
+// ============================================================
+
+function hasActiveSessionForNumber(number) {
+    const cleanNumber =
+        cleanPhoneNumber(number);
+
+    const sessions =
+        sessionManager.getActiveSessions();
+
+    if (!Array.isArray(sessions)) {
+        return false;
+    }
+
+    return sessions.some(session => {
+        if (!session) {
+            return false;
+        }
+
+        const owner =
+            cleanPhoneNumber(
+                session.ownerNumber ||
+                session.phoneNumber ||
+                session.number ||
+                ''
+            );
+
+        return (
+            owner === cleanNumber &&
+            session.connected === true
+        );
+    });
 }
 
 
@@ -237,9 +243,7 @@ async function startPairing(
     commandsMap
 ) {
     const cleanNumber =
-        cleanPhoneNumber(
-            number
-        );
+        cleanPhoneNumber(number);
 
     // --------------------------------------------------------
     // Validate number
@@ -270,11 +274,7 @@ async function startPairing(
     // Existing Telegram pairing
     // --------------------------------------------------------
 
-    if (
-        pendingPairings.has(
-            chatId
-        )
-    ) {
+    if (pendingPairings.has(chatId)) {
         await sendMessage(
             chatId,
             '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
@@ -283,127 +283,43 @@ async function startPairing(
         return;
     }
 
+    // --------------------------------------------------------
+    // Check whether this number is REALLY connected
+    // --------------------------------------------------------
+
+    if (hasActiveSessionForNumber(cleanNumber)) {
+        await sendMessage(
+            chatId,
+            '✅ This WhatsApp number is already connected to QUEEN VIDA.'
+        );
+
+        return;
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * We deliberately do NOT block pairing just because
+     * sessionManager.sessionExists(number) or
+     * sessionManager.sessionExists(tg-number) returns true.
+     *
+     * Those checks can find an old saved authentication folder
+     * even after the WhatsApp device has been unlinked.
+     *
+     * A saved folder is NOT proof that the WhatsApp account is
+     * still connected.
+     */
+
+    // --------------------------------------------------------
+    // Generate a fresh session ID
+    // --------------------------------------------------------
+
     const sessionId =
-        getSessionId(
-            cleanNumber
-        );
+        `tg-${cleanNumber}-${Date.now()}`;
 
-    // --------------------------------------------------------
-    // Clean stale session FIRST
-    // --------------------------------------------------------
-
-    cleanupStalePairingSession(
-        sessionId
+    console.log(
+        `📱 [TELEGRAM] Starting fresh pairing session: ${sessionId}`
     );
-
-    // --------------------------------------------------------
-    // Check active session
-    // --------------------------------------------------------
-
-    if (
-        isConnected(
-            sessionId
-        )
-    ) {
-        await sendMessage(
-            chatId,
-            '✅ This WhatsApp number is already connected to QUEEN VIDA through Telegram.'
-        );
-
-        return;
-    }
-
-    // --------------------------------------------------------
-    // Check existing registered session
-    // --------------------------------------------------------
-
-    if (
-        sessionManager.sessionExists(
-            sessionId
-        )
-    ) {
-        /*
-         * There is a real saved WhatsApp session.
-         * Don't destroy it.
-         *
-         * Try restoring it if it isn't currently active.
-         */
-        await sendMessage(
-            chatId,
-            '🔄 A saved WhatsApp session was found. Attempting to restore it...'
-        );
-
-        try {
-            await sessionManager.startSession({
-                sessionId,
-                ownerNumber:
-                    cleanNumber,
-                isMain: false,
-                commandsMap
-            });
-
-            await new Promise(
-                resolve =>
-                    setTimeout(
-                        resolve,
-                        2500
-                    )
-            );
-
-            if (
-                isConnected(
-                    sessionId
-                )
-            ) {
-                await sendMessage(
-                    chatId,
-                    '✅ Your existing WhatsApp session has been restored.'
-                );
-            } else {
-                await sendMessage(
-                    chatId,
-                    '⚠️ A valid saved session exists, but WhatsApp has not connected yet.\n\nWait a moment and use /status.'
-                );
-            }
-        } catch (error) {
-            await sendMessage(
-                chatId,
-                `❌ Could not restore the saved session.\n\n${error.message || 'Unknown error'}`
-            );
-        }
-
-        return;
-    }
-
-    // --------------------------------------------------------
-    // Other possible session IDs
-    // --------------------------------------------------------
-
-    if (
-        sessionManager.sessionExists(
-            cleanNumber
-        )
-    ) {
-        await sendMessage(
-            chatId,
-            '⚠️ This WhatsApp number already has an active QUEEN VIDA session.'
-        );
-
-        return;
-    }
-
-    if (
-        sessionManager.sessionExists(
-            `web-${cleanNumber}`
-        )
-    ) {
-        await sendMessage(
-            chatId,
-            '⚠️ This WhatsApp number already has a QUEEN VIDA web session.'
-        );
-
-        return;
-    }
 
     // --------------------------------------------------------
     // Mark pairing as pending
@@ -412,13 +328,10 @@ async function startPairing(
     pendingPairings.set(
         chatId,
         {
-            number:
-                cleanNumber,
+            number: cleanNumber,
             sessionId,
-            startedAt:
-                Date.now(),
-            waitingForCode:
-                false
+            startedAt: Date.now(),
+            waitingForCode: false
         }
     );
 
@@ -429,41 +342,32 @@ async function startPairing(
 
     let codeSent = false;
 
-    let connectionWatcher =
-        null;
+    let connectionWatcher = null;
 
-    let completed =
-        false;
+    let completed = false;
 
-    const finishPairing =
-        () => {
-            if (
+    const finishPairing = () => {
+        if (connectionWatcher) {
+            clearInterval(
                 connectionWatcher
-            ) {
-                clearInterval(
-                    connectionWatcher
-                );
-
-                connectionWatcher =
-                    null;
-            }
-
-            pendingPairings.delete(
-                chatId
             );
-        };
+
+            connectionWatcher = null;
+        }
+
+        pendingPairings.delete(chatId);
+    };
 
     try {
         await sessionManager.startSession({
             sessionId,
-            ownerNumber:
-                cleanNumber,
+            ownerNumber: cleanNumber,
             isMain: false,
             commandsMap,
 
-            // ================================================
+            // =================================================
             // PAIRING CODE
-            // ================================================
+            // =================================================
 
             onPairingCode:
                 async (
@@ -493,11 +397,9 @@ async function startPairing(
                         return;
                     }
 
-                    codeSent =
-                        true;
+                    codeSent = true;
 
-                    pending.waitingForCode =
-                        true;
+                    pending.waitingForCode = true;
 
                     pendingPairings.set(
                         chatId,
@@ -508,14 +410,13 @@ async function startPairing(
                         chatId,
                         `🔐 *QUEEN VIDA PAIRING CODE*\n\n*${code}*\n\nOpen WhatsApp on the number you entered and use:\n\n*Linked Devices → Link a Device → Link with phone number*\n\n⏳ Enter the code now.`,
                         {
-                            parse_mode:
-                                'Markdown'
+                            parse_mode: 'Markdown'
                         }
                     );
 
-                    // ========================================
+                    // =================================================
                     // CONNECTION WATCHER
-                    // ========================================
+                    // =================================================
 
                     let checks = 0;
 
@@ -524,9 +425,7 @@ async function startPairing(
                             async () => {
                                 checks++;
 
-                                if (
-                                    completed
-                                ) {
+                                if (completed) {
                                     clearInterval(
                                         connectionWatcher
                                     );
@@ -546,8 +445,7 @@ async function startPairing(
                                     session &&
                                     session.connected
                                 ) {
-                                    completed =
-                                        true;
+                                    completed = true;
 
                                     clearInterval(
                                         connectionWatcher
@@ -557,9 +455,7 @@ async function startPairing(
                                         null;
 
                                     telegramSessions[
-                                        String(
-                                            chatId
-                                        )
+                                        String(chatId)
                                     ] = {
                                         whatsappNumber:
                                             cleanNumber,
@@ -591,10 +487,7 @@ async function startPairing(
                                 /*
                                  * 3 minutes.
                                  */
-                                if (
-                                    checks >=
-                                    36
-                                ) {
+                                if (checks >= 36) {
                                     clearInterval(
                                         connectionWatcher
                                     );
@@ -611,11 +504,6 @@ async function startPairing(
                                             chatId
                                         );
 
-                                        /*
-                                         * Clean the incomplete
-                                         * pairing session so the
-                                         * next /pair works.
-                                         */
                                         cleanupStalePairingSession(
                                             sessionId
                                         );
@@ -664,9 +552,7 @@ async function startPairing(
                 return;
             }
 
-            if (
-                !codeSent
-            ) {
+            if (!codeSent) {
                 finishPairing();
 
                 cleanupStalePairingSession(
@@ -722,15 +608,12 @@ async function handleUpdate(
     // /start
     // ========================================================
 
-    if (
-        text === '/start'
-    ) {
+    if (text === '/start') {
         await sendMessage(
             chatId,
             `👑 *QUEEN VIDA-V3*\n\nWhatsApp Pairing Gateway\n\nUse /pair to connect your WhatsApp number to QUEEN VIDA.\n\nCommands:\n/pair - Pair WhatsApp\n/status - Check your connection\n/cancel - Cancel a pending pairing\n/help - Show help`,
             {
-                parse_mode:
-                    'Markdown'
+                parse_mode: 'Markdown'
             }
         );
 
@@ -741,15 +624,12 @@ async function handleUpdate(
     // /help
     // ========================================================
 
-    if (
-        text === '/help'
-    ) {
+    if (text === '/help') {
         await sendMessage(
             chatId,
             `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nStart WhatsApp pairing.\n\n/status\nCheck your Telegram/WhatsApp connection.\n\n/cancel\nCancel a pending pairing.\n\n/help\nShow this help message.`,
             {
-                parse_mode:
-                    'Markdown'
+                parse_mode: 'Markdown'
             }
         );
 
@@ -760,17 +640,14 @@ async function handleUpdate(
     // /pair
     // ========================================================
 
-    if (
-        text === '/pair'
-    ) {
+    if (text === '/pair') {
         const existing =
             telegramSessions[
                 String(chatId)
             ];
 
         /*
-         * If Telegram already has a saved pairing,
-         * check it first.
+         * Existing Telegram mapping.
          */
         if (
             existing &&
@@ -790,28 +667,19 @@ async function handleUpdate(
             }
 
             /*
-             * If the saved Telegram mapping points
-             * to a stale session, remove the mapping
-             * so /pair can start fresh.
+             * The Telegram mapping exists but the
+             * corresponding session is no longer active.
+             *
+             * Remove the stale Telegram mapping.
              */
-            if (
-                !sessionManager.sessionExists(
-                    existing.sessionId
-                )
-            ) {
-                delete telegramSessions[
-                    String(chatId)
-                ];
+            delete telegramSessions[
+                String(chatId)
+            ];
 
-                saveTelegramSessions();
-            }
+            saveTelegramSessions();
         }
 
-        if (
-            pendingPairings.has(
-                chatId
-            )
-        ) {
+        if (pendingPairings.has(chatId)) {
             await sendMessage(
                 chatId,
                 '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
@@ -823,10 +691,8 @@ async function handleUpdate(
         pendingPairings.set(
             chatId,
             {
-                waitingForNumber:
-                    true,
-                startedAt:
-                    Date.now()
+                waitingForNumber: true,
+                startedAt: Date.now()
             }
         );
 
@@ -842,26 +708,14 @@ async function handleUpdate(
     // /cancel
     // ========================================================
 
-    if (
-        text === '/cancel'
-    ) {
+    if (text === '/cancel') {
         const pending =
-            pendingPairings.get(
-                chatId
-            );
+            pendingPairings.get(chatId);
 
         if (pending) {
-            pendingPairings.delete(
-                chatId
-            );
+            pendingPairings.delete(chatId);
 
-            /*
-             * Clean incomplete session if one
-             * was already created.
-             */
-            if (
-                pending.sessionId
-            ) {
+            if (pending.sessionId) {
                 cleanupStalePairingSession(
                     pending.sessionId
                 );
@@ -885,9 +739,7 @@ async function handleUpdate(
     // /status
     // ========================================================
 
-    if (
-        text === '/status'
-    ) {
+    if (text === '/status') {
         const saved =
             telegramSessions[
                 String(chatId)
@@ -915,17 +767,24 @@ async function handleUpdate(
                 chatId,
                 `🟢 *CONNECTED*\n\nWhatsApp: +${saved.whatsappNumber}\n\n👑 QUEEN VIDA is active.`,
                 {
-                    parse_mode:
-                        'Markdown'
+                    parse_mode: 'Markdown'
                 }
             );
         } else {
+            /*
+             * Remove stale Telegram mapping.
+             */
+            delete telegramSessions[
+                String(chatId)
+            ];
+
+            saveTelegramSessions();
+
             await sendMessage(
                 chatId,
-                `🟡 *RECONNECTING / OFFLINE*\n\nWhatsApp: +${saved.whatsappNumber}\n\nThe saved session is not currently connected.`,
+                `🔴 *DISCONNECTED*\n\nWhatsApp: +${saved.whatsappNumber}\n\nThe old connection is no longer active.\n\nUse /pair to link WhatsApp again.`,
                 {
-                    parse_mode:
-                        'Markdown'
+                    parse_mode: 'Markdown'
                 }
             );
         }
@@ -938,17 +797,13 @@ async function handleUpdate(
     // ========================================================
 
     const pending =
-        pendingPairings.get(
-            chatId
-        );
+        pendingPairings.get(chatId);
 
     if (
         pending &&
         pending.waitingForNumber
     ) {
-        pendingPairings.delete(
-            chatId
-        );
+        pendingPairings.delete(chatId);
 
         await startPairing(
             chatId,
@@ -977,9 +832,7 @@ async function handleUpdate(
 async function startTelegramGateway(
     commandsMap
 ) {
-    if (
-        !TELEGRAM_BOT_TOKEN
-    ) {
+    if (!TELEGRAM_BOT_TOKEN) {
         console.error(
             '❌ [TELEGRAM] TELEGRAM_BOT_TOKEN is missing.'
         );
@@ -991,15 +844,12 @@ async function startTelegramGateway(
         await telegram(
             'deleteWebhook',
             {
-                drop_pending_updates:
-                    false
+                drop_pending_updates: false
             }
         );
 
         const me =
-            await telegram(
-                'getMe'
-            );
+            await telegram('getMe');
 
         console.log(
             `🤖 [TELEGRAM] Gateway connected as @${me.username || me.first_name}`
@@ -1026,8 +876,7 @@ async function startTelegramGateway(
                     const update of updates
                 ) {
                     offset =
-                        update.update_id +
-                        1;
+                        update.update_id + 1;
 
                     try {
                         await handleUpdate(
