@@ -91,14 +91,15 @@ function saveTelegramSessions() {
 
 async function telegram(
     method,
-    data = {}
+    data = {},
+    axiosTimeout = 30000
 ) {
     const response =
         await axios.post(
             `${TELEGRAM_API}/${method}`,
             data,
             {
-                timeout: 30000
+                timeout: axiosTimeout
             }
         );
 
@@ -1017,7 +1018,8 @@ async function startTelegramGateway(
                             allowed_updates: [
                                 'message'
                             ]
-                        }
+                        },
+                        40000
                     );
 
                 for (
