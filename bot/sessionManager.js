@@ -298,10 +298,7 @@ function cleanupStaleSession(
         );
 
     /*
-     * No auth directory:
-     *
-     * If the registry says it exists but there is
-     * no auth state, the registry entry is stale.
+     * No auth directory.
      */
     if (!auth.exists) {
         removeSessionFromRegistry(
@@ -328,13 +325,7 @@ function cleanupStaleSession(
     }
 
     /*
-     * An unregistered auth state means pairing
-     * never completed.
-     *
-     * This is exactly the situation that caused:
-     *
-     * "A session for this WhatsApp number already
-     * exists or is being restored."
+     * Unregistered auth state.
      */
     if (!auth.registered) {
         deleteAuthFolder(
@@ -374,10 +365,6 @@ function sessionExists(
         return false;
     }
 
-    /*
-     * If the registry exists but auth is gone,
-     * automatically remove the stale entry.
-     */
     const auth =
         readCredentials(
             sessionId,
@@ -395,10 +382,6 @@ function sessionExists(
         return false;
     }
 
-    /*
-     * Unregistered sessions are incomplete
-     * pairing attempts, so clean them.
-     */
     if (!auth.registered) {
         deleteAuthFolder(
             sessionId,
@@ -518,10 +501,6 @@ async function startSession({
 
                 /*
                  * Clean incomplete pairing state.
-                 *
-                 * IMPORTANT:
-                 * Only clean an unregistered session.
-                 * Never delete a valid registered account.
                  */
                 const auth =
                     readCredentials(
@@ -554,6 +533,22 @@ async function startSession({
                         authPath
                     );
 
+
+                // ====================================================
+                // GROUP METADATA CACHE
+                // ====================================================
+
+                /*
+                 * Each WhatsApp session gets its own group cache.
+                 *
+                 * This is especially important for large groups.
+                 * Baileys needs group participant metadata when
+                 * encrypting/sending messages to groups.
+                 */
+                const groupMetadataCache =
+                    new Map();
+
+
                 const sock =
                     makeWASocket({
                         logger: pino({
@@ -579,7 +574,23 @@ async function startSession({
                             60000,
 
                         keepAliveIntervalMs:
-                            25000
+                            25000,
+
+                        /*
+                         * IMPORTANT:
+                         *
+                         * Give Baileys access to cached group
+                         * participant metadata.
+                         *
+                         * This helps large groups, especially
+                         * 400+ member groups.
+                         */
+                        cachedGroupMetadata:
+                            async jid => {
+                                return groupMetadataCache.get(
+                                    jid
+                                );
+                            }
                     });
 
                 sock.commands =
@@ -602,6 +613,57 @@ async function startSession({
 
                 let bannerSent =
                     false;
+
+
+                // ====================================================
+                // GROUP METADATA LOADER
+                // ====================================================
+
+                const refreshGroupMetadata =
+                    async groupJid => {
+                        if (
+                            !groupJid ||
+                            !groupJid.endsWith(
+                                '@g.us'
+                            )
+                        ) {
+                            return null;
+                        }
+
+                        try {
+                            const metadata =
+                                await sock.groupMetadata(
+                                    groupJid
+                                );
+
+                            if (
+                                metadata &&
+                                Array.isArray(
+                                    metadata.participants
+                                )
+                            ) {
+                                groupMetadataCache.set(
+                                    groupJid,
+                                    metadata
+                                );
+
+                                console.log(
+                                    `📦 [GROUP CACHE] ${groupJid} -> ${metadata.participants.length} participants`
+                                );
+
+                                return metadata;
+                            }
+                        } catch (error) {
+                            console.error(
+                                `⚠️ [GROUP CACHE] Failed loading ${groupJid}:`,
+                                error?.message ||
+                                    error
+                            );
+                        }
+
+                        return null;
+                    };
+
 
                 // ====================================================
                 // PAIRING
@@ -692,16 +754,16 @@ async function startSession({
                                             ?.message ||
                                             'Unknown pairing error'
                                     );
-                                } catch (callbackError) {}
+                                } catch (
+                                    callbackError
+                                ) {}
                             }
                         }
                     };
 
+
                 /*
-                 * Wait briefly for the socket to initialize.
-                 *
-                 * Pairing code requests are tied to the
-                 * socket connection lifecycle.
+                 * Wait briefly for socket initialization.
                  */
                 if (
                     !state.creds
@@ -722,6 +784,7 @@ async function startSession({
                     );
                 }
 
+
                 // ====================================================
                 // CONNECTION
                 // ====================================================
@@ -733,6 +796,7 @@ async function startSession({
                             connection,
                             lastDisconnect
                         } = update;
+
 
                         // ============================================
                         // OPEN
@@ -746,6 +810,63 @@ async function startSession({
                                 `--- [SESSION ${sessionId}] CONNECTED ---`
                             );
 
+
+                            // ========================================
+                            // PRELOAD GROUP METADATA
+                            // ========================================
+
+                            /*
+                             * Load all groups the account participates
+                             * in when the connection becomes ready.
+                             *
+                             * This makes the cache immediately useful,
+                             * including for large groups.
+                             */
+                            try {
+                                const groups =
+                                    await sock.groupFetchAllParticipating();
+
+                                const entries =
+                                    Object.entries(
+                                        groups || {}
+                                    );
+
+                                let cachedCount =
+                                    0;
+
+                                for (
+                                    const [
+                                        jid,
+                                        metadata
+                                    ] of entries
+                                ) {
+                                    if (
+                                        metadata &&
+                                        Array.isArray(
+                                            metadata.participants
+                                        )
+                                    ) {
+                                        groupMetadataCache.set(
+                                            jid,
+                                            metadata
+                                        );
+
+                                        cachedCount++;
+                                    }
+                                }
+
+                                console.log(
+                                    `📦 [GROUP CACHE] Preloaded ${cachedCount} group(s) for session ${sessionId}`
+                                );
+                            } catch (cacheError) {
+                                console.error(
+                                    `⚠️ [GROUP CACHE] Preload failed for session ${sessionId}:`,
+                                    cacheError?.message ||
+                                        cacheError
+                                );
+                            }
+
+
                             if (
                                 !isMain
                             ) {
@@ -754,6 +875,7 @@ async function startSession({
                                     ownerNumber
                                 );
                             }
+
 
                             if (
                                 onConnected
@@ -775,6 +897,7 @@ async function startSession({
                                     );
                                 }
                             }
+
 
                             if (
                                 !bannerSent
@@ -808,6 +931,7 @@ async function startSession({
                             }
                         }
 
+
                         // ============================================
                         // CLOSE
                         // ============================================
@@ -836,12 +960,16 @@ async function startSession({
                         );
 
                         /*
-                         * LOGGED OUT
-                         *
-                         * Credentials are no longer valid.
-                         * Remove everything so /pair can start
-                         * a completely fresh session.
+                         * Clear group cache when this socket closes.
+                         * A new socket will build a fresh cache.
                          */
+                        groupMetadataCache.clear();
+
+
+                        // ============================================
+                        // LOGGED OUT
+                        // ============================================
+
                         if (
                             statusCode ===
                             DisconnectReason.loggedOut
@@ -862,12 +990,11 @@ async function startSession({
                             return;
                         }
 
-                        /*
-                         * BAD SESSION / AUTH FAILURE
-                         *
-                         * 401 can mean the saved auth is no
-                         * longer usable.
-                         */
+
+                        // ============================================
+                        // BAD SESSION / AUTH FAILURE
+                        // ============================================
+
                         if (
                             statusCode ===
                                 401 ||
@@ -894,16 +1021,11 @@ async function startSession({
                             return;
                         }
 
-                        /*
-                         * TEMPORARY DISCONNECT
-                         *
-                         * Keep registered credentials and
-                         * reconnect.
-                         *
-                         * IMPORTANT:
-                         * Preserve callbacks so a pairing
-                         * attempt doesn't become orphaned.
-                         */
+
+                        // ============================================
+                        // TEMPORARY DISCONNECT
+                        // ============================================
+
                         console.log(
                             `🔄 [SESSION ${sessionId}] Reconnecting in 3 seconds...`
                         );
@@ -935,6 +1057,62 @@ async function startSession({
                     }
                 );
 
+
+                // ====================================================
+                // GROUP UPDATES
+                // ====================================================
+
+                /*
+                 * Refresh cache whenever group information changes.
+                 */
+                sock.ev.on(
+                    'groups.update',
+                    async events => {
+                        if (
+                            !Array.isArray(
+                                events
+                            )
+                        ) {
+                            return;
+                        }
+
+                        for (
+                            const event of events
+                        ) {
+                            if (
+                                event?.id
+                            ) {
+                                await refreshGroupMetadata(
+                                    event.id
+                                );
+                            }
+                        }
+                    }
+                );
+
+
+                // ====================================================
+                // GROUP PARTICIPANT UPDATES
+                // ====================================================
+
+                /*
+                 * Refresh cache when members are added,
+                 * removed, promoted or demoted.
+                 */
+                sock.ev.on(
+                    'group-participants.update',
+                    async event => {
+                        if (
+                            event?.id
+                        ) {
+                            await refreshGroupMetadata(
+                                event.id
+                            );
+                        }
+                    }
+                );
+
+
                 // ====================================================
                 // SAVE CREDS
                 // ====================================================
@@ -943,6 +1121,7 @@ async function startSession({
                     'creds.update',
                     saveCreds
                 );
+
 
                 // ====================================================
                 // MESSAGE HANDLER
