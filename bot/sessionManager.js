@@ -10,6 +10,7 @@ const {
 
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
+const NodeCache = require('node-cache');
 
 const { createMessageHandler } = require('./messageHandler');
 const { CREATOR_NAME } = require('./config');
@@ -286,7 +287,6 @@ function cleanupStaleSession(
     sessionId,
     isMain = false
 ) {
-    // Never destroy a currently active session.
     if (activeSessions.has(sessionId)) {
         return false;
     }
@@ -297,9 +297,6 @@ function cleanupStaleSession(
             isMain
         );
 
-    /*
-     * No auth directory.
-     */
     if (!auth.exists) {
         removeSessionFromRegistry(
             sessionId
@@ -308,9 +305,6 @@ function cleanupStaleSession(
         return true;
     }
 
-    /*
-     * Broken creds.json.
-     */
     if (!auth.valid) {
         deleteAuthFolder(
             sessionId,
@@ -324,9 +318,6 @@ function cleanupStaleSession(
         return true;
     }
 
-    /*
-     * Unregistered auth state.
-     */
     if (!auth.registered) {
         deleteAuthFolder(
             sessionId,
@@ -340,9 +331,6 @@ function cleanupStaleSession(
         return true;
     }
 
-    /*
-     * Registered credentials are NOT stale.
-     */
     return false;
 }
 
@@ -464,7 +452,6 @@ async function startSession({
     onPairingCode = null,
     onConnected = null
 }) {
-    // Existing active socket.
     if (
         activeSessions.has(
             sessionId
@@ -475,7 +462,6 @@ async function startSession({
         ).sock;
     }
 
-    // Existing start operation.
     if (
         startingSessions.has(
             sessionId
@@ -499,9 +485,6 @@ async function startSession({
                     AUTH_ROOT
                 );
 
-                /*
-                 * Clean incomplete pairing state.
-                 */
                 const auth =
                     readCredentials(
                         sessionId,
@@ -540,13 +523,33 @@ async function startSession({
                 // GROUP METADATA CACHE
                 // ====================================================
 
-                /*
-                 * Each WhatsApp session gets its own group cache.
-                 *
-                 * This is especially important for large groups.
-                 */
                 const groupMetadataCache =
                     new Map();
+
+
+                // ====================================================
+                // USER DEVICE CACHE
+                // ====================================================
+
+                /*
+                 * CRITICAL FIX FOR LARGE GROUPS
+                 *
+                 * Baileys uses this cache inside
+                 * getUSyncDevices().
+                 *
+                 * Without this cache, every large-group
+                 * message can require another USync device
+                 * query for many participants.
+                 *
+                 * 10 minute TTL keeps the cache useful while
+                 * avoiding unlimited growth.
+                 */
+                const userDevicesCache =
+                    new NodeCache({
+                        stdTTL: 600,
+                        checkperiod: 120,
+                        useClones: false
+                    });
 
 
                 // ====================================================
@@ -581,27 +584,28 @@ async function startSession({
                             60000,
 
                         /*
-                         * IMPORTANT:
+                         * CRITICAL:
                          *
-                         * Increase the default Baileys
-                         * query timeout from the normal
-                         * default so large groups have
-                         * enough time to resolve devices.
-                         *
-                         * This directly targets:
-                         *
-                         * getUSyncDevices
-                         * Error: Timed Out
+                         * Give USync/device queries
+                         * considerably more time.
                          */
                         defaultQueryTimeoutMs:
-                            180000,
+                            300000,
 
                         keepAliveIntervalMs:
                             25000,
 
                         /*
-                         * Give Baileys access to cached
-                         * group participant metadata.
+                         * CRITICAL:
+                         *
+                         * Reuse participant device
+                         * information instead of repeatedly
+                         * querying WhatsApp.
+                         */
+                        userDevicesCache,
+
+                        /*
+                         * Reuse group participant metadata.
                          */
                         cachedGroupMetadata:
                             async jid => {
@@ -816,11 +820,6 @@ async function startSession({
                             lastDisconnect
                         } = update;
 
-
-                        // ============================================
-                        // OPEN
-                        // ============================================
-
                         if (
                             connection ===
                             'open'
@@ -828,11 +827,6 @@ async function startSession({
                             console.log(
                                 `--- [SESSION ${sessionId}] CONNECTED ---`
                             );
-
-
-                            // ========================================
-                            // PRELOAD GROUP METADATA
-                            // ========================================
 
                             try {
                                 const groups =
@@ -878,7 +872,6 @@ async function startSession({
                                 );
                             }
 
-
                             if (
                                 !isMain
                             ) {
@@ -887,7 +880,6 @@ async function startSession({
                                     ownerNumber
                                 );
                             }
-
 
                             if (
                                 onConnected
@@ -909,11 +901,6 @@ async function startSession({
                                     );
                                 }
                             }
-
-
-                            // ========================================
-                            // CONNECTION BANNER
-                            // ========================================
 
                             if (
                                 !bannerSent
@@ -947,11 +934,6 @@ async function startSession({
                             }
                         }
 
-
-                        // ============================================
-                        // CLOSE
-                        // ============================================
-
                         if (
                             connection !==
                             'close'
@@ -975,15 +957,8 @@ async function startSession({
                             sessionId
                         );
 
-                        /*
-                         * Clear group cache when this socket closes.
-                         */
                         groupMetadataCache.clear();
-
-
-                        // ============================================
-                        // LOGGED OUT
-                        // ============================================
+                        userDevicesCache.flushAll();
 
                         if (
                             statusCode ===
@@ -1004,11 +979,6 @@ async function startSession({
 
                             return;
                         }
-
-
-                        // ============================================
-                        // BAD SESSION / AUTH FAILURE
-                        // ============================================
 
                         if (
                             statusCode ===
@@ -1035,11 +1005,6 @@ async function startSession({
 
                             return;
                         }
-
-
-                        // ============================================
-                        // TEMPORARY DISCONNECT
-                        // ============================================
 
                         console.log(
                             `🔄 [SESSION ${sessionId}] Reconnecting in 3 seconds...`
@@ -1246,10 +1211,6 @@ async function restoreSessions(
         const ownerNumber =
             saved?.ownerNumber;
 
-        /*
-         * Automatically remove broken registry
-         * entries before attempting restoration.
-         */
         const auth =
             readCredentials(
                 sessionId,
