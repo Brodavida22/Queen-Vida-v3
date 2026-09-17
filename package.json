@@ -4,7 +4,8 @@
   "description": "Advanced WhatsApp Group Management & Utility Bot",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "node scripts/patch-baileys.js"
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
