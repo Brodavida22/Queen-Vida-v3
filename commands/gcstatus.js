@@ -1,121 +1,63 @@
 const {
-    downloadMediaMessage
+    downloadMediaMessage,
+    StatusHelper
 } = require('@whiskeysockets/baileys');
 
 const { getPrefix } = require('../utils/prefix');
 
 
-/*
- * ============================================================
- * QUEEN VIDA V3
- * GCSTATUS
- *
- * Supports:
- *   .gcstatus Hello everyone
- *   .gcstatus https://example.com
- *
- * Reply to IMAGE:
- *   .gcstatus
- *   .gcstatus My caption
- *
- * Reply to VIDEO:
- *   .gcstatus
- *   .gcstatus My caption
- *
- * Reply to TEXT:
- *   .gcstatus
- *
- * Uses groupStatus:true so the post appears in the
- * actual WhatsApp Group Status, not normal group chat.
- *
- * Also supplies cachedGroupMetadata on every send.
- * This is important for large groups.
- * ============================================================
- */
-
-
-/*
- * ============================================================
- * GET QUOTED MESSAGE
- * ============================================================
- */
-
-function getQuotedMessage(m) {
-    return (
-        m?.message?.extendedTextMessage?.contextInfo
-            ?.quotedMessage ||
-        m?.message?.imageMessage?.contextInfo
-            ?.quotedMessage ||
-        m?.message?.videoMessage?.contextInfo
-            ?.quotedMessage ||
-        m?.message?.documentMessage?.contextInfo
-            ?.quotedMessage ||
-        null
-    );
-}
-
-
-/*
- * ============================================================
- * GET QUOTED CONTEXT
- * ============================================================
- */
-
-function getQuotedContext(m) {
-    return (
-        m?.message?.extendedTextMessage?.contextInfo ||
-        {}
-    );
-}
-
-
-/*
- * ============================================================
- * UNWRAP WHATSAPP MESSAGE
- * ============================================================
- */
+// ============================================================
+// MESSAGE HELPERS
+// ============================================================
 
 function unwrapMessage(message) {
-    if (!message) {
-        return null;
-    }
+    if (!message) return null;
 
     let current = message;
 
     if (current.ephemeralMessage?.message) {
-        current =
-            current.ephemeralMessage.message;
+        current = current.ephemeralMessage.message;
     }
 
     if (current.viewOnceMessage?.message) {
-        current =
-            current.viewOnceMessage.message;
+        current = current.viewOnceMessage.message;
     }
 
     if (current.viewOnceMessageV2?.message) {
-        current =
-            current.viewOnceMessageV2.message;
+        current = current.viewOnceMessageV2.message;
     }
 
-    if (
-        current.viewOnceMessageV2Extension
-            ?.message
-    ) {
-        current =
-            current.viewOnceMessageV2Extension.message;
+    if (current.viewOnceMessageV2Extension?.message) {
+        current = current.viewOnceMessageV2Extension.message;
     }
 
     return current;
 }
 
 
-/*
- * ============================================================
- * DETECT MEDIA
- * ============================================================
- */
+function getQuotedContext(m) {
+    return (
+        m?.message?.extendedTextMessage?.contextInfo ||
+        m?.message?.imageMessage?.contextInfo ||
+        m?.message?.videoMessage?.contextInfo ||
+        m?.message?.documentMessage?.contextInfo ||
+        {}
+    );
+}
 
-function getMediaType(message) {
+
+function getQuotedMessage(m) {
+    const contextInfo =
+        getQuotedContext(m);
+
+    return (
+        contextInfo?.quotedMessage ||
+        null
+    );
+}
+
+
+function getMedia(message) {
     const current =
         unwrapMessage(message);
 
@@ -141,13 +83,7 @@ function getMediaType(message) {
 }
 
 
-/*
- * ============================================================
- * GET TEXT FROM MESSAGE
- * ============================================================
- */
-
-function getMessageText(message) {
+function getText(message) {
     const current =
         unwrapMessage(message);
 
@@ -166,13 +102,7 @@ function getMessageText(message) {
 }
 
 
-/*
- * ============================================================
- * GET CURRENT COMMAND TEXT
- * ============================================================
- */
-
-function getArgsText(args) {
+function getCommandText(args) {
     if (!Array.isArray(args)) {
         return '';
     }
@@ -183,109 +113,11 @@ function getArgsText(args) {
 }
 
 
-/*
- * ============================================================
- * LARGE GROUP METADATA
- *
- * This is deliberately supplied directly to sendMessage.
- * It prevents Baileys from repeatedly fetching group
- * participants while building the Group Status message.
- * ============================================================
- */
-
-async function getGroupMetadata(sock, jid) {
-    try {
-        const metadata =
-            await sock.groupMetadata(jid);
-
-        if (
-            metadata &&
-            Array.isArray(
-                metadata.participants
-            )
-        ) {
-            console.log(
-                `📦 [GCSTATUS] Group metadata loaded: ${metadata.participants.length} participants`
-            );
-
-            return metadata;
-        }
-
-        return undefined;
-
-    } catch (error) {
-        console.error(
-            '⚠️ [GCSTATUS] Could not load group metadata:',
-            error?.message || error
-        );
-
-        return undefined;
-    }
-}
-
-
-/*
- * ============================================================
- * SEND GROUP STATUS
- * ============================================================
- */
-
-async function sendGroupStatus(
-    sock,
-    groupJid,
-    content
-) {
-    /*
-     * IMPORTANT:
-     *
-     * We fetch the group metadata ourselves and give it
-     * directly to Baileys for this send.
-     *
-     * This is especially important for large groups.
-     */
-
-    const metadata =
-        await getGroupMetadata(
-            sock,
-            groupJid
-        );
-
-    const options = {
-        useCachedGroupMetadata: true
-    };
-
-    if (metadata) {
-        options.cachedGroupMetadata =
-            async () => metadata;
-    }
-
-    /*
-     * InnovatorsSoft Baileys supports:
-     *
-     * groupStatus: true
-     *
-     * which creates the actual Group Status message.
-     */
-
-    return sock.sendMessage(
-        groupJid,
-        {
-            ...content,
-            groupStatus: true
-        },
-        options
-    );
-}
-
-
-/*
- * ============================================================
- * DOWNLOAD QUOTED MEDIA
- * ============================================================
- */
+// ============================================================
+// DOWNLOAD REPLIED MEDIA
+// ============================================================
 
 async function downloadQuotedMedia(
-    sock,
     m,
     from,
     quoted
@@ -293,7 +125,7 @@ async function downloadQuotedMedia(
     const contextInfo =
         getQuotedContext(m);
 
-    if (!contextInfo.stanzaId) {
+    if (!contextInfo?.stanzaId) {
         throw new Error(
             'Could not identify the replied message.'
         );
@@ -333,11 +165,53 @@ async function downloadQuotedMedia(
 }
 
 
-/*
- * ============================================================
- * COMMAND
- * ============================================================
- */
+// ============================================================
+// GROUP STATUS SENDER
+// ============================================================
+
+async function sendGroupStatus(
+    sock,
+    groupJid,
+    status
+) {
+    if (
+        !groupJid ||
+        !groupJid.endsWith('@g.us')
+    ) {
+        throw new Error(
+            'Invalid group JID.'
+        );
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT use:
+     *
+     * sock.sendMessage(groupJid, {
+     *     groupStatus: true
+     * })
+     *
+     * here.
+     *
+     * We use the dedicated InnovatorsSoft
+     * StatusHelper group-audience path.
+     *
+     * This is specifically documented to accept
+     * group JIDs.
+     */
+
+    return StatusHelper.send(
+        sock,
+        status,
+        [groupJid]
+    );
+}
+
+
+// ============================================================
+// COMMAND
+// ============================================================
 
 module.exports = {
     name: 'gcstatus',
@@ -355,11 +229,9 @@ module.exports = {
         const prefix =
             getPrefix();
 
-        /*
-         * ----------------------------------------------------
-         * OWNER ONLY
-         * ----------------------------------------------------
-         */
+        // ========================================================
+        // OWNER ONLY
+        // ========================================================
 
         if (!isOwner) {
             return sock.sendMessage(
@@ -375,11 +247,9 @@ module.exports = {
         }
 
 
-        /*
-         * ----------------------------------------------------
-         * GROUP ONLY
-         * ----------------------------------------------------
-         */
+        // ========================================================
+        // GROUP ONLY
+        // ========================================================
 
         if (
             !from ||
@@ -399,59 +269,35 @@ module.exports = {
 
 
         try {
-
-            /*
-             * ------------------------------------------------
-             * COMMAND TEXT
-             * ------------------------------------------------
-             */
-
             const commandText =
-                getArgsText(args);
-
-
-            /*
-             * ------------------------------------------------
-             * QUOTED MESSAGE
-             * ------------------------------------------------
-             */
+                getCommandText(args);
 
             const quoted =
                 getQuotedMessage(m);
 
 
-            /*
-             * ------------------------------------------------
-             * 1. IF USER REPLIED TO MEDIA
-             * ------------------------------------------------
-             */
+            // ====================================================
+            // REPLIED MESSAGE
+            // ====================================================
 
             if (quoted) {
 
                 const media =
-                    getMediaType(
-                        quoted
-                    );
+                    getMedia(quoted);
 
-                /*
-                 * IMAGE / VIDEO
-                 */
+
+                // ==================================================
+                // REPLIED IMAGE / VIDEO
+                // ==================================================
+
                 if (media) {
 
                     const buffer =
                         await downloadQuotedMedia(
-                            sock,
                             m,
                             from,
                             quoted
                         );
-
-                    /*
-                     * Caption priority:
-                     *
-                     * 1. Text after .gcstatus
-                     * 2. Original media caption
-                     */
 
                     const caption =
                         commandText ||
@@ -464,26 +310,30 @@ module.exports = {
                         'image'
                     ) {
 
+                        const status =
+                            StatusHelper.image(
+                                buffer,
+                                caption
+                            );
+
                         await sendGroupStatus(
                             sock,
                             from,
-                            {
-                                image:
-                                    buffer,
-                                caption
-                            }
+                            status
                         );
 
                     } else {
 
+                        const status =
+                            StatusHelper.video(
+                                buffer,
+                                caption
+                            );
+
                         await sendGroupStatus(
                             sock,
                             from,
-                            {
-                                video:
-                                    buffer,
-                                caption
-                            }
+                            status
                         );
                     }
 
@@ -492,7 +342,12 @@ module.exports = {
                         from,
                         {
                             text:
-                                `✅ ${media.type === 'image' ? 'Image' : 'Video'} posted to the Group Status.`
+                                `✅ ${
+                                    media.type ===
+                                    'image'
+                                        ? 'Image'
+                                        : 'Video'
+                                } posted to the Group Status.`
                         },
                         {
                             quoted: m
@@ -503,29 +358,27 @@ module.exports = {
                 }
 
 
-                /*
-                 * ------------------------------------------------
-                 * REPLIED TO TEXT
-                 * ------------------------------------------------
-                 */
+                // ==================================================
+                // REPLIED TEXT
+                // ==================================================
 
                 const quotedText =
-                    getMessageText(
-                        quoted
-                    );
+                    getText(quoted);
 
                 if (
                     quotedText &&
                     !commandText
                 ) {
 
+                    const status =
+                        StatusHelper.text(
+                            quotedText
+                        );
+
                     await sendGroupStatus(
                         sock,
                         from,
-                        {
-                            text:
-                                quotedText
-                        }
+                        status
                     );
 
                     await sock.sendMessage(
@@ -544,27 +397,30 @@ module.exports = {
             }
 
 
-            /*
-             * ------------------------------------------------
-             * 2. DIRECT TEXT / LINK
-             *
-             * Example:
-             *
-             * .gcstatus Hello everyone
-             *
-             * .gcstatus https://chat.whatsapp.com/xxxx
-             * ------------------------------------------------
-             */
+            // ====================================================
+            // DIRECT TEXT / LINK
+            // ====================================================
 
             if (commandText) {
+
+                /*
+                 * Links are intentionally sent as text.
+                 *
+                 * WhatsApp will recognize normal URLs
+                 * such as:
+                 *
+                 * https://example.com
+                 */
+
+                const status =
+                    StatusHelper.text(
+                        commandText
+                    );
 
                 await sendGroupStatus(
                     sock,
                     from,
-                    {
-                        text:
-                            commandText
-                    }
+                    status
                 );
 
                 await sock.sendMessage(
@@ -582,11 +438,9 @@ module.exports = {
             }
 
 
-            /*
-             * ------------------------------------------------
-             * 3. NOTHING PROVIDED
-             * ------------------------------------------------
-             */
+            // ====================================================
+            // HELP
+            // ====================================================
 
             await sock.sendMessage(
                 from,
@@ -621,23 +475,20 @@ module.exports = {
                 error
             );
 
-            const errorMessage =
-                error?.message ||
-                'Unknown error';
-
             await sock.sendMessage(
                 from,
                 {
                     text:
                         `❌ *Group Status failed.*\n\n` +
-                        `Error: ${errorMessage}`
+                        `Error: ${
+                            error?.message ||
+                            'Unknown error'
+                        }`
                 },
                 {
                     quoted: m
                 }
-            ).catch(
-                () => {}
-            );
+            ).catch(() => {});
         }
     }
 };
