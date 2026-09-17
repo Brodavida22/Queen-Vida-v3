@@ -370,10 +370,19 @@ async function handleWordGameMessage(
             chatId
         );
 
-    if (
-        !game ||
-        game.answered
-    ) {
+    if (!game) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> no active game, ignoring.`
+        );
+
+        return false;
+    }
+
+    if (game.answered) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> round already answered, ignoring incoming message.`
+        );
+
         return false;
     }
 
@@ -384,10 +393,18 @@ async function handleWordGameMessage(
         );
 
     if (!text) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> could not extract any text from the message, ignoring.`
+        );
+
         return false;
     }
 
     if (isCommand(text)) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> text "${text}" looks like a command, ignoring.`
+        );
+
         return false;
     }
 
@@ -401,10 +418,19 @@ async function handleWordGameMessage(
             ]
         );
 
+    console.log(
+        `[WORDGAME DEBUG] chat=${chatId} type=${game.type} round=${game.current + 1}/${game.values.length} ` +
+        `rawText="${text}" normalizedAnswer="${answer}" requiredLetters="${required}"`
+    );
+
     if (
         !answer ||
         !required
     ) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> empty answer or missing required letters, ignoring.`
+        );
+
         return false;
     }
 
@@ -429,9 +455,22 @@ async function handleWordGameMessage(
                 required.length;
     }
 
+    console.log(
+        `[WORDGAME DEBUG] chat=${chatId} -> match check result: correct=${correct} ` +
+        `(startsWith/endsWith check against "${required}", length ${answer.length} vs required length ${required.length})`
+    );
+
     if (!correct) {
+        console.log(
+            `[WORDGAME DEBUG] chat=${chatId} -> answer "${answer}" did NOT satisfy the "${required}" requirement, ignoring.`
+        );
+
         return false;
     }
+
+    console.log(
+        `[WORDGAME DEBUG] chat=${chatId} -> ACCEPTED "${text}" as the correct answer for round ${game.current + 1}.`
+    );
 
     /*
      * Mark answered FIRST.
