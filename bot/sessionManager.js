@@ -510,8 +510,10 @@ async function startSession({
 
                 if (
                     auth.exists &&
-                    (!auth.valid ||
-                        !auth.registered)
+                    (
+                        !auth.valid ||
+                        !auth.registered
+                    )
                 ) {
                     deleteAuthFolder(
                         sessionId,
@@ -542,12 +544,14 @@ async function startSession({
                  * Each WhatsApp session gets its own group cache.
                  *
                  * This is especially important for large groups.
-                 * Baileys needs group participant metadata when
-                 * encrypting/sending messages to groups.
                  */
                 const groupMetadataCache =
                     new Map();
 
+
+                // ====================================================
+                // CREATE SOCKET
+                // ====================================================
 
                 const sock =
                     makeWASocket({
@@ -570,20 +574,34 @@ async function startSession({
                         markOnlineOnConnect:
                             true,
 
+                        /*
+                         * Connection timeout.
+                         */
                         connectTimeoutMs:
                             60000,
+
+                        /*
+                         * IMPORTANT:
+                         *
+                         * Increase the default Baileys
+                         * query timeout from the normal
+                         * default so large groups have
+                         * enough time to resolve devices.
+                         *
+                         * This directly targets:
+                         *
+                         * getUSyncDevices
+                         * Error: Timed Out
+                         */
+                        defaultQueryTimeoutMs:
+                            180000,
 
                         keepAliveIntervalMs:
                             25000,
 
                         /*
-                         * IMPORTANT:
-                         *
-                         * Give Baileys access to cached group
-                         * participant metadata.
-                         *
-                         * This helps large groups, especially
-                         * 400+ member groups.
+                         * Give Baileys access to cached
+                         * group participant metadata.
                          */
                         cachedGroupMetadata:
                             async jid => {
@@ -762,9 +780,10 @@ async function startSession({
                     };
 
 
-                /*
-                 * Wait briefly for socket initialization.
-                 */
+                // ====================================================
+                // INITIAL PAIRING
+                // ====================================================
+
                 if (
                     !state.creds
                         .registered
@@ -815,13 +834,6 @@ async function startSession({
                             // PRELOAD GROUP METADATA
                             // ========================================
 
-                            /*
-                             * Load all groups the account participates
-                             * in when the connection becomes ready.
-                             *
-                             * This makes the cache immediately useful,
-                             * including for large groups.
-                             */
                             try {
                                 const groups =
                                     await sock.groupFetchAllParticipating();
@@ -899,6 +911,10 @@ async function startSession({
                             }
 
 
+                            // ========================================
+                            // CONNECTION BANNER
+                            // ========================================
+
                             if (
                                 !bannerSent
                             ) {
@@ -961,7 +977,6 @@ async function startSession({
 
                         /*
                          * Clear group cache when this socket closes.
-                         * A new socket will build a fresh cache.
                          */
                         groupMetadataCache.clear();
 
@@ -1062,9 +1077,6 @@ async function startSession({
                 // GROUP UPDATES
                 // ====================================================
 
-                /*
-                 * Refresh cache whenever group information changes.
-                 */
                 sock.ev.on(
                     'groups.update',
                     async events => {
@@ -1095,10 +1107,6 @@ async function startSession({
                 // GROUP PARTICIPANT UPDATES
                 // ====================================================
 
-                /*
-                 * Refresh cache when members are added,
-                 * removed, promoted or demoted.
-                 */
                 sock.ev.on(
                     'group-participants.update',
                     async event => {
