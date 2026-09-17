@@ -102,31 +102,6 @@ module.exports = [
     },
 
     {
-        name: 'riddle',
-        aliases: ['riddles', 'brain'],
-        description: 'Start an interactive riddle game',
-
-        async execute(sock, m, from, args) {
-            if (!from.endsWith('@g.us')) {
-                return sock.sendMessage(
-                    from,
-                    {
-                        text: '❌ This game can only be played inside a group.'
-                    },
-                    { quoted: m }
-                );
-            }
-
-            return startGame(
-                sock,
-                from,
-                'riddle',
-                5
-            );
-        }
-    },
-
-    {
         name: 'quiz',
         aliases: ['quizgame'],
         description: 'Start an interactive general knowledge quiz',
