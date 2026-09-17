@@ -9,10 +9,6 @@ const {
 const sessionManager =
     require('./sessionManager');
 
-const {
-    CREATOR_NUMBERS
-} = require('./config');
-
 const gcstatus =
     require('../commands/gcstatus');
 
@@ -66,24 +62,6 @@ function loadTelegramSessions() {
             return {};
         }
 
-        /*
-         * Convert old single-account format:
-         *
-         * {
-         *   "12345": {
-         *      whatsappNumber: "...",
-         *      sessionId: "..."
-         *   }
-         * }
-         *
-         * into new multi-account format:
-         *
-         * {
-         *   "12345": [
-         *      {...}
-         *   ]
-         * }
-         */
         for (const chatId of Object.keys(parsed)) {
             if (
                 parsed[chatId] &&
@@ -342,19 +320,6 @@ function isConnected(sessionId) {
 }
 
 
-function findTelegramSession(
-    chatId,
-    sessionId
-) {
-    return getChatSessions(chatId)
-        .find(
-            session =>
-                session.sessionId ===
-                sessionId
-        ) || null;
-}
-
-
 function getConnectedTelegramSessions(
     chatId
 ) {
@@ -383,26 +348,26 @@ function getConnectedTelegramSessions(
 
 
 // ============================================================
-// TELEGRAM GCSTATUS AUTHORIZATION
+// TELEGRAM GCSTATUS SESSION ACCESS
 // ============================================================
 
-function isCreatorWhatsAppSession(
-    session
+function getTelegramGcStatusSession(
+    chatId,
+    sessionId
 ) {
-    if (!session) {
-        return false;
+    if (!sessionId) {
+        return null;
     }
 
-    const owner =
-        cleanPhoneNumber(
-            session.ownerNumber ||
-            session.saved?.whatsappNumber ||
-            ''
+    const connected =
+        getConnectedTelegramSessions(
+            chatId
         );
 
-    return CREATOR_NUMBERS
-        .map(cleanPhoneNumber)
-        .includes(owner);
+    return connected.find(
+        session =>
+            session.sessionId === sessionId
+    ) || null;
 }
 
 
@@ -422,25 +387,27 @@ function getAuthorizedGcStatusSession(
         };
     }
 
-    const creator =
-        connected.find(
-            session =>
-                isCreatorWhatsAppSession(
-                    session
-                )
-        );
-
-    if (!creator) {
+    /*
+     * Every Telegram-linked WhatsApp account
+     * is allowed to use GCSTATUS for its own groups.
+     *
+     * If there is only one account, use it directly.
+     */
+    if (connected.length === 1) {
         return {
-            ok: false,
-            message:
-                '❌ GCSTATUS is restricted to the QUEEN VIDA creator account.'
+            ok: true,
+            session: connected[0]
         };
     }
 
+    /*
+     * If multiple accounts are connected,
+     * the user must select one.
+     */
     return {
         ok: true,
-        session: creator
+        multiple: true,
+        sessions: connected
     };
 }
 
@@ -646,10 +613,6 @@ async function startPairing(
         return;
     }
 
-    /*
-     * Remove only stale Telegram mappings
-     * for this same number.
-     */
     removeDisconnectedMappingsForNumber(
         chatId,
         cleanNumber
@@ -797,10 +760,6 @@ async function startPairing(
                                             chatId
                                         );
 
-                                    /*
-                                     * Do not duplicate
-                                     * the same session.
-                                     */
                                     const alreadySaved =
                                         sessions.some(
                                             saved =>
@@ -972,7 +931,7 @@ async function downloadTelegramFile(
 
 
 // ============================================================
-// GROUP STATUS GROUP LIST
+// GET WHATSAPP GROUPS
 // ============================================================
 
 async function getWhatsAppGroups(
@@ -1012,10 +971,10 @@ async function getWhatsAppGroups(
 
 
 // ============================================================
-// SHOW GROUP PICKER
+// SHOW WHATSAPP ACCOUNT PICKER
 // ============================================================
 
-async function showGcStatusGroups(
+async function showGcStatusAccountPicker(
     chatId
 ) {
     const auth =
@@ -1032,16 +991,78 @@ async function showGcStatusGroups(
         return;
     }
 
+    if (!auth.multiple) {
+        await showGcStatusGroupsForSession(
+            chatId,
+            auth.session.sessionId
+        );
+
+        return;
+    }
+
+    const keyboard =
+        auth.sessions.map(
+            session => [
+                {
+                    text:
+                        `📱 +${session.saved.whatsappNumber}`,
+
+                    callback_data:
+                        `gcsacct:${session.sessionId}`
+                }
+            ]
+        );
+
+    await sendMessage(
+        chatId,
+        '📱 *SELECT WHATSAPP ACCOUNT*\n\nYou have multiple WhatsApp numbers linked.\n\nChoose the account whose groups you want to use for GCSTATUS.',
+        {
+            parse_mode:
+                'Markdown',
+
+            reply_markup:
+            {
+                inline_keyboard:
+                    keyboard
+            }
+        }
+    );
+}
+
+
+// ============================================================
+// SHOW GROUPS FOR SELECTED ACCOUNT
+// ============================================================
+
+async function showGcStatusGroupsForSession(
+    chatId,
+    sessionId
+) {
+    const auth =
+        getTelegramGcStatusSession(
+            chatId,
+            sessionId
+        );
+
+    if (!auth) {
+        await sendMessage(
+            chatId,
+            '🔴 That WhatsApp account is no longer connected.\n\nUse /status to check your accounts.'
+        );
+
+        return;
+    }
+
     try {
         const groups =
             await getWhatsAppGroups(
-                auth.session.sock
+                auth.sock
             );
 
         if (!groups.length) {
             await sendMessage(
                 chatId,
-                '❌ No WhatsApp groups were found on this account.'
+                `❌ No WhatsApp groups were found for +${auth.saved.whatsappNumber}.`
             );
 
             return;
@@ -1064,9 +1085,33 @@ async function showGcStatusGroups(
                 ]
             );
 
+        /*
+         * Save the selected WhatsApp account
+         * before the group is selected.
+         */
+        pendingGcStatus.set(
+            chatId,
+            {
+                sessionId:
+                    auth.sessionId,
+
+                accountNumber:
+                    auth.saved.whatsappNumber,
+
+                groupJid:
+                    null,
+
+                groupName:
+                    null,
+
+                createdAt:
+                    Date.now()
+            }
+        );
+
         await sendMessage(
             chatId,
-            `📢 *GCSTATUS*\n\nSelect the WhatsApp group where you want to post the status:\n\n${groups.length > 40 ? '⚠️ Showing the first 40 groups.' : ''}`,
+            `📢 *GCSTATUS*\n\nWhatsApp: +${auth.saved.whatsappNumber}\n\nSelect the WhatsApp group where you want to post the status:\n\n${groups.length > 40 ? '⚠️ Showing the first 40 groups.' : ''}`,
             {
                 parse_mode:
                     'Markdown',
@@ -1089,6 +1134,69 @@ async function showGcStatusGroups(
             `❌ Could not load your WhatsApp groups.\n\n${error.message || 'Unknown error.'}`
         );
     }
+}
+
+
+// ============================================================
+// HANDLE ACCOUNT SELECTION
+// ============================================================
+
+async function handleGcStatusAccountSelection(
+    callbackQuery
+) {
+    const callbackId =
+        callbackQuery.id;
+
+    const data =
+        String(
+            callbackQuery.data || ''
+        );
+
+    const chatId =
+        callbackQuery.message?.chat?.id;
+
+    if (
+        !chatId ||
+        !data.startsWith(
+            'gcsacct:'
+        )
+    ) {
+        await answerCallbackQuery(
+            callbackId
+        );
+
+        return;
+    }
+
+    const sessionId =
+        data.slice(
+            'gcsacct:'.length
+        );
+
+    const session =
+        getTelegramGcStatusSession(
+            chatId,
+            sessionId
+        );
+
+    if (!session) {
+        await answerCallbackQuery(
+            callbackId,
+            'WhatsApp account is no longer connected.'
+        );
+
+        return;
+    }
+
+    await answerCallbackQuery(
+        callbackId,
+        'Account selected.'
+    );
+
+    await showGcStatusGroupsForSession(
+        chatId,
+        sessionId
+    );
 }
 
 
@@ -1128,20 +1236,42 @@ async function handleGcStatusGroupSelection(
             'gcsgrp:'.length
         );
 
-    const auth =
-        getAuthorizedGcStatusSession(
+    const pending =
+        pendingGcStatus.get(
             chatId
         );
 
-    if (!auth.ok) {
+    if (
+        !pending ||
+        !pending.sessionId
+    ) {
         await answerCallbackQuery(
             callbackId,
-            'WhatsApp session is not connected.'
+            'GCSTATUS session expired.'
+        );
+
+        return;
+    }
+
+    const auth =
+        getTelegramGcStatusSession(
+            chatId,
+            pending.sessionId
+        );
+
+    if (!auth) {
+        pendingGcStatus.delete(
+            chatId
+        );
+
+        await answerCallbackQuery(
+            callbackId,
+            'WhatsApp account is not connected.'
         );
 
         await sendMessage(
             chatId,
-            auth.message
+            '🔴 The selected WhatsApp account is no longer connected.\n\nUse /gcstatus again.'
         );
 
         return;
@@ -1150,7 +1280,7 @@ async function handleGcStatusGroupSelection(
     try {
         const groups =
             await getWhatsAppGroups(
-                auth.session.sock
+                auth.sock
             );
 
         const selected =
@@ -1172,8 +1302,13 @@ async function handleGcStatusGroupSelection(
         pendingGcStatus.set(
             chatId,
             {
+                ...pending,
+
                 sessionId:
-                    auth.session.sessionId,
+                    auth.sessionId,
+
+                accountNumber:
+                    auth.saved.whatsappNumber,
 
                 groupJid:
                     selected.jid,
@@ -1197,7 +1332,7 @@ async function handleGcStatusGroupSelection(
             await editMessageText(
                 chatId,
                 callbackQuery.message.message_id,
-                `✅ *Group selected:*\n${selected.subject}\n\nNow send me:\n\n📝 Text/link\n🖼️ Image\n🎥 Video\n\nFor media, you can include a caption.`,
+                `✅ *Group selected:*\n${selected.subject}\n\n📱 WhatsApp: +${auth.saved.whatsappNumber}\n\nNow send me:\n\n📝 Text/link\n🖼️ Image\n🎥 Video\n\nFor media, you can include a caption.`,
                 {
                     parse_mode:
                         'Markdown'
@@ -1206,7 +1341,7 @@ async function handleGcStatusGroupSelection(
         } else {
             await sendMessage(
                 chatId,
-                `✅ *Group selected:*\n${selected.subject}\n\nNow send me text, an image, or a video.`,
+                `✅ *Group selected:*\n${selected.subject}\n\n📱 WhatsApp: +${auth.saved.whatsappNumber}\n\nNow send me text, an image, or a video.`,
                 {
                     parse_mode:
                         'Markdown'
@@ -1240,46 +1375,34 @@ async function processTelegramGcStatus(
             chatId
         );
 
-    if (!pending) {
+    if (
+        !pending ||
+        !pending.groupJid
+    ) {
         return false;
     }
 
     const auth =
-        getAuthorizedGcStatusSession(
-            chatId
+        getTelegramGcStatusSession(
+            chatId,
+            pending.sessionId
         );
 
-    if (!auth.ok) {
+    if (!auth) {
         pendingGcStatus.delete(
             chatId
         );
 
         await sendMessage(
             chatId,
-            auth.message
-        );
-
-        return true;
-    }
-
-    if (
-        auth.session.sessionId !==
-        pending.sessionId
-    ) {
-        pendingGcStatus.delete(
-            chatId
-        );
-
-        await sendMessage(
-            chatId,
-            '⚠️ Your WhatsApp session changed. Use /gcstatus again.'
+            '🔴 The selected WhatsApp account is no longer connected.\n\nUse /gcstatus again.'
         );
 
         return true;
     }
 
     const sock =
-        auth.session.sock;
+        auth.sock;
 
     try {
         if (
@@ -1307,7 +1430,7 @@ async function processTelegramGcStatus(
 
             await sendMessage(
                 chatId,
-                `✅ Text posted to Group Status.\n\n📢 ${pending.groupName}`
+                `✅ Text posted to Group Status.\n\n📱 +${pending.accountNumber}\n📢 ${pending.groupName}`
             );
 
             return true;
@@ -1353,7 +1476,7 @@ async function processTelegramGcStatus(
 
             await sendMessage(
                 chatId,
-                `✅ Image posted to Group Status.\n\n📢 ${pending.groupName}`
+                `✅ Image posted to Group Status.\n\n📱 +${pending.accountNumber}\n📢 ${pending.groupName}`
             );
 
             return true;
@@ -1389,7 +1512,7 @@ async function processTelegramGcStatus(
 
             await sendMessage(
                 chatId,
-                `✅ Video posted to Group Status.\n\n📢 ${pending.groupName}`
+                `✅ Video posted to Group Status.\n\n📱 +${pending.accountNumber}\n📢 ${pending.groupName}`
             );
 
             return true;
@@ -1439,8 +1562,6 @@ async function showAccounts(
     let text =
         '📱 *YOUR LINKED WHATSAPP ACCOUNTS*\n\n';
 
-    const cleaned = [];
-
     for (
         let i = 0;
         i < sessions.length;
@@ -1454,18 +1575,8 @@ async function showAccounts(
                 saved.sessionId
             );
 
-        if (!connected) {
-            text +=
-                `${i + 1}. 🔴 +${saved.whatsappNumber} — Disconnected\n`;
-        } else {
-            text +=
-                `${i + 1}. 🟢 +${saved.whatsappNumber} — Connected\n`;
-        }
-
-        cleaned.push({
-            ...saved,
-            connected
-        });
+        text +=
+            `${i + 1}. ${connected ? '🟢' : '🔴'} +${saved.whatsappNumber} — ${connected ? 'Connected' : 'Disconnected'}\n`;
     }
 
     text +=
@@ -1737,6 +1848,18 @@ async function handleUpdate(
 
         if (
             callbackData.startsWith(
+                'gcsacct:'
+            )
+        ) {
+            await handleGcStatusAccountSelection(
+                update.callback_query
+            );
+
+            return;
+        }
+
+        if (
+            callbackData.startsWith(
                 'gcsgrp:'
             )
         ) {
@@ -1777,14 +1900,23 @@ async function handleUpdate(
             chatId
         )
     ) {
-        const handled =
-            await processTelegramGcStatus(
-                chatId,
-                message
+        const pending =
+            pendingGcStatus.get(
+                chatId
             );
 
-        if (handled) {
-            return;
+        if (
+            pending?.groupJid
+        ) {
+            const handled =
+                await processTelegramGcStatus(
+                    chatId,
+                    message
+                );
+
+            if (handled) {
+                return;
+            }
         }
     }
 
@@ -1817,7 +1949,7 @@ async function handleUpdate(
     if (text === '/help') {
         await sendMessage(
             chatId,
-            `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nLink a new WhatsApp number. You can link multiple numbers to the same Telegram account.\n\n/status\nShow all linked WhatsApp accounts.\n\n/clear\nChoose one WhatsApp session to remove. The number can then be paired again.\n\n/clearall\nRemove all WhatsApp sessions linked to this Telegram account.\n\n/gcstatus\nChoose a WhatsApp group and post text, image or video to Group Status.\n\n/cancel\nCancel a pending pairing.\n\n/help\nShow this help message.`,
+            `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nLink a new WhatsApp number. You can link multiple numbers to the same Telegram account.\n\n/status\nShow all linked WhatsApp accounts.\n\n/clear\nChoose one WhatsApp session to remove. The number can then be paired again.\n\n/clearall\nRemove all WhatsApp sessions linked to this Telegram account.\n\n/gcstatus\nChoose which linked WhatsApp account to use, then choose one of its groups and post text, image or video to Group Status.\n\n/cancel\nCancel a pending pairing or GCSTATUS selection.\n\n/help\nShow this help message.`,
             {
                 parse_mode:
                     'Markdown'
@@ -1840,7 +1972,7 @@ async function handleUpdate(
             chatId
         );
 
-        await showGcStatusGroups(
+        await showGcStatusAccountPicker(
             chatId
         );
 
