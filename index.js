@@ -171,6 +171,17 @@ function loadCommands() {
                                 cmd.name,
                                 cmd
                             );
+
+                            if (Array.isArray(cmd.aliases)) {
+                                for (const alias of cmd.aliases) {
+                                    if (alias) {
+                                        commandsMap.set(
+                                            alias,
+                                            cmd
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                 } else if (
@@ -181,6 +192,17 @@ function loadCommands() {
                         required.name,
                         required
                     );
+
+                    if (Array.isArray(required.aliases)) {
+                        for (const alias of required.aliases) {
+                            if (alias) {
+                                commandsMap.set(
+                                    alias,
+                                    required
+                                );
+                            }
+                        }
+                    }
                 }
             } catch (cmdLoadErr) {
                 console.error(
