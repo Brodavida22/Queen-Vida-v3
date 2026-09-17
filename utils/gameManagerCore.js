@@ -1,121 +1,459 @@
+/**
+ * ============================================================
+ * QUEEN VIDA V3
+ * GAME MANAGER CORE
+ * ============================================================
+ *
+ * Handles:
+ * - Trivia
+ * - Quiz
+ * - Scramble
+ *
+ * FIXES:
+ * - Correctly identifies the actual group member answering
+ * - Prevents group JID from being used as a player
+ * - Accepts A, B, C, D in different formats
+ * - Case-insensitive answers
+ * - Ignores commands while a round is active
+ * - Prevents duplicate answers
+ * - Correctly adds +5 points
+ * - Keeps scores per player during the game
+ * ============================================================
+ */
+
 const fs = require('fs');
 const path = require('path');
 
-const activeGames = {}; // { groupJid: sessionData }
-
-/*
- * ============================================================
- * GAME TIMER HELPERS
- * ============================================================
- */
-
-function clearGameTimer(session, timerName) {
-    if (!session) return;
-
-    if (session[timerName]) {
-        clearTimeout(session[timerName]);
-        session[timerName] = null;
-    }
-}
-
-function clearAllGameTimers(session) {
-    if (!session) return;
-
-    clearGameTimer(session, 'timer');
-    clearGameTimer(session, 'nextRoundTimer');
-    clearGameTimer(session, 'finishTimer');
-    clearGameTimer(session, 'startTimer');
-}
-
-function scheduleNextRound(from, delay = 3000) {
-    const session = activeGames[from];
-
-    if (!session || session.stopped) return;
-
-    clearGameTimer(session, 'nextRoundTimer');
-
-    session.nextRoundTimer = setTimeout(() => {
-        const currentSession = activeGames[from];
-
-        if (!currentSession || currentSession.stopped) {
-            return;
-        }
-
-        currentSession.nextRoundTimer = null;
-
-        nextRound(from);
-    }, delay);
-}
+const activeGames = new Map();
 
 
 /*
  * ============================================================
- * SHUFFLE
+ * LOAD GAME DATA
  * ============================================================
  */
 
-function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-
-        [array[i], array[j]] = [
-            array[j],
-            array[i]
-        ];
-    }
-
-    return array;
-}
-
-
-/*
- * ============================================================
- * LOAD QUESTIONS
- * ============================================================
- */
-
-function loadQuestions(gameType, difficulty = 'all') {
+function loadGameData(name) {
     try {
         const filePath = path.join(
             __dirname,
             '..',
             'games',
-            `${gameType}.json`
+            `${name}.json`
         );
 
         if (!fs.existsSync(filePath)) {
+            console.error(
+                `❌ [GAME] Missing games/${name}.json`
+            );
+
             return [];
         }
 
-        const raw = fs.readFileSync(
-            filePath,
-            'utf8'
+        const data = JSON.parse(
+            fs.readFileSync(filePath, 'utf8')
         );
 
-        const questions = JSON.parse(raw);
-
-        if (!Array.isArray(questions)) {
-            return [];
+        if (Array.isArray(data)) {
+            return data;
         }
 
-        if (difficulty === 'all') {
-            return questions;
+        if (Array.isArray(data.questions)) {
+            return data.questions;
         }
 
-        return questions.filter(
-            q =>
-                String(q.difficulty || '')
-                    .toLowerCase() === difficulty
-        );
+        return [];
 
-    } catch (e) {
+    } catch (error) {
         console.error(
-            `Error loading questions for ${gameType}:`,
-            e
+            `❌ [GAME] Failed loading ${name}.json:`,
+            error
         );
 
         return [];
     }
+}
+
+
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
+
+function getText(m, body = '') {
+    return String(
+        body ||
+        m?.message?.conversation ||
+        m?.message?.extendedTextMessage?.text ||
+        m?.message?.imageMessage?.caption ||
+        m?.message?.videoMessage?.caption ||
+        m?.message?.documentMessage?.caption ||
+        ''
+    ).trim();
+}
+
+
+function isCommand(text) {
+    return /^[.!/#]/.test(
+        String(text || '').trim()
+    );
+}
+
+
+/*
+ * IMPORTANT:
+ * In WhatsApp groups:
+ *
+ * m.key.remoteJid = GROUP JID
+ * m.key.participant = ACTUAL MEMBER JID
+ *
+ * Never use remoteJid as the player ID when it is
+ * a group message.
+ */
+function getSenderId(m) {
+    const participant =
+        m?.key?.participant ||
+        m?.participant ||
+        m?.sender ||
+        m?.key?.participantAlt ||
+        null;
+
+    if (
+        participant &&
+        typeof participant === 'string' &&
+        !participant.endsWith('@g.us')
+    ) {
+        return participant;
+    }
+
+    const remoteJid =
+        m?.key?.remoteJid ||
+        m?.remoteJid ||
+        null;
+
+    /*
+     * Never score the group itself.
+     */
+    if (
+        !remoteJid ||
+        typeof remoteJid !== 'string' ||
+        remoteJid.endsWith('@g.us')
+    ) {
+        return null;
+    }
+
+    return remoteJid;
+}
+
+
+/*
+ * Normalize WhatsApp JID variants.
+ */
+function normalizeJid(jid) {
+    if (!jid) {
+        return null;
+    }
+
+    return String(jid)
+        .replace(/:\d+(?=@)/, '')
+        .trim();
+}
+
+
+/*
+ * ============================================================
+ * PLAYER NAME
+ * ============================================================
+ */
+
+function getPlayerName(m, sender) {
+    return (
+        m?.pushName ||
+        m?.verifiedBizName ||
+        sender?.split('@')[0] ||
+        'Player'
+    );
+}
+
+
+/*
+ * ============================================================
+ * SEND MESSAGE
+ * ============================================================
+ */
+
+async function send(sock, jid, text) {
+    if (!sock || !jid) {
+        return;
+    }
+
+    try {
+        await sock.sendMessage(jid, {
+            text: String(text)
+        });
+    } catch (error) {
+        console.error(
+            '❌ [GAME SEND ERROR]:',
+            error.message || error
+        );
+    }
+}
+
+
+/*
+ * ============================================================
+ * TIMER HELPERS
+ * ============================================================
+ */
+
+function clearGameTimer(game, timerName) {
+    if (
+        game &&
+        game[timerName]
+    ) {
+        clearTimeout(game[timerName]);
+        game[timerName] = null;
+    }
+}
+
+
+function clearAllTimers(game) {
+    if (!game) {
+        return;
+    }
+
+    clearGameTimer(game, 'timer');
+    clearGameTimer(game, 'nextRoundTimer');
+}
+
+
+/*
+ * ============================================================
+ * NORMALIZE ANSWERS
+ * ============================================================
+ */
+
+function normalizeAnswer(text) {
+    return String(text || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, ' ');
+}
+
+
+/*
+ * ============================================================
+ * TRIVIA / QUIZ OPTION NORMALIZER
+ * ============================================================
+ *
+ * Accepts:
+ *
+ * A
+ * a
+ * A)
+ * A.
+ * Option A
+ * option a
+ * Answer A
+ *
+ * But still allows normal text when required.
+ * ============================================================
+ */
+
+function normalizeOption(text) {
+    const value = normalizeAnswer(text);
+
+    const match = value.match(
+        /^(?:OPTION|ANSWER)?\s*([ABCD])(?:[\)\.\:\-]|\s|$)/
+    );
+
+    if (!match) {
+        return value;
+    }
+
+    return match[1];
+}
+
+
+/*
+ * ============================================================
+ * CHECK ANSWER
+ * ============================================================
+ */
+
+function isCorrectAnswer(game, question, text) {
+    if (!question) {
+        return false;
+    }
+
+    const cleanText =
+        normalizeAnswer(text);
+
+    /*
+     * --------------------------------------------------------
+     * SCRAMBLE
+     * --------------------------------------------------------
+     */
+
+    if (game.type === 'scramble') {
+        const target =
+            question.targetWord ||
+            question.answer ||
+            question.word ||
+            '';
+
+        return (
+            cleanText ===
+            normalizeAnswer(target)
+        );
+    }
+
+
+    /*
+     * --------------------------------------------------------
+     * TRIVIA / QUIZ
+     * --------------------------------------------------------
+     */
+
+    const expected =
+        question.answer ??
+        question.correctAnswer ??
+        question.correct ??
+        question.option ??
+        '';
+
+    if (!expected) {
+        return false;
+    }
+
+    /*
+     * If answer is A/B/C/D, allow flexible formats.
+     */
+    const expectedNormalized =
+        normalizeOption(expected);
+
+    const suppliedNormalized =
+        normalizeOption(text);
+
+    if (
+        ['A', 'B', 'C', 'D'].includes(
+            expectedNormalized
+        )
+    ) {
+        return (
+            suppliedNormalized ===
+            expectedNormalized
+        );
+    }
+
+    /*
+     * If the JSON contains the full answer text,
+     * compare the text itself.
+     */
+    return (
+        cleanText ===
+        normalizeAnswer(expected)
+    );
+}
+
+
+/*
+ * ============================================================
+ * GET QUESTION TEXT
+ * ============================================================
+ */
+
+function getQuestionText(question) {
+    return (
+        question?.question ||
+        question?.q ||
+        question?.text ||
+        question?.clue ||
+        ''
+    );
+}
+
+
+/*
+ * ============================================================
+ * GET OPTIONS
+ * ============================================================
+ */
+
+function getOptions(question) {
+    if (Array.isArray(question?.options)) {
+        return question.options;
+    }
+
+    if (Array.isArray(question?.choices)) {
+        return question.choices;
+    }
+
+    return [];
+}
+
+
+/*
+ * ============================================================
+ * FORMAT QUESTION
+ * ============================================================
+ */
+
+function formatQuestion(game) {
+    const question =
+        game.questions[game.current];
+
+    if (!question) {
+        return '';
+    }
+
+    const questionText =
+        getQuestionText(question);
+
+    const options =
+        getOptions(question);
+
+    let output =
+        `🎮 *${game.type.toUpperCase()}*\n\n`;
+
+    if (questionText) {
+        output +=
+            `❓ ${questionText}\n`;
+    }
+
+    if (options.length) {
+        output += '\n';
+
+        options.forEach((option, index) => {
+            const letter =
+                String.fromCharCode(
+                    65 + index
+                );
+
+            output +=
+                `${letter}. ${option}\n`;
+        });
+    }
+
+    if (game.type === 'scramble') {
+        const scrambled =
+            question.scrambled ||
+            question.scramble ||
+            question.word ||
+            question.question ||
+            '';
+
+        output =
+            `🔤 *SCRAMBLE*\n\n` +
+            `Unscramble this word:\n\n` +
+            `👉 *${scrambled}*\n`;
+    }
+
+    output +=
+        '\n⏳ You have 30 seconds!';
+
+    return output;
 }
 
 
@@ -127,161 +465,458 @@ function loadQuestions(gameType, difficulty = 'all') {
 
 async function startGame(
     sock,
-    from,
-    gameType,
-    totalRounds,
-    difficulty = 'all'
+    jid,
+    type,
+    questions
 ) {
-    if (activeGames[from]) {
-        await sock.sendMessage(from, {
-            text:
-                '❌ A game is already active in this group! ' +
-                'Use `.game stop` to end it first.'
-        });
+    if (!Array.isArray(questions) || !questions.length) {
+        await send(
+            sock,
+            jid,
+            `❌ No questions found for ${type}.`
+        );
 
-        return;
+        return false;
     }
 
-    gameType = String(
-        gameType || ''
-    ).toLowerCase();
+    /*
+     * Stop an existing game in this group.
+     */
+    const existing =
+        activeGames.get(jid);
 
-    const validDifficulty = [
-        'easy',
-        'medium',
-        'hard',
-        'all'
-    ].includes(difficulty)
-        ? difficulty
-        : 'all';
-
-    const allQuestions = loadQuestions(
-        gameType,
-        validDifficulty
-    );
-
-    if (allQuestions.length === 0) {
-        await sock.sendMessage(from, {
-            text:
-                `❌ No questions found for *${gameType}* ` +
-                `at *${validDifficulty}* difficulty.`
-        });
-
-        return;
+    if (existing) {
+        clearAllTimers(existing);
     }
 
-    if (totalRounds > allQuestions.length) {
-        await sock.sendMessage(from, {
-            text:
-                `❌ *Not enough questions!*\n\n` +
-                `🎮 Game: *${gameType.toUpperCase()}*\n` +
-                `📚 Difficulty: *${validDifficulty.toUpperCase()}*\n` +
-                `❓ Available: *${allQuestions.length}*\n` +
-                `🎯 Requested: *${totalRounds}*`
-        });
-
-        return;
-    }
-
-    const sessionQuestions =
-        shuffle([...allQuestions])
-            .slice(0, totalRounds);
-
-    activeGames[from] = {
-        gameType,
-        difficulty: validDifficulty,
-
-        rounds: sessionQuestions.length,
-        currentRound: 0,
-
-        questions: sessionQuestions,
-
+    const game = {
+        type,
+        jid,
+        questions: [...questions],
+        current: 0,
         scores: {},
-
-        activeQuestion: null,
-
+        answeredThisRound: false,
         timer: null,
         nextRoundTimer: null,
-        finishTimer: null,
-        startTimer: null,
-
-        stopped: false,
-
-        answeredThisRound: false,
-
-        truthDareParticipants: new Set(),
-        truthDareWinners: [],
-
-        sock
+        startedAt: Date.now()
     };
 
-    const gameTitles = {
-        trivia: '🎯 TRIVIA SHOWDOWN',
-        quiz: '🧠 QUIZ CHALLENGE',
-        scramble: '🔤 WORD SCRAMBLE',
-        guess: '🔢 NUMBER GUESSING',
-        truthordare: '🔥 TRUTH OR DARE'
-    };
+    activeGames.set(
+        jid,
+        game
+    );
 
-    const gameTitle =
-        gameTitles[gameType] ||
-        gameType.toUpperCase();
+    /*
+     * Shuffle questions.
+     */
+    for (
+        let i = game.questions.length - 1;
+        i > 0;
+        i--
+    ) {
+        const j =
+            Math.floor(
+                Math.random() * (i + 1)
+            );
 
-    const roundDuration =
-        ['trivia', 'quiz'].includes(gameType)
-            ? '25s'
-            : '45s';
-
-    const difficultyText =
-        ['trivia', 'quiz'].includes(gameType)
-            ? `┃ 🎚️ *Difficulty:* ${
-                validDifficulty === 'all'
-                    ? 'MIXED'
-                    : validDifficulty.toUpperCase()
-            }\n`
-            : '';
-
-    let rewardText =
-        '💎 *Reward:* 5 Points / Correct Answer';
-
-    if (gameType === 'truthordare') {
-        rewardText =
-            '💎 *Rewards:* 🥇 10 pts • 🥈 5 pts • 🥉 3 pts\n' +
-            '┃ 👥 *Everyone can answer!*';
+        [
+            game.questions[i],
+            game.questions[j]
+        ] = [
+            game.questions[j],
+            game.questions[i]
+        ];
     }
 
-    const startMsg =
-`┏━━━ 🎮 *QUEEN VIDA GAME SUITE* 🎮 ━━━┓
-┃ 🏆 *Game:* ${gameTitle}
-┃ 🔄 *Total Rounds:* ${sessionQuestions.length}
-${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration} Per Round
-┃ ${rewardText}
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🚀 *Game session is starting now!*
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
+    await sendNextRound(
+        sock,
+        game
+    );
 
-    await sock.sendMessage(from, {
-        text: startMsg
-    });
+    return true;
+}
 
-    const session = activeGames[from];
 
-    if (!session || session.stopped) {
+/*
+ * ============================================================
+ * SEND NEXT ROUND
+ * ============================================================
+ */
+
+async function sendNextRound(
+    sock,
+    game
+) {
+    if (!game) {
         return;
     }
 
-    session.startTimer = setTimeout(() => {
-        const currentSession = activeGames[from];
+    if (
+        !activeGames.has(game.jid) ||
+        activeGames.get(game.jid) !== game
+    ) {
+        return;
+    }
 
-        if (!currentSession || currentSession.stopped) {
-            return;
+    if (
+        game.current >=
+        game.questions.length
+    ) {
+        await finishGame(
+            sock,
+            game.jid
+        );
+
+        return;
+    }
+
+    clearAllTimers(game);
+
+    game.answeredThisRound = false;
+
+    const question =
+        game.questions[game.current];
+
+    const message =
+        formatQuestion(game);
+
+    await send(
+        sock,
+        game.jid,
+        message
+    );
+
+    game.timer =
+        setTimeout(
+            async () => {
+                try {
+                    if (
+                        !activeGames.has(game.jid) ||
+                        activeGames.get(game.jid) !== game
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        game.answeredThisRound
+                    ) {
+                        return;
+                    }
+
+                    game.answeredThisRound =
+                        true;
+
+                    await send(
+                        sock,
+                        game.jid,
+                        `⏰ Time's up!\n\n` +
+                        `The answer was: *${
+                            question.answer ||
+                            question.correctAnswer ||
+                            question.targetWord ||
+                            'Unknown'
+                        }*`
+                    );
+
+                    game.nextRoundTimer =
+                        setTimeout(
+                            async () => {
+                                game.current++;
+
+                                await sendNextRound(
+                                    sock,
+                                    game
+                                );
+                            },
+                            2000
+                        );
+
+                } catch (error) {
+                    console.error(
+                        '🔥 [GAME TIMER ERROR]:',
+                        error
+                    );
+                }
+            },
+            30000
+        );
+}
+
+
+/*
+ * ============================================================
+ * HANDLE GAME ANSWER
+ * ============================================================
+ */
+
+async function handleGameMessage(
+    sock,
+    m,
+    from,
+    body = ''
+) {
+    try {
+        if (
+            !from ||
+            typeof from !== 'string'
+        ) {
+            return false;
         }
 
-        currentSession.startTimer = null;
+        const game =
+            activeGames.get(from);
 
-        nextRound(from);
+        /*
+         * No active game in this chat.
+         */
+        if (!game) {
+            return false;
+        }
 
-    }, 2000);
+        const text =
+            getText(
+                m,
+                body
+            );
+
+        if (!text) {
+            return false;
+        }
+
+        /*
+         * Commands must go to the normal command handler.
+         */
+        if (isCommand(text)) {
+            return false;
+        }
+
+        /*
+         * Round already answered.
+         */
+        if (
+            game.answeredThisRound
+        ) {
+            return true;
+        }
+
+        /*
+         * IMPORTANT FIX:
+         * Get the actual WhatsApp member who sent
+         * the answer.
+         */
+        const rawSender =
+            getSenderId(m);
+
+        const sender =
+            normalizeJid(
+                rawSender
+            );
+
+        /*
+         * Never award a score to the group JID.
+         */
+        if (
+            !sender ||
+            sender.endsWith('@g.us')
+        ) {
+            console.warn(
+                '⚠️ [GAME] Could not identify actual player:',
+                {
+                    remoteJid:
+                        m?.key?.remoteJid,
+                    participant:
+                        m?.key?.participant
+                }
+            );
+
+            /*
+             * Consume the answer so it doesn't fall
+             * through into unrelated handlers, but do
+             * not create a fake score.
+             */
+            return true;
+        }
+
+        const question =
+            game.questions[
+                game.current
+            ];
+
+        if (!question) {
+            return true;
+        }
+
+        /*
+         * Check answer.
+         */
+        const correct =
+            isCorrectAnswer(
+                game,
+                question,
+                text
+            );
+
+        if (!correct) {
+            return true;
+        }
+
+        /*
+         * ----------------------------------------------------
+         * CORRECT ANSWER
+         * ----------------------------------------------------
+         */
+
+        game.answeredThisRound =
+            true;
+
+        clearGameTimer(
+            game,
+            'timer'
+        );
+
+        clearGameTimer(
+            game,
+            'nextRoundTimer'
+        );
+
+        /*
+         * ACTUAL SCORE UPDATE
+         */
+        game.scores[sender] =
+            (
+                game.scores[sender] ||
+                0
+            ) + 5;
+
+        const playerName =
+            getPlayerName(
+                m,
+                sender
+            );
+
+        console.log(
+            `✅ [GAME] ${game.type} correct answer`,
+            {
+                group: from,
+                player: sender,
+                name: playerName,
+                score: game.scores[sender],
+                round: game.current + 1
+            }
+        );
+
+        await send(
+            sock,
+            from,
+            `🎉 *Correct!*\n\n` +
+            `👤 ${playerName}\n` +
+            `⭐ +5 points\n` +
+            `🏆 Score: *${game.scores[sender]}*`
+        );
+
+        /*
+         * Move to next question.
+         */
+        game.nextRoundTimer =
+            setTimeout(
+                async () => {
+                    try {
+                        if (
+                            !activeGames.has(from) ||
+                            activeGames.get(from) !== game
+                        ) {
+                            return;
+                        }
+
+                        game.current++;
+
+                        await sendNextRound(
+                            sock,
+                            game
+                        );
+
+                    } catch (error) {
+                        console.error(
+                            '🔥 [NEXT ROUND ERROR]:',
+                            error
+                        );
+                    }
+                },
+                2000
+            );
+
+        return true;
+
+    } catch (error) {
+        console.error(
+            '🔥 [GAME ANSWER ERROR]:',
+            error
+        );
+
+        return false;
+    }
+}
+
+
+/*
+ * ============================================================
+ * FINISH GAME
+ * ============================================================
+ */
+
+async function finishGame(
+    sock,
+    jid
+) {
+    const game =
+        activeGames.get(jid);
+
+    if (!game) {
+        return false;
+    }
+
+    clearAllTimers(game);
+
+    const entries =
+        Object.entries(
+            game.scores
+        );
+
+    entries.sort(
+        (a, b) =>
+            b[1] - a[1]
+    );
+
+    let message =
+        `🏁 *${game.type.toUpperCase()} FINISHED!*\n\n`;
+
+    if (!entries.length) {
+        message +=
+            `😔 Nobody scored any points.`;
+    } else {
+        message +=
+            `🏆 *FINAL SCORES*\n\n`;
+
+        entries.forEach(
+            ([jidKey, score], index) => {
+                const number =
+                    jidKey.split('@')[0];
+
+                message +=
+                    `${index + 1}. @${number} — *${score} points*\n`;
+            }
+        );
+    }
+
+    await send(
+        sock,
+        jid,
+        message
+    );
+
+    activeGames.delete(jid);
+
+    return true;
 }
 
 
@@ -291,784 +926,17 @@ ${difficultyText}┃ ⏱️ *Time Limit:* ${roundDuration} Per Round
  * ============================================================
  */
 
-async function stopGame(sock, from) {
-    const session = activeGames[from];
-
-    if (!session) {
-        await sock.sendMessage(from, {
-            text:
-                '❌ No active game session found in this group.'
-        });
-
-        return;
-    }
-
-    session.stopped = true;
-
-    clearAllGameTimers(session);
-
-    session.activeQuestion = null;
-    session.answeredThisRound = true;
-
-    delete activeGames[from];
-
-    await sock.sendMessage(from, {
-        text:
-            '🛑 *Game session has been manually stopped by an admin/creator!*\n\n' +
-            '✅ All game timers have been cancelled.\n' +
-            '✅ No more rounds will start.'
-    });
-}
-
-
-/*
- * ============================================================
- * NEXT ROUND
- * ============================================================
- */
-
-async function nextRound(from) {
-    const session = activeGames[from];
-
-    if (!session || session.stopped) {
-        return;
-    }
-
-    session.nextRoundTimer = null;
-
-    if (session.currentRound >= session.rounds) {
-        return endGame(from);
-    }
-
-    session.currentRound++;
-
-    session.answeredThisRound = false;
-
-    session.truthDareParticipants =
-        new Set();
-
-    session.truthDareWinners = [];
-
-    const qData =
-        session.questions[
-            session.currentRound - 1
-        ];
-
-    if (!qData) {
-        return endGame(from);
-    }
-
-    session.activeQuestion = qData;
-
-    let roundText = '';
-
-    const roundTimeLimit =
-        ['trivia', 'quiz'].includes(
-            session.gameType
-        )
-            ? 25
-            : 45;
-
-
-    /*
-     * ========================================================
-     * TRIVIA / QUIZ
-     * ========================================================
-     */
-
-    if (
-        session.gameType === 'trivia' ||
-        session.gameType === 'quiz'
-    ) {
-        const label =
-            session.gameType === 'trivia'
-                ? 'TRIVIA'
-                : 'QUIZ';
-
-        const emoji =
-            session.gameType === 'trivia'
-                ? '🎯'
-                : '🧠';
-
-        const difficultyLabel =
-            qData.difficulty
-                ? `┃ 🎚️ *Difficulty:* ${
-                    qData.difficulty.toUpperCase()
-                }\n`
-                : '';
-
-        roundText =
-`┏━━━ ${emoji} *${label} (Round ${session.currentRound}/${session.rounds})* ${emoji} ━━━┓
-${difficultyLabel}┃ ❓ *Question:* ${qData.question}
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🅰️ *A)* ${qData.options.A}
-┃ 🅱️ *B)* ${qData.options.B}
-┃ 🅲 *C)* ${qData.options.C}
-┃ 🅳 *D)* ${qData.options.D}
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⏱️ *Type your answer option (A, B, C, or D)!* (${roundTimeLimit}s)
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-    }
-
-
-    /*
-     * ========================================================
-     * SCRAMBLE
-     * ========================================================
-     */
-
-    else if (
-        session.gameType === 'scramble'
-    ) {
-        const scrambled =
-            qData.word
-                .split('')
-                .sort(() => Math.random() - 0.5)
-                .join(' ');
-
-        session.activeQuestion.targetWord =
-            qData.word;
-
-        roundText =
-`┏━━━ 🔤 *WORD SCRAMBLE (Round ${session.currentRound}/${session.rounds})* 🔤 ━━━┓
-┃ 🔀 *Scrambled:* \`${scrambled}\`
-┃ 💡 *Hint:* ${qData.hint}
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⏱️ *Type the correct unscrambled word below!* (${roundTimeLimit}s)
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-    }
-
-
-    /*
-     * ========================================================
-     * NUMBER GUESS
-     * ========================================================
-     */
-
-    else if (
-        session.gameType === 'guess'
-    ) {
-        session.activeQuestion.targetNumber =
-            qData.target;
-
-        roundText =
-`┏━━━ 🔢 *NUMBER GUESS (Round ${session.currentRound}/${session.rounds})* 🔢 ━━━┓
-┃ 🎯 *Guess the number between* ${qData.min} *and* ${qData.max}!
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ⏱️ *Type your guessed number in chat!* (${roundTimeLimit}s - Bot gives hints)
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-    }
-
-
-    /*
-     * ========================================================
-     * TRUTH OR DARE
-     * ========================================================
-     */
-
-    else if (
-        session.gameType === 'truthordare'
-    ) {
-        const type =
-            String(qData.type || '')
-                .toLowerCase();
-
-        const isTruth =
-            type === 'truth';
-
-        roundText =
-`┏━━━ 🔥 *TRUTH OR DARE* 🔥 ━━━┓
-┃ 🎮 *Round:* ${session.currentRound}/${session.rounds}
-┃ ${isTruth ? '🧠' : '🎯'} *${isTruth ? 'TRUTH' : 'DARE'}*
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ ❓ *${qData.question}*
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 👥 *EVERYONE CAN ANSWER!*
-┃ 🥇 First valid answer: *+10 pts*
-┃ 🥈 Second valid answer: *+5 pts*
-┃ 🥉 Third valid answer: *+3 pts*
-┃ ⏱️ *You have ${roundTimeLimit} seconds!*
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-    }
-
-
-    /*
-     * ========================================================
-     * SEND ROUND
-     * ========================================================
-     */
-
-    await session.sock.sendMessage(from, {
-        text: roundText
-    });
-
-    const currentSessionAfterSend =
-        activeGames[from];
-
-    if (
-        !currentSessionAfterSend ||
-        currentSessionAfterSend.stopped
-    ) {
-        return;
-    }
-
-    clearGameTimer(
-        currentSessionAfterSend,
-        'timer'
-    );
-
-    currentSessionAfterSend.timer =
-        setTimeout(async () => {
-
-            const currentSession =
-                activeGames[from];
-
-            if (
-                !currentSession ||
-                currentSession.stopped
-            ) {
-                return;
-            }
-
-            currentSession.timer = null;
-
-            if (
-                currentSession.gameType ===
-                'truthordare'
-            ) {
-                await finishTruthOrDareRound(from);
-                return;
-            }
-
-            if (
-                currentSession.answeredThisRound
-            ) {
-                return;
-            }
-
-            let timeOutText =
-                `⏰ *Time's up!* No one guessed correctly this round.\n`;
-
-            const q =
-                currentSession.activeQuestion;
-
-            if (!q) {
-                return;
-            }
-
-            if (
-                currentSession.gameType === 'trivia' ||
-                currentSession.gameType === 'quiz'
-            ) {
-                const answer =
-                    String(q.answer || '')
-                        .trim()
-                        .toUpperCase();
-
-                const optionKey =
-                    answer.match(/[A-D]/)?.[0] ||
-                    answer;
-
-                timeOutText +=
-                    `📌 *Correct Answer was:* *${optionKey}* ` +
-                    `(${q.options?.[optionKey] || ''})`;
-            }
-
-            else if (
-                currentSession.gameType === 'scramble'
-            ) {
-                timeOutText +=
-                    `📌 *Correct Word was:* *${q.word}*`;
-            }
-
-            else if (
-                currentSession.gameType === 'guess'
-            ) {
-                timeOutText +=
-                    `📌 *Secret Number was:* *${q.target}*`;
-            }
-
-            await currentSession.sock.sendMessage(
-                from,
-                {
-                    text: timeOutText
-                }
-            );
-
-            const sessionAfterTimeout =
-                activeGames[from];
-
-            if (
-                !sessionAfterTimeout ||
-                sessionAfterTimeout.stopped
-            ) {
-                return;
-            }
-
-            scheduleNextRound(from, 3000);
-
-        }, roundTimeLimit * 1000);
-}
-
-
-/*
- * ============================================================
- * HANDLE GAME MESSAGE
- * ============================================================
- */
-
-async function handleGameMessage(
-    sock,
-    m,
-    from,
-    text
-) {
-    const session =
-        activeGames[from];
-
-    if (
-        !session ||
-        session.stopped ||
-        !session.activeQuestion
-    ) {
+function stopGame(jid) {
+    const game =
+        activeGames.get(jid);
+
+    if (!game) {
         return false;
     }
 
-    /*
-     * Get the actual WhatsApp member.
-     */
-    const sender =
-        m?.key?.participant ||
-        m?.participant ||
-        m?.sender ||
-        m?.key?.senderPn ||
-        m?.key?.participantPn;
+    clearAllTimers(game);
 
-    /*
-     * In a group, never use the group JID
-     * as the player's identity.
-     */
-    if (
-        !sender ||
-        (
-            from.endsWith('@g.us') &&
-            sender === from
-        )
-    ) {
-        return false;
-    }
-
-
-    /*
-     * ========================================================
-     * TRUTH OR DARE
-     * ========================================================
-     */
-
-    if (
-        session.gameType === 'truthordare'
-    ) {
-        return handleTruthOrDareMessage(
-            sock,
-            m,
-            from,
-            text,
-            session,
-            sender
-        );
-    }
-
-
-    /*
-     * Existing games use one winner per round.
-     */
-
-    if (session.answeredThisRound) {
-        return false;
-    }
-
-    const cleanText =
-        String(text || '')
-            .trim()
-            .toUpperCase();
-
-    if (!cleanText) {
-        return false;
-    }
-
-    const q =
-        session.activeQuestion;
-
-    let isCorrect = false;
-
-
-    /*
-     * ========================================================
-     * TRIVIA / QUIZ
-     * ========================================================
-     */
-
-    if (
-        session.gameType === 'trivia' ||
-        session.gameType === 'quiz'
-    ) {
-        const correctAnswer =
-            String(q?.answer || '')
-                .trim()
-                .toUpperCase()
-                .match(/[A-D]/)?.[0] || '';
-
-        /*
-         * Accept:
-         *
-         * A
-         * a
-         * A)
-         * A.
-         * A:
-         * Option A
-         * Option: A
-         * Answer A
-         * Answer: A
-         */
-        const submittedMatch =
-            cleanText.match(
-                /(?:OPTION|ANSWER)?\s*[:.]?\s*([A-D])\b/
-            );
-
-        const submittedChoice =
-            submittedMatch?.[1] ||
-            (
-                /^[A-D]$/.test(cleanText)
-                    ? cleanText
-                    : ''
-            );
-
-        if (
-            correctAnswer &&
-            submittedChoice === correctAnswer
-        ) {
-            isCorrect = true;
-        }
-    }
-
-
-    /*
-     * ========================================================
-     * SCRAMBLE
-     * ========================================================
-     */
-
-    else if (
-        session.gameType === 'scramble'
-    ) {
-        const targetWord =
-            String(
-                q?.targetWord ||
-                q?.word ||
-                ''
-            )
-                .trim()
-                .toUpperCase();
-
-        const submittedWord =
-            cleanText
-                .replace(/\s+/g, '');
-
-        const expectedWord =
-            targetWord
-                .replace(/\s+/g, '');
-
-        if (
-            expectedWord &&
-            submittedWord === expectedWord
-        ) {
-            isCorrect = true;
-        }
-    }
-
-
-    /*
-     * ========================================================
-     * NUMBER GUESS
-     * ========================================================
-     */
-
-    else if (
-        session.gameType === 'guess'
-    ) {
-        const num =
-            parseInt(cleanText, 10);
-
-        if (!isNaN(num)) {
-
-            if (
-                num === q.targetNumber
-            ) {
-                isCorrect = true;
-            }
-
-            else {
-                const hintDir =
-                    num < q.targetNumber
-                        ? '📈 *Higher!*'
-                        : '📉 *Lower!*';
-
-                await sock.sendMessage(
-                    from,
-                    {
-                        text:
-                            `❌ *${num}* is wrong! ` +
-                            `${hintDir} Try again!`
-                    },
-                    {
-                        quoted: m
-                    }
-                );
-
-                return true;
-            }
-        }
-    }
-
-
-    /*
-     * ========================================================
-     * CORRECT ANSWER
-     * ========================================================
-     */
-
-    if (isCorrect) {
-
-        const currentSession =
-            activeGames[from];
-
-        if (
-            !currentSession ||
-            currentSession.stopped
-        ) {
-            return false;
-        }
-
-        currentSession.answeredThisRound =
-            true;
-
-        clearGameTimer(
-            currentSession,
-            'timer'
-        );
-
-        clearGameTimer(
-            currentSession,
-            'nextRoundTimer'
-        );
-
-        /*
-         * Add 5 points to the actual player.
-         */
-        currentSession.scores[sender] =
-            Number(
-                currentSession.scores[sender] || 0
-            ) + 5;
-
-        const playerPoints =
-            currentSession.scores[sender];
-
-        let winAnnouncement =
-`🎉 *Correct!*
-@${sender.replace(/[^0-9]/g, '')} guessed right and earned *+5 Points*!
-
-💎 *Your Total:* ${playerPoints} pts
-
-🏆 *Current Scores:*`;
-
-        const sortedScores =
-            Object.entries(
-                currentSession.scores
-            ).sort(
-                (a, b) => b[1] - a[1]
-            );
-
-        sortedScores.forEach(
-            ([user, pts], index) => {
-
-                winAnnouncement +=
-                    `\n${index + 1}. @${user.replace(/[^0-9]/g, '')} — *${pts} pts*`;
-            }
-        );
-
-        await sock.sendMessage(
-            from,
-            {
-                text: winAnnouncement,
-                mentions: sortedScores.map(
-                    ([user]) => user
-                )
-            },
-            {
-                quoted: m
-            }
-        );
-
-        const sessionAfterWin =
-            activeGames[from];
-
-        if (
-            !sessionAfterWin ||
-            sessionAfterWin.stopped
-        ) {
-            return true;
-        }
-
-        scheduleNextRound(from, 3000);
-
-        return true;
-    }
-
-    return false;
-}
-
-
-/*
- * ============================================================
- * TRUTH OR DARE MESSAGE
- * ============================================================
- */
-
-async function handleTruthOrDareMessage(
-    sock,
-    m,
-    from,
-    text,
-    session,
-    sender
-) {
-    if (
-        activeGames[from] !== session ||
-        session.stopped
-    ) {
-        return false;
-    }
-
-    const cleanText =
-        String(text || '').trim();
-
-    if (!cleanText) {
-        return false;
-    }
-
-    if (
-        session.truthDareParticipants.has(
-            sender
-        )
-    ) {
-        return false;
-    }
-
-    if (
-        session.truthDareWinners.length >= 3
-    ) {
-        return false;
-    }
-
-    const position =
-        session.truthDareWinners.length;
-
-    const rewards = [
-        10,
-        5,
-        3
-    ];
-
-    const reward =
-        rewards[position];
-
-    session.truthDareParticipants.add(
-        sender
-    );
-
-    session.truthDareWinners.push({
-        user: sender,
-        points: reward,
-        answer: cleanText
-    });
-
-    session.scores[sender] =
-        Number(
-            session.scores[sender] || 0
-        ) + reward;
-
-    const place =
-        position === 0
-            ? '🥇 FIRST'
-            : position === 1
-                ? '🥈 SECOND'
-                : '🥉 THIRD';
-
-    await sock.sendMessage(
-        from,
-        {
-            text:
-`🔥 *TRUTH OR DARE — ${place}!*
-
-🎉 @${sender.replace(/[^0-9]/g, '')}
-💎 *+${reward} Points!*
-
-👥 *Players can still answer!*
-${
-    session.truthDareWinners.length >= 3
-        ? '🏁 All 3 scoring positions are now filled!'
-        : '⚡ There is still a scoring position available!'
-}`,
-            mentions: [sender]
-        },
-        {
-            quoted: m
-        }
-    );
-
-    const currentSession =
-        activeGames[from];
-
-    if (
-        !currentSession ||
-        currentSession.stopped
-    ) {
-        return true;
-    }
-
-    if (
-        session.truthDareWinners.length >= 3
-    ) {
-        clearGameTimer(
-            session,
-            'timer'
-        );
-
-        clearGameTimer(
-            session,
-            'finishTimer'
-        );
-
-        session.finishTimer =
-            setTimeout(() => {
-
-                const current =
-                    activeGames[from];
-
-                if (
-                    !current ||
-                    current.stopped
-                ) {
-                    return;
-                }
-
-                current.finishTimer = null;
-
-                finishTruthOrDareRound(from);
-
-            }, 1500);
-    }
+    activeGames.delete(jid);
 
     return true;
 }
@@ -1076,231 +944,12 @@ ${
 
 /*
  * ============================================================
- * FINISH TRUTH OR DARE ROUND
+ * GET ACTIVE GAME
  * ============================================================
  */
 
-async function finishTruthOrDareRound(from) {
-    const session =
-        activeGames[from];
-
-    if (
-        !session ||
-        session.stopped
-    ) {
-        return;
-    }
-
-    clearGameTimer(
-        session,
-        'timer'
-    );
-
-    clearGameTimer(
-        session,
-        'finishTimer'
-    );
-
-    const winners =
-        session.truthDareWinners || [];
-
-    let roundResult =
-`┏━━━ 🔥 *TRUTH OR DARE ROUND OVER* 🔥 ━━━┓`;
-
-    if (winners.length === 0) {
-
-        roundResult +=
-`
-┃ ⏰ *Time's up!*
-┃ ❌ Nobody answered this round.
-`;
-
-    } else {
-
-        roundResult +=
-`
-┃ 🏆 *ROUND WINNERS:*`;
-
-        winners.forEach(
-            (winner, index) => {
-
-                const medal =
-                    index === 0
-                        ? '🥇'
-                        : index === 1
-                            ? '🥈'
-                            : '🥉';
-
-                roundResult +=
-                    `\n┃ ${medal} @${winner.user.replace(/[^0-9]/g, '')} — *+${winner.points} pts*`;
-            }
-        );
-
-        roundResult +=
-`
-┃
-┃ 👥 *Other answers received no points this round.*
-`;
-    }
-
-    roundResult +=
-`
-┣━━━━━━━━━━━━━━━━━━━━━━━
-┃ 🏆 *CURRENT LEADERBOARD:*`;
-
-    const sortedScores =
-        Object.entries(
-            session.scores
-        ).sort(
-            (a, b) => b[1] - a[1]
-        );
-
-    if (sortedScores.length === 0) {
-
-        roundResult +=
-            `\n┃ No points yet.`;
-
-    } else {
-
-        sortedScores.forEach(
-            ([user, pts], index) => {
-
-                roundResult +=
-                    `\n┃ ${index + 1}. @${user.replace(/[^0-9]/g, '')} — *${pts} pts*`;
-            }
-        );
-    }
-
-    roundResult +=
-`
-┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-
-    await session.sock.sendMessage(
-        from,
-        {
-            text: roundResult,
-            mentions: sortedScores.map(
-                ([user]) => user
-            )
-        }
-    );
-
-    const currentSession =
-        activeGames[from];
-
-    if (
-        !currentSession ||
-        currentSession.stopped
-    ) {
-        return;
-    }
-
-    currentSession.activeQuestion =
-        null;
-
-    scheduleNextRound(from, 3000);
-}
-
-
-/*
- * ============================================================
- * END GAME
- * ============================================================
- */
-
-async function endGame(from) {
-    const session =
-        activeGames[from];
-
-    if (
-        !session ||
-        session.stopped
-    ) {
-        return;
-    }
-
-    clearAllGameTimers(session);
-
-    const sortedScores =
-        Object.entries(
-            session.scores
-        ).sort(
-            (a, b) => b[1] - a[1]
-        );
-
-    let finalDashboard =
-`┏━━━ 🏆 *GAME OVER - FINAL LEADERBOARD* 🏆 ━━━┓
-┃ 🎮 *Game Session Completed Successfully!*
-┣━━━━━━━━━━━━━━━━━━━━━━━`;
-
-    if (sortedScores.length === 0) {
-
-        finalDashboard +=
-            `\n┃ ❌ *No players scored any points this session.*`;
-
-    } else {
-
-        sortedScores.forEach(
-            ([user, pts], index) => {
-
-                const medal =
-                    index === 0
-                        ? '🥇'
-                        : index === 1
-                            ? '🥈'
-                            : index === 2
-                                ? '🥉'
-                                : '▪️';
-
-                finalDashboard +=
-                    `\n┃ ${medal} ${index + 1}. @${user.replace(/[^0-9]/g, '')} — *${pts} Points*`;
-            }
-        );
-
-        const winner =
-            sortedScores[0][0];
-
-        finalDashboard +=
-            `\n┣━━━━━━━━━━━━━━━━━━━━━━━\n` +
-            `┃ 👑 *WINNER:* @${winner.replace(/[^0-9]/g, '')} 🎉`;
-    }
-
-    finalDashboard +=
-        `\n┗━━━ 👑 *QUEEN VIDA-V3* 👑 ━━━┛`;
-
-    await session.sock.sendMessage(
-        from,
-        {
-            text: finalDashboard,
-            mentions: sortedScores.map(
-                ([user]) => user
-            )
-        }
-    );
-
-    clearAllGameTimers(session);
-
-    session.stopped = true;
-    session.activeQuestion = null;
-
-    delete activeGames[from];
-}
-
-
-/*
- * ============================================================
- * CHECK GAME STATUS
- * ============================================================
- */
-
-function isGameActive(from) {
-    const session =
-        activeGames[from];
-
-    return !!(
-        session &&
-        !session.stopped
-    );
+function getActiveGame(jid) {
+    return activeGames.get(jid) || null;
 }
 
 
@@ -1311,8 +960,23 @@ function isGameActive(from) {
  */
 
 module.exports = {
+    activeGames,
+
     startGame,
-    stopGame,
+
     handleGameMessage,
-    isGameActive
+
+    finishGame,
+
+    stopGame,
+
+    getActiveGame,
+
+    getSenderId,
+
+    normalizeAnswer,
+
+    normalizeOption,
+
+    isCorrectAnswer
 };
