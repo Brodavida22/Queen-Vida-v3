@@ -3,6 +3,9 @@ const {
     stopGame
 } = require('../utils/gameManager');
 
+const riddleGame = require('./riddle');
+const wordGames = require('./wordgames');
+
 const CREATOR_NUMBERS = [
     "2348138558590"
 ];
@@ -267,10 +270,30 @@ module.exports = {
             action === 'stop'
         ) {
 
-            return stopGame(
+            await stopGame(
                 sock,
                 from
             );
+
+            if (
+                riddleGame &&
+                typeof riddleGame.isActive === 'function' &&
+                riddleGame.isActive(from) &&
+                typeof riddleGame.stop === 'function'
+            ) {
+                await riddleGame.stop(sock, from);
+            }
+
+            if (
+                wordGames &&
+                typeof wordGames.isActive === 'function' &&
+                wordGames.isActive(from) &&
+                typeof wordGames.stop === 'function'
+            ) {
+                await wordGames.stop(sock, from);
+            }
+
+            return;
         }
 
 
