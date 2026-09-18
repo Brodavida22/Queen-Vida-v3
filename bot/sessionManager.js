@@ -8,44 +8,66 @@ const {
     Browsers
 } = require('@whiskeysockets/baileys');
 
-const { Boom } = require('@hapi/boom');
-const pino = require('pino');
-const NodeCache = require('node-cache');
+const {
+    Boom
+} = require('@hapi/boom');
 
-const { createMessageHandler } = require('./messageHandler');
-const { CREATOR_NAME } = require('./config');
+const pino =
+    require('pino');
 
-const SESSIONS_FILE = path.join(
-    __dirname,
-    '..',
-    'sessions.json'
-);
+const NodeCache =
+    require('node-cache');
 
-const AUTH_ROOT = path.join(
-    __dirname,
-    '..',
-    'auth_info'
-);
+const {
+    createMessageHandler
+} = require('./messageHandler');
 
-// sessionId -> { sock, ownerNumber, isMain }
-const activeSessions = new Map();
+const {
+    CREATOR_NAME
+} = require('./config');
 
-// Prevent two startSession() calls from creating
-// two sockets for the same session.
-const startingSessions = new Map();
+
+const SESSIONS_FILE =
+    path.join(
+        __dirname,
+        '..',
+        'sessions.json'
+    );
+
+const AUTH_ROOT =
+    path.join(
+        __dirname,
+        '..',
+        'auth_info'
+    );
+
+
+const activeSessions =
+    new Map();
+
+const startingSessions =
+    new Map();
 
 
 // ============================================================
 // FILE HELPERS
 // ============================================================
 
-function ensureDirectory(dir) {
+function ensureDirectory(
+    dir
+) {
     try {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, {
-                recursive: true
-            });
+        if (
+            !fs.existsSync(dir)
+        ) {
+            fs.mkdirSync(
+                dir,
+                {
+                    recursive: true
+                }
+            );
         }
+
     } catch (error) {
         console.error(
             '🔥 [SESSION] Failed creating directory:',
@@ -54,40 +76,51 @@ function ensureDirectory(dir) {
     }
 }
 
+
 function loadSessionRegistry() {
-    if (!fs.existsSync(SESSIONS_FILE)) {
+    if (
+        !fs.existsSync(
+            SESSIONS_FILE
+        )
+    ) {
         return {};
     }
 
     try {
-        const data = fs.readFileSync(
-            SESSIONS_FILE,
-            'utf8'
-        );
+        const parsed =
+            JSON.parse(
+                fs.readFileSync(
+                    SESSIONS_FILE,
+                    'utf8'
+                ) || '{}'
+            );
 
-        if (!data.trim()) {
-            return {};
-        }
-
-        const parsed = JSON.parse(data);
-
-        return parsed &&
-            typeof parsed === 'object'
+        return (
+            parsed &&
+            typeof parsed ===
+                'object'
+        )
             ? parsed
             : {};
+
     } catch (error) {
         console.error(
-            '⚠️ [SESSION REGISTRY] Invalid sessions.json. Starting with empty registry.'
+            '⚠️ [SESSION REGISTRY] Invalid sessions.json. Starting empty registry.'
         );
 
         return {};
     }
 }
 
-function saveSessionRegistry(registry) {
+
+function saveSessionRegistry(
+    registry
+) {
     try {
         ensureDirectory(
-            path.dirname(SESSIONS_FILE)
+            path.dirname(
+                SESSIONS_FILE
+            )
         );
 
         fs.writeFileSync(
@@ -100,6 +133,7 @@ function saveSessionRegistry(registry) {
         );
 
         return true;
+
     } catch (error) {
         console.error(
             '🔥 [SESSION REGISTRY] Failed to save:',
@@ -110,6 +144,7 @@ function saveSessionRegistry(registry) {
     }
 }
 
+
 function registerSession(
     sessionId,
     ownerNumber
@@ -119,14 +154,22 @@ function registerSession(
 
     registry[sessionId] = {
         ownerNumber,
+
         addedAt:
-            registry[sessionId]?.addedAt ||
+            registry[
+                sessionId
+            ]?.addedAt ||
             Date.now(),
-        updatedAt: Date.now()
+
+        updatedAt:
+            Date.now()
     };
 
-    saveSessionRegistry(registry);
+    saveSessionRegistry(
+        registry
+    );
 }
+
 
 function removeSessionFromRegistry(
     sessionId
@@ -140,9 +183,13 @@ function removeSessionFromRegistry(
             sessionId
         )
     ) {
-        delete registry[sessionId];
+        delete registry[
+            sessionId
+        ];
 
-        saveSessionRegistry(registry);
+        saveSessionRegistry(
+            registry
+        );
 
         console.log(
             `🧹 [SESSION] Removed ${sessionId} from sessions.json`
@@ -167,22 +214,9 @@ function getAuthPath(
         );
 }
 
-function getCredsPath(
-    sessionId,
-    isMain = false
-) {
-    return path.join(
-        getAuthPath(
-            sessionId,
-            isMain
-        ),
-        'creds.json'
-    );
-}
-
 
 // ============================================================
-// AUTH STATE CHECKS
+// READ CREDENTIALS
 // ============================================================
 
 function readCredentials(
@@ -202,13 +236,22 @@ function readCredentials(
         );
 
     if (
-        !fs.existsSync(authPath) ||
-        !fs.existsSync(credsPath)
+        !fs.existsSync(
+            authPath
+        ) ||
+        !fs.existsSync(
+            credsPath
+        )
     ) {
         return {
-            exists: false,
-            registered: false,
-            valid: false
+            exists:
+                false,
+
+            registered:
+                false,
+
+            valid:
+                false
         };
     }
 
@@ -221,34 +264,53 @@ function readCredentials(
 
         if (!raw.trim()) {
             return {
-                exists: true,
-                registered: false,
-                valid: false
+                exists:
+                    true,
+
+                registered:
+                    false,
+
+                valid:
+                    false
             };
         }
 
         const creds =
-            JSON.parse(raw);
+            JSON.parse(
+                raw
+            );
 
         return {
-            exists: true,
+            exists:
+                true,
+
             registered:
-                creds.registered === true,
-            valid: true,
+                creds.registered ===
+                true,
+
+            valid:
+                true,
+
             creds
         };
+
     } catch (error) {
         return {
-            exists: true,
-            registered: false,
-            valid: false
+            exists:
+                true,
+
+            registered:
+                false,
+
+            valid:
+                false
         };
     }
 }
 
 
 // ============================================================
-// STALE SESSION CLEANUP
+// DELETE AUTH
 // ============================================================
 
 function deleteAuthFolder(
@@ -262,12 +324,19 @@ function deleteAuthFolder(
         );
 
     try {
-        if (fs.existsSync(authPath)) {
+        if (
+            fs.existsSync(
+                authPath
+            )
+        ) {
             fs.rmSync(
                 authPath,
                 {
-                    recursive: true,
-                    force: true
+                    recursive:
+                        true,
+
+                    force:
+                        true
                 }
             );
 
@@ -275,6 +344,7 @@ function deleteAuthFolder(
                 `🧹 [SESSION] Deleted auth folder for ${sessionId}`
             );
         }
+
     } catch (error) {
         console.error(
             `🔥 [SESSION] Failed deleting auth folder for ${sessionId}:`,
@@ -283,11 +353,20 @@ function deleteAuthFolder(
     }
 }
 
+
+// ============================================================
+// STALE SESSION
+// ============================================================
+
 function cleanupStaleSession(
     sessionId,
     isMain = false
 ) {
-    if (activeSessions.has(sessionId)) {
+    if (
+        activeSessions.has(
+            sessionId
+        )
+    ) {
         return false;
     }
 
@@ -297,28 +376,11 @@ function cleanupStaleSession(
             isMain
         );
 
-    if (!auth.exists) {
-        removeSessionFromRegistry(
-            sessionId
-        );
-
-        return true;
-    }
-
-    if (!auth.valid) {
-        deleteAuthFolder(
-            sessionId,
-            isMain
-        );
-
-        removeSessionFromRegistry(
-            sessionId
-        );
-
-        return true;
-    }
-
-    if (!auth.registered) {
+    if (
+        !auth.exists ||
+        !auth.valid ||
+        !auth.registered
+    ) {
         deleteAuthFolder(
             sessionId,
             isMain
@@ -336,20 +398,26 @@ function cleanupStaleSession(
 
 
 // ============================================================
-// SESSION STATUS
+// SESSION EXISTS
 // ============================================================
 
 function sessionExists(
     sessionId
 ) {
-    if (activeSessions.has(sessionId)) {
+    if (
+        activeSessions.has(
+            sessionId
+        )
+    ) {
         return true;
     }
 
     const registry =
         loadSessionRegistry();
 
-    if (!registry[sessionId]) {
+    if (
+        !registry[sessionId]
+    ) {
         return false;
     }
 
@@ -361,16 +429,9 @@ function sessionExists(
 
     if (
         !auth.exists ||
-        !auth.valid
+        !auth.valid ||
+        !auth.registered
     ) {
-        removeSessionFromRegistry(
-            sessionId
-        );
-
-        return false;
-    }
-
-    if (!auth.registered) {
         deleteAuthFolder(
             sessionId,
             false
@@ -388,7 +449,7 @@ function sessionExists(
 
 
 // ============================================================
-// FORCE CLEAN SESSION
+// REMOVE SESSION
 // ============================================================
 
 async function removeSession(
@@ -407,12 +468,22 @@ async function removeSession(
 
     if (active) {
         try {
+            /*
+             * IMPORTANT:
+             * Prevent the connection.close handler
+             * from automatically reconnecting after
+             * the user deliberately clears the session.
+             */
+            active.manualRemoval =
+                true;
+
             active.sock?.end?.(
                 new Error(
                     'Session removed'
                 )
             );
-        } catch (e) {}
+
+        } catch (error) {}
 
         activeSessions.delete(
             sessionId
@@ -423,13 +494,17 @@ async function removeSession(
         sessionId
     );
 
-    if (removeRegistry) {
+    if (
+        removeRegistry
+    ) {
         removeSessionFromRegistry(
             sessionId
         );
     }
 
-    if (removeAuth) {
+    if (
+        removeAuth
+    ) {
         deleteAuthFolder(
             sessionId,
             false
@@ -472,8 +547,39 @@ async function startSession({
         );
     }
 
+
     const startPromise =
         (async () => {
+            let sock =
+                null;
+
+            let groupMetadataCache =
+                null;
+
+            let userDevicesCache =
+                null;
+
+            let pairingRequested =
+                false;
+
+            let pairingRetryTimer =
+                null;
+
+            let bannerSent =
+                false;
+
+            /*
+             * THIS IS THE IMPORTANT FIX.
+             *
+             * We do not request a pairing code
+             * after an arbitrary 2.5 seconds.
+             *
+             * We wait until WhatsApp reports
+             * connection === 'open'.
+             */
+            let connectionOpened =
+                false;
+
             try {
                 const authPath =
                     getAuthPath(
@@ -510,6 +616,11 @@ async function startSession({
                     }
                 }
 
+
+                // ====================================================
+                // AUTH STATE
+                // ====================================================
+
                 const {
                     state,
                     saveCreds
@@ -520,51 +631,42 @@ async function startSession({
 
 
                 // ====================================================
-                // GROUP METADATA CACHE
+                // CACHES
                 // ====================================================
 
-                const groupMetadataCache =
+                groupMetadataCache =
                     new Map();
 
-
-                // ====================================================
-                // USER DEVICE CACHE
-                // ====================================================
-
-                /*
-                 * CRITICAL FIX FOR LARGE GROUPS
-                 *
-                 * Baileys uses this cache inside
-                 * getUSyncDevices().
-                 *
-                 * Without this cache, every large-group
-                 * message can require another USync device
-                 * query for many participants.
-                 *
-                 * 10 minute TTL keeps the cache useful while
-                 * avoiding unlimited growth.
-                 */
-                const userDevicesCache =
+                userDevicesCache =
                     new NodeCache({
-                        stdTTL: 600,
-                        checkperiod: 120,
-                        useClones: false
+                        stdTTL:
+                            600,
+
+                        checkperiod:
+                            120,
+
+                        useClones:
+                            false
                     });
 
 
                 // ====================================================
-                // CREATE SOCKET
+                // SOCKET
                 // ====================================================
 
-                const sock =
+                sock =
                     makeWASocket({
-                        logger: pino({
-                            level: 'silent'
-                        }),
+                        logger:
+                            pino({
+                                level:
+                                    'silent'
+                            }),
 
-                        auth: state,
+                        auth:
+                            state,
 
-                        printQRInTerminal: false,
+                        printQRInTerminal:
+                            false,
 
                         browser:
                             Browsers.macOS(
@@ -577,43 +679,24 @@ async function startSession({
                         markOnlineOnConnect:
                             true,
 
-                        /*
-                         * Connection timeout.
-                         */
                         connectTimeoutMs:
                             60000,
 
-                        /*
-                         * CRITICAL:
-                         *
-                         * Give USync/device queries
-                         * considerably more time.
-                         */
                         defaultQueryTimeoutMs:
                             300000,
 
                         keepAliveIntervalMs:
                             25000,
 
-                        /*
-                         * CRITICAL:
-                         *
-                         * Reuse participant device
-                         * information instead of repeatedly
-                         * querying WhatsApp.
-                         */
                         userDevicesCache,
 
-                        /*
-                         * Reuse group participant metadata.
-                         */
                         cachedGroupMetadata:
-                            async jid => {
-                                return groupMetadataCache.get(
+                            async jid =>
+                                groupMetadataCache.get(
                                     jid
-                                );
-                            }
+                                )
                     });
+
 
                 sock.commands =
                     commandsMap;
@@ -621,24 +704,27 @@ async function startSession({
                 sock.sessionId =
                     sessionId;
 
+
+                const sessionData = {
+                    sock,
+
+                    ownerNumber,
+
+                    isMain,
+
+                    manualRemoval:
+                        false
+                };
+
+
                 activeSessions.set(
                     sessionId,
-                    {
-                        sock,
-                        ownerNumber,
-                        isMain
-                    }
+                    sessionData
                 );
-
-                let pairingRequested =
-                    false;
-
-                let bannerSent =
-                    false;
 
 
                 // ====================================================
-                // GROUP METADATA LOADER
+                // GROUP METADATA
                 // ====================================================
 
                 const refreshGroupMetadata =
@@ -659,7 +745,7 @@ async function startSession({
                                 );
 
                             if (
-                                metadata &&
+                                metadata?.participants &&
                                 Array.isArray(
                                     metadata.participants
                                 )
@@ -669,17 +755,14 @@ async function startSession({
                                     metadata
                                 );
 
-                                console.log(
-                                    `📦 [GROUP CACHE] ${groupJid} -> ${metadata.participants.length} participants`
-                                );
-
                                 return metadata;
                             }
+
                         } catch (error) {
                             console.error(
                                 `⚠️ [GROUP CACHE] Failed loading ${groupJid}:`,
                                 error?.message ||
-                                    error
+                                error
                             );
                         }
 
@@ -688,7 +771,7 @@ async function startSession({
 
 
                 // ====================================================
-                // PAIRING
+                // PAIRING CODE
                 // ====================================================
 
                 const requestPairing =
@@ -700,8 +783,7 @@ async function startSession({
                         }
 
                         if (
-                            sock.authState?.creds
-                                ?.registered
+                            state.creds.registered
                         ) {
                             return;
                         }
@@ -709,8 +791,32 @@ async function startSession({
                         if (
                             !ownerNumber
                         ) {
-                            console.error(
-                                `❌ [SESSION ${sessionId}] No phone number provided.`
+                            const error =
+                                new Error(
+                                    'No phone number provided.'
+                                );
+
+                            if (
+                                onPairingCode
+                            ) {
+                                await onPairingCode(
+                                    null,
+                                    error.message
+                                );
+                            }
+
+                            return;
+                        }
+
+                        /*
+                         * DO NOT REQUEST THE CODE
+                         * UNTIL WHATSAPP IS CONNECTED.
+                         */
+                        if (
+                            !connectionOpened
+                        ) {
+                            console.log(
+                                `⏳ [SESSION ${sessionId}] Waiting for WhatsApp connection before requesting pairing code...`
                             );
 
                             return;
@@ -741,13 +847,23 @@ async function startSession({
                                 );
                             }
 
+                            console.log(
+                                `📱 [SESSION ${sessionId}] Requesting pairing code for +${cleanNumber}...`
+                            );
+
                             const code =
                                 await sock.requestPairingCode(
                                     cleanNumber
                                 );
 
+                            if (!code) {
+                                throw new Error(
+                                    'WhatsApp returned an empty pairing code.'
+                                );
+                            }
+
                             console.log(
-                                `✨ [SESSION ${sessionId}] PAIRING CODE: ${code}`
+                                `✨ [SESSION ${sessionId}] PAIRING CODE GENERATED.`
                             );
 
                             if (
@@ -757,12 +873,16 @@ async function startSession({
                                     code
                                 );
                             }
-                        } catch (pairError) {
+
+                        } catch (
+                            pairError
+                        ) {
                             pairingRequested =
                                 false;
 
                             console.error(
                                 `🔥 [SESSION ${sessionId}] PAIRING ERROR:`,
+                                pairError?.message ||
                                 pairError
                             );
 
@@ -772,9 +892,8 @@ async function startSession({
                                 try {
                                     await onPairingCode(
                                         null,
-                                        pairError
-                                            ?.message ||
-                                            'Unknown pairing error'
+                                        pairError?.message ||
+                                        'Unknown pairing error'
                                     );
                                 } catch (
                                     callbackError
@@ -785,31 +904,7 @@ async function startSession({
 
 
                 // ====================================================
-                // INITIAL PAIRING
-                // ====================================================
-
-                if (
-                    !state.creds
-                        .registered
-                ) {
-                    setTimeout(
-                        () => {
-                            requestPairing()
-                                .catch(
-                                    error =>
-                                        console.error(
-                                            `🔥 [SESSION ${sessionId}] Pairing request failed:`,
-                                            error
-                                        )
-                                );
-                        },
-                        2500
-                    );
-                }
-
-
-                // ====================================================
-                // CONNECTION
+                // CONNECTION UPDATE
                 // ====================================================
 
                 sock.ev.on(
@@ -820,22 +915,65 @@ async function startSession({
                             lastDisconnect
                         } = update;
 
+
+                        // ==================================================
+                        // OPEN
+                        // ==================================================
+
                         if (
                             connection ===
                             'open'
                         ) {
+                            connectionOpened =
+                                true;
+
                             console.log(
                                 `--- [SESSION ${sessionId}] CONNECTED ---`
                             );
 
+
+                            /*
+                             * IMPORTANT:
+                             *
+                             * Request pairing code only now,
+                             * after WhatsApp is actually open.
+                             */
+                            if (
+                                !state.creds.registered &&
+                                !pairingRequested
+                            ) {
+                                if (
+                                    pairingRetryTimer
+                                ) {
+                                    clearTimeout(
+                                        pairingRetryTimer
+                                    );
+                                }
+
+                                pairingRetryTimer =
+                                    setTimeout(
+                                        () => {
+                                            requestPairing()
+                                                .catch(
+                                                    error =>
+                                                        console.error(
+                                                            `🔥 [SESSION ${sessionId}] Pairing request failed:`,
+                                                            error
+                                                        )
+                                                );
+                                        },
+                                        1500
+                                    );
+                            }
+
+
+                            // ==============================================
+                            // GROUP CACHE
+                            // ==============================================
+
                             try {
                                 const groups =
                                     await sock.groupFetchAllParticipating();
-
-                                const entries =
-                                    Object.entries(
-                                        groups || {}
-                                    );
 
                                 let cachedCount =
                                     0;
@@ -844,10 +982,13 @@ async function startSession({
                                     const [
                                         jid,
                                         metadata
-                                    ] of entries
+                                    ] of Object.entries(
+                                        groups ||
+                                        {}
+                                    )
                                 ) {
                                     if (
-                                        metadata &&
+                                        metadata?.participants &&
                                         Array.isArray(
                                             metadata.participants
                                         )
@@ -864,13 +1005,21 @@ async function startSession({
                                 console.log(
                                     `📦 [GROUP CACHE] Preloaded ${cachedCount} group(s) for session ${sessionId}`
                                 );
-                            } catch (cacheError) {
+
+                            } catch (
+                                error
+                            ) {
                                 console.error(
                                     `⚠️ [GROUP CACHE] Preload failed for session ${sessionId}:`,
-                                    cacheError?.message ||
-                                        cacheError
+                                    error?.message ||
+                                    error
                                 );
                             }
+
+
+                            // ==============================================
+                            // REGISTER
+                            // ==============================================
 
                             if (
                                 !isMain
@@ -881,58 +1030,69 @@ async function startSession({
                                 );
                             }
 
+
+                            // ==============================================
+                            // CALLBACK
+                            // ==============================================
+
                             if (
                                 onConnected
                             ) {
                                 try {
-                                    await onConnected(
-                                        {
-                                            sessionId,
-                                            ownerNumber,
-                                            isMain
-                                        }
-                                    );
+                                    await onConnected({
+                                        sessionId,
+
+                                        ownerNumber,
+
+                                        isMain
+                                    });
+
                                 } catch (
-                                    callbackError
+                                    error
                                 ) {
                                     console.error(
                                         `🔥 [SESSION ${sessionId}] onConnected error:`,
-                                        callbackError.message
+                                        error.message
                                     );
                                 }
                             }
 
+
+                            // ==============================================
+                            // BANNER
+                            // ==============================================
+
                             if (
-                                !bannerSent
+                                !bannerSent &&
+                                sock.user
                             ) {
                                 bannerSent =
                                     true;
 
                                 try {
                                     const botJid =
-                                        sock.user?.id
-                                            ?.split(
-                                                ':'
-                                            )[0] +
-                                        '@s.whatsapp.net';
+                                        `${sock.user.id?.split(':')[0]}@s.whatsapp.net`;
 
-                                    if (
-                                        sock.user
-                                    ) {
-                                        await sock.sendMessage(
-                                            botJid,
-                                            {
-                                                text:
-                                                    `👑 *${CREATOR_NAME}* is now connected and active on this number!\n\n` +
-                                                    `Type *!menu* to see all commands.`
-                                            }
-                                        );
-                                    }
+                                    await sock.sendMessage(
+                                        botJid,
+                                        {
+                                            text:
+                                                `👑 *${CREATOR_NAME}* is now connected and active on this number!\n\nType *!menu* to see all commands.`
+                                        }
+                                    );
+
                                 } catch (
-                                    bannerError
+                                    error
                                 ) {}
                             }
+
+                            return;
                         }
+
+
+                        // ==================================================
+                        // CLOSED
+                        // ==================================================
 
                         if (
                             connection !==
@@ -941,24 +1101,70 @@ async function startSession({
                             return;
                         }
 
+                        connectionOpened =
+                            false;
+
+                        if (
+                            pairingRetryTimer
+                        ) {
+                            clearTimeout(
+                                pairingRetryTimer
+                            );
+
+                            pairingRetryTimer =
+                                null;
+                        }
+
+
                         const statusCode =
                             new Boom(
                                 lastDisconnect?.error
                             )?.output
                                 ?.statusCode;
 
+
+                        const current =
+                            activeSessions.get(
+                                sessionId
+                            );
+
+                        const manualRemoval =
+                            current?.manualRemoval ===
+                            true;
+
+
                         console.error(
                             `🔥 [SESSION ${sessionId}] CONNECTION CLOSED. Status: ${statusCode}`,
+
                             lastDisconnect?.error ||
-                                'Unknown disconnect reason'
+                            'Unknown disconnect reason'
                         );
+
 
                         activeSessions.delete(
                             sessionId
                         );
 
+
                         groupMetadataCache.clear();
+
                         userDevicesCache.flushAll();
+
+
+                        /*
+                         * User deliberately removed it.
+                         * DO NOT reconnect.
+                         */
+                        if (
+                            manualRemoval
+                        ) {
+                            return;
+                        }
+
+
+                        // ==============================================
+                        // LOGGED OUT
+                        // ==============================================
 
                         if (
                             statusCode ===
@@ -980,11 +1186,16 @@ async function startSession({
                             return;
                         }
 
+
+                        // ==============================================
+                        // BAD SESSION
+                        // ==============================================
+
                         if (
                             statusCode ===
                                 401 ||
                             statusCode ===
-                                DisconnectReason.badSession
+                            DisconnectReason.badSession
                         ) {
                             console.log(
                                 `🧹 [SESSION ${sessionId}] Invalid session. Cleaning auth.`
@@ -1006,6 +1217,11 @@ async function startSession({
                             return;
                         }
 
+
+                        // ==============================================
+                        // RECONNECT
+                        // ==============================================
+
                         console.log(
                             `🔄 [SESSION ${sessionId}] Reconnecting in 3 seconds...`
                         );
@@ -1013,22 +1229,26 @@ async function startSession({
                         setTimeout(
                             async () => {
                                 try {
-                                    await startSession(
-                                        {
-                                            sessionId,
-                                            ownerNumber,
-                                            isMain,
-                                            commandsMap,
-                                            onPairingCode,
-                                            onConnected
-                                        }
-                                    );
+                                    await startSession({
+                                        sessionId,
+
+                                        ownerNumber,
+
+                                        isMain,
+
+                                        commandsMap,
+
+                                        onPairingCode,
+
+                                        onConnected
+                                    });
+
                                 } catch (
-                                    reconnectError
+                                    error
                                 ) {
                                     console.error(
                                         `🔥 [SESSION ${sessionId}] Reconnect failed:`,
-                                        reconnectError
+                                        error
                                     );
                                 }
                             },
@@ -1087,7 +1307,7 @@ async function startSession({
 
 
                 // ====================================================
-                // SAVE CREDS
+                // SAVE CREDENTIALS
                 // ====================================================
 
                 sock.ev.on(
@@ -1102,19 +1322,31 @@ async function startSession({
 
                 sock.ev.on(
                     'messages.upsert',
+
                     createMessageHandler(
                         sock,
                         {
                             sessionId,
+
                             ownerNumber,
+
                             isMain
                         }
                     )
                 );
 
+
                 return sock;
 
             } catch (error) {
+                if (
+                    pairingRetryTimer
+                ) {
+                    clearTimeout(
+                        pairingRetryTimer
+                    );
+                }
+
                 activeSessions.delete(
                     sessionId
                 );
@@ -1128,13 +1360,16 @@ async function startSession({
             }
         })();
 
+
     startingSessions.set(
         sessionId,
         startPromise
     );
 
+
     try {
         return await startPromise;
+
     } finally {
         startingSessions.delete(
             sessionId
@@ -1151,19 +1386,28 @@ function getActiveSessions() {
     return Array.from(
         activeSessions.entries()
     ).map(
-        ([sessionId, data]) => ({
+        (
+            [
+                sessionId,
+                data
+            ]
+        ) => ({
             sessionId,
+
             ownerNumber:
                 data.ownerNumber,
-            isMain: data.isMain,
-            connected: !!(
-                data.sock &&
-                data.sock.user
-            ),
-            registered: !!(
-                data.sock?.authState
-                    ?.creds?.registered
-            )
+
+            isMain:
+                data.isMain,
+
+            connected:
+                !!(
+                    data.sock &&
+                    data.sock.user
+                ),
+
+            registered:
+                !!data.sock?.user
         })
     );
 }
@@ -1180,10 +1424,12 @@ async function restoreSessions(
         loadSessionRegistry();
 
     const sessionIds =
-        Object.keys(registry);
+        Object.keys(
+            registry
+        );
 
     if (
-        sessionIds.length === 0
+        !sessionIds.length
     ) {
         return;
     }
@@ -1191,6 +1437,7 @@ async function restoreSessions(
     console.log(
         `🔄 Restoring ${sessionIds.length} saved session(s)...`
     );
+
 
     for (
         const sessionId of sessionIds
@@ -1203,13 +1450,10 @@ async function restoreSessions(
             continue;
         }
 
-        const saved =
+        const ownerNumber =
             registry[
                 sessionId
-            ];
-
-        const ownerNumber =
-            saved?.ownerNumber;
+            ]?.ownerNumber;
 
         const auth =
             readCredentials(
@@ -1241,10 +1485,15 @@ async function restoreSessions(
         try {
             await startSession({
                 sessionId,
+
                 ownerNumber,
-                isMain: false,
+
+                isMain:
+                    false,
+
                 commandsMap
             });
+
         } catch (error) {
             console.error(
                 `🔥 Failed to restore session ${sessionId}:`,
@@ -1261,10 +1510,16 @@ async function restoreSessions(
 
 module.exports = {
     startSession,
+
     getActiveSessions,
+
     restoreSessions,
+
     sessionExists,
+
     removeSession,
+
     cleanupStaleSession,
+
     activeSessions
 };
