@@ -25,8 +25,23 @@ const PENDING_FILE =
         'telegram_sessions.json'
     );
 
-const pendingPairings = new Map();
-const pendingGcStatus = new Map();
+const PAIRING_CODE_TIMEOUT =
+    4 * 60 * 1000;
+
+const PAIRING_ENTRY_TIMEOUT =
+    10 * 60 * 1000;
+
+const PAIRING_WATCH_INTERVAL =
+    2000;
+
+const GCSTATUS_TIMEOUT =
+    10 * 60 * 1000;
+
+const pendingPairings =
+    new Map();
+
+const pendingGcStatus =
+    new Map();
 
 const telegramSessions =
     loadTelegramSessions();
@@ -42,18 +57,13 @@ function loadTelegramSessions() {
     }
 
     try {
-        const data =
-            fs.readFileSync(
-                PENDING_FILE,
-                'utf8'
-            );
-
-        if (!data.trim()) {
-            return {};
-        }
-
         const parsed =
-            JSON.parse(data);
+            JSON.parse(
+                fs.readFileSync(
+                    PENDING_FILE,
+                    'utf8'
+                ) || '{}'
+            );
 
         if (
             !parsed ||
@@ -62,23 +72,30 @@ function loadTelegramSessions() {
             return {};
         }
 
-        for (const chatId of Object.keys(parsed)) {
+        for (
+            const key of Object.keys(parsed)
+        ) {
             if (
-                parsed[chatId] &&
-                !Array.isArray(parsed[chatId]) &&
-                typeof parsed[chatId] === 'object'
+                parsed[key] &&
+                !Array.isArray(parsed[key]) &&
+                typeof parsed[key] === 'object'
             ) {
-                parsed[chatId] = [
-                    parsed[chatId]
+                parsed[key] = [
+                    parsed[key]
                 ];
             }
 
-            if (!Array.isArray(parsed[chatId])) {
-                parsed[chatId] = [];
+            if (
+                !Array.isArray(
+                    parsed[key]
+                )
+            ) {
+                parsed[key] = [];
             }
         }
 
         return parsed;
+
     } catch (error) {
         console.error(
             '⚠️ [TELEGRAM] Invalid telegram_sessions.json. Starting empty.'
@@ -99,6 +116,7 @@ function saveTelegramSessions() {
                 2
             )
         );
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Failed to save sessions:',
@@ -108,10 +126,17 @@ function saveTelegramSessions() {
 }
 
 
-function getChatSessions(chatId) {
-    const key = String(chatId);
+function getChatSessions(
+    chatId
+) {
+    const key =
+        String(chatId);
 
-    if (!Array.isArray(telegramSessions[key])) {
+    if (
+        !Array.isArray(
+            telegramSessions[key]
+        )
+    ) {
         telegramSessions[key] = [];
     }
 
@@ -119,13 +144,18 @@ function getChatSessions(chatId) {
 }
 
 
-function saveChatSessions(chatId, sessions) {
-    const key = String(chatId);
+function saveChatSessions(
+    chatId,
+    sessions
+) {
+    const key =
+        String(chatId);
 
-    if (!sessions.length) {
-        delete telegramSessions[key];
+    if (sessions.length) {
+        telegramSessions[key] =
+            sessions;
     } else {
-        telegramSessions[key] = sessions;
+        delete telegramSessions[key];
     }
 
     saveTelegramSessions();
@@ -139,20 +169,19 @@ function saveChatSessions(chatId, sessions) {
 async function telegram(
     method,
     data = {},
-    axiosTimeout = 30000
+    timeout = 30000
 ) {
     const response =
         await axios.post(
             `${TELEGRAM_API}/${method}`,
             data,
             {
-                timeout: axiosTimeout
+                timeout
             }
         );
 
     if (
-        !response.data ||
-        !response.data.ok
+        !response.data?.ok
     ) {
         throw new Error(
             response.data?.description ||
@@ -178,6 +207,7 @@ async function sendMessage(
                 ...extra
             }
         );
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Failed to send message:',
@@ -190,7 +220,7 @@ async function sendMessage(
 
 
 async function answerCallbackQuery(
-    callbackQueryId,
+    id,
     text = ''
 ) {
     try {
@@ -198,10 +228,11 @@ async function answerCallbackQuery(
             'answerCallbackQuery',
             {
                 callback_query_id:
-                    callbackQueryId,
+                    id,
                 text
             }
         );
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Callback error:',
@@ -229,6 +260,7 @@ async function editMessageText(
                 ...extra
             }
         );
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Edit message error:',
@@ -241,10 +273,12 @@ async function editMessageText(
 
 
 // ============================================================
-// PHONE HELPERS
+// PHONE
 // ============================================================
 
-function cleanPhoneNumber(value) {
+function cleanPhoneNumber(
+    value
+) {
     return String(value || '')
         .trim()
         .replace(/[^0-9]/g, '');
@@ -252,70 +286,53 @@ function cleanPhoneNumber(value) {
 
 
 // ============================================================
-// SESSION HELPERS
+// WHATSAPP SESSION HELPERS
 // ============================================================
 
-function getSessionRecord(sessionId) {
-    if (!sessionId) {
-        return null;
-    }
-
-    const sessions =
-        sessionManager.getActiveSessions();
-
-    if (!Array.isArray(sessions)) {
-        return null;
-    }
-
-    return sessions.find(
-        session =>
-            session.sessionId === sessionId
-    ) || null;
-}
-
-
-function getConnectedSession(sessionId) {
+function getConnectedSession(
+    sessionId
+) {
     if (!sessionId) {
         return null;
     }
 
     const active =
-        sessionManager.activeSessions?.get(
-            sessionId
-        );
+        sessionManager
+            .activeSessions
+            ?.get(sessionId);
 
     if (!active) {
         return null;
     }
 
-    const connected =
-        !!(
-            active.sock &&
-            active.sock.user
-        );
-
     return {
         sessionId,
+
         ownerNumber:
             active.ownerNumber,
+
         isMain:
             active.isMain,
-        connected,
+
+        connected:
+            !!(
+                active.sock &&
+                active.sock.user
+            ),
+
         sock:
             active.sock
     };
 }
 
 
-function isConnected(sessionId) {
-    const session =
+function isConnected(
+    sessionId
+) {
+    return !!(
         getConnectedSession(
             sessionId
-        );
-
-    return !!(
-        session &&
-        session.connected
+        )?.connected
     );
 }
 
@@ -331,8 +348,7 @@ function getConnectedTelegramSessions(
                 );
 
             if (
-                !session ||
-                !session.connected ||
+                !session?.connected ||
                 !session.sock
             ) {
                 return null;
@@ -347,29 +363,23 @@ function getConnectedTelegramSessions(
 }
 
 
-// ============================================================
-// TELEGRAM GCSTATUS SESSION ACCESS
-// ============================================================
-
 function getTelegramGcStatusSession(
     chatId,
     sessionId
 ) {
-    if (!sessionId) {
-        return null;
-    }
-
-    const connected =
-        getConnectedTelegramSessions(
-            chatId
-        );
-
-    return connected.find(
+    return getConnectedTelegramSessions(
+        chatId
+    ).find(
         session =>
-            session.sessionId === sessionId
+            session.sessionId ===
+            sessionId
     ) || null;
 }
 
+
+// ============================================================
+// GCSTATUS ACCESS
+// ============================================================
 
 function getAuthorizedGcStatusSession(
     chatId
@@ -382,65 +392,33 @@ function getAuthorizedGcStatusSession(
     if (!connected.length) {
         return {
             ok: false,
+
             message:
                 '🔴 No WhatsApp session is currently connected.\n\nUse /pair to link WhatsApp first.'
         };
     }
 
-    /*
-     * Every Telegram-linked WhatsApp account
-     * is allowed to use GCSTATUS for its own groups.
-     *
-     * If there is only one account, use it directly.
-     */
-    if (connected.length === 1) {
+    if (
+        connected.length === 1
+    ) {
         return {
             ok: true,
-            session: connected[0]
+            session:
+                connected[0]
         };
     }
 
-    /*
-     * If multiple accounts are connected,
-     * the user must select one.
-     */
     return {
         ok: true,
         multiple: true,
-        sessions: connected
+        sessions:
+            connected
     };
 }
 
 
 // ============================================================
-// STALE SESSION CLEANUP
-// ============================================================
-
-function cleanupStalePairingSession(
-    sessionId
-) {
-    if (!sessionId) {
-        return false;
-    }
-
-    try {
-        return sessionManager.cleanupStaleSession(
-            sessionId,
-            false
-        );
-    } catch (error) {
-        console.error(
-            `🔥 [TELEGRAM] Stale session cleanup failed for ${sessionId}:`,
-            error.message
-        );
-
-        return false;
-    }
-}
-
-
-// ============================================================
-// FORCE CLEAR SESSION
+// CLEAR WHATSAPP SESSION
 // ============================================================
 
 async function clearWhatsAppSession(
@@ -451,26 +429,16 @@ async function clearWhatsAppSession(
     }
 
     try {
-        if (
-            typeof sessionManager.removeSession ===
-            'function'
-        ) {
-            await sessionManager.removeSession(
-                sessionId,
-                {
-                    removeAuth: true,
-                    removeRegistry: true
-                }
-            );
-
-            return true;
-        }
-
-        cleanupStalePairingSession(
-            sessionId
+        await sessionManager.removeSession(
+            sessionId,
+            {
+                removeAuth: true,
+                removeRegistry: true
+            }
         );
 
-        return false;
+        return true;
+
     } catch (error) {
         console.error(
             `🔥 [TELEGRAM] Failed to clear session ${sessionId}:`,
@@ -489,18 +457,12 @@ async function clearWhatsAppSession(
 function hasActiveSessionForNumber(
     number
 ) {
-    const cleanNumber =
+    const clean =
         cleanPhoneNumber(number);
 
-    const sessions =
-        sessionManager.getActiveSessions();
-
-    if (!Array.isArray(sessions)) {
-        return false;
-    }
-
-    return sessions.some(
-        session => {
+    return sessionManager
+        .getActiveSessions()
+        .some(session => {
             const owner =
                 cleanPhoneNumber(
                     session.ownerNumber ||
@@ -510,11 +472,10 @@ function hasActiveSessionForNumber(
                 );
 
             return (
-                owner === cleanNumber &&
+                owner === clean &&
                 session.connected === true
             );
-        }
-    );
+        });
 }
 
 
@@ -526,19 +487,16 @@ function removeDisconnectedMappingsForNumber(
     chatId,
     number
 ) {
-    const cleanNumber =
+    const clean =
         cleanPhoneNumber(number);
 
-    const sessions =
-        getChatSessions(chatId);
-
     const remaining =
-        sessions.filter(
-            saved => {
+        getChatSessions(chatId)
+            .filter(saved => {
                 if (
                     cleanPhoneNumber(
                         saved.whatsappNumber
-                    ) !== cleanNumber
+                    ) !== clean
                 ) {
                     return true;
                 }
@@ -546,8 +504,7 @@ function removeDisconnectedMappingsForNumber(
                 return isConnected(
                     saved.sessionId
                 );
-            }
-        );
+            });
 
     saveChatSessions(
         chatId,
@@ -555,6 +512,85 @@ function removeDisconnectedMappingsForNumber(
     );
 
     return remaining;
+}
+
+
+// ============================================================
+// PAIRING TIMER CLEANUP
+// ============================================================
+
+function clearPairingTimers(
+    pending
+) {
+    if (!pending) {
+        return;
+    }
+
+    if (pending.generationTimer) {
+        clearTimeout(
+            pending.generationTimer
+        );
+    }
+
+    if (pending.entryTimer) {
+        clearTimeout(
+            pending.entryTimer
+        );
+    }
+
+    if (pending.watcher) {
+        clearInterval(
+            pending.watcher
+        );
+    }
+
+    pending.generationTimer =
+        null;
+
+    pending.entryTimer =
+        null;
+
+    pending.watcher =
+        null;
+}
+
+
+// ============================================================
+// ABORT PAIRING
+// ============================================================
+
+async function abortPairing(
+    chatId,
+    sessionId,
+    message
+) {
+    const pending =
+        pendingPairings.get(
+            chatId
+        );
+
+    if (pending) {
+        clearPairingTimers(
+            pending
+        );
+    }
+
+    pendingPairings.delete(
+        chatId
+    );
+
+    if (sessionId) {
+        await clearWhatsAppSession(
+            sessionId
+        );
+    }
+
+    if (message) {
+        await sendMessage(
+            chatId,
+            message
+        );
+    }
 }
 
 
@@ -570,28 +606,24 @@ async function startPairing(
     const cleanNumber =
         cleanPhoneNumber(number);
 
-    if (!cleanNumber) {
+    if (
+        !cleanNumber ||
+        cleanNumber.length < 10 ||
+        cleanNumber.length > 15
+    ) {
         await sendMessage(
             chatId,
-            '❌ Invalid phone number.\n\nSend your WhatsApp number using country code.\nExample: 2348012345678'
+            '❌ Invalid phone number.\n\nSend the number with country code.\nExample: 2348012345678'
         );
 
         return;
     }
 
     if (
-        cleanNumber.length < 10 ||
-        cleanNumber.length > 15
+        pendingPairings.has(
+            chatId
+        )
     ) {
-        await sendMessage(
-            chatId,
-            '❌ Invalid phone number length.\n\nSend the number with country code.\nExample: 2348012345678'
-        );
-
-        return;
-    }
-
-    if (pendingPairings.has(chatId)) {
         await sendMessage(
             chatId,
             '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
@@ -621,40 +653,58 @@ async function startPairing(
     const sessionId =
         `tg-${cleanNumber}-${Date.now()}`;
 
-    console.log(
-        `📱 [TELEGRAM] Starting fresh pairing session: ${sessionId}`
-    );
+    const pending = {
+        number:
+            cleanNumber,
+
+        sessionId,
+
+        startedAt:
+            Date.now(),
+
+        waitingForNumber:
+            false,
+
+        waitingForCode:
+            false,
+
+        codeSent:
+            false,
+
+        completed:
+            false,
+
+        generationTimer:
+            null,
+
+        entryTimer:
+            null,
+
+        watcher:
+            null
+    };
 
     pendingPairings.set(
         chatId,
-        {
-            number:
-                cleanNumber,
-            sessionId,
-            startedAt:
-                Date.now(),
-            waitingForCode:
-                false
-        }
+        pending
     );
 
     await sendMessage(
         chatId,
-        `⏳ Starting WhatsApp pairing for +${cleanNumber}...\n\nPlease wait while QUEEN VIDA generates your pairing code.`
+        `⏳ Starting WhatsApp pairing for +${cleanNumber}...\n\nPlease wait. Your pairing code can take a little time to generate.`
     );
 
-    let codeSent = false;
-    let connectionWatcher = null;
-    let completed = false;
-
-    const finishPairing =
+    const finish =
         () => {
-            if (connectionWatcher) {
-                clearInterval(
-                    connectionWatcher
+            const current =
+                pendingPairings.get(
+                    chatId
                 );
 
-                connectionWatcher = null;
+            if (current) {
+                clearPairingTimers(
+                    current
+                );
             }
 
             pendingPairings.delete(
@@ -662,13 +712,86 @@ async function startPairing(
             );
         };
 
+    const markConnected =
+        async () => {
+            const current =
+                pendingPairings.get(
+                    chatId
+                );
+
+            if (
+                !current ||
+                current.completed
+            ) {
+                return false;
+            }
+
+            const session =
+                getConnectedSession(
+                    sessionId
+                );
+
+            if (
+                !session?.connected
+            ) {
+                return false;
+            }
+
+            current.completed =
+                true;
+
+            finish();
+
+            const sessions =
+                getChatSessions(
+                    chatId
+                );
+
+            if (
+                !sessions.some(
+                    s =>
+                        s.sessionId ===
+                        sessionId
+                )
+            ) {
+                sessions.push({
+                    whatsappNumber:
+                        cleanNumber,
+
+                    sessionId,
+
+                    pairedAt:
+                        Date.now()
+                });
+
+                saveChatSessions(
+                    chatId,
+                    sessions
+                );
+            }
+
+            await sendMessage(
+                chatId,
+                `✅ *PAIRING SUCCESSFUL!*\n\nWhatsApp: +${cleanNumber}\n\n👑 QUEEN VIDA is now connected and active.\n\nYou can link another number anytime with /pair.\nUse /status to view all linked accounts.`,
+                {
+                    parse_mode:
+                        'Markdown'
+                }
+            );
+
+            return true;
+        };
+
     try {
         await sessionManager.startSession({
             sessionId,
+
             ownerNumber:
                 cleanNumber,
+
             isMain:
                 false,
+
             commandsMap,
 
             onPairingCode:
@@ -676,208 +799,156 @@ async function startPairing(
                     code,
                     errorMessage
                 ) => {
-                    const pending =
+                    const current =
                         pendingPairings.get(
                             chatId
                         );
 
                     if (
-                        !pending ||
-                        completed
+                        !current ||
+                        current.completed
                     ) {
                         return;
                     }
 
                     if (!code) {
-                        finishPairing();
-
-                        await sendMessage(
+                        await abortPairing(
                             chatId,
+                            sessionId,
                             `❌ Pairing failed.\n\n${errorMessage || 'Unknown pairing error.'}\n\nUse /pair to try again.`
                         );
 
                         return;
                     }
 
-                    codeSent = true;
-
-                    pending.waitingForCode =
+                    current.codeSent =
                         true;
 
-                    pendingPairings.set(
-                        chatId,
-                        pending
-                    );
+                    current.waitingForCode =
+                        true;
+
+                    if (
+                        current.generationTimer
+                    ) {
+                        clearTimeout(
+                            current.generationTimer
+                        );
+
+                        current.generationTimer =
+                            null;
+                    }
 
                     await sendMessage(
                         chatId,
-                        `🔐 *QUEEN VIDA PAIRING CODE*\n\n*${code}*\n\nOpen WhatsApp on the number you entered and use:\n\n*Linked Devices → Link a Device → Link with phone number*\n\n⏳ Enter the code now.`,
+                        `🔐 *QUEEN VIDA PAIRING CODE*\n\n*${code}*\n\nOpen WhatsApp on the number you entered:\n\n*Linked Devices → Link a Device → Link with phone number*\n\n⏳ Enter the code now.`,
                         {
                             parse_mode:
                                 'Markdown'
                         }
                     );
 
-                    let checks = 0;
-
-                    connectionWatcher =
+                    current.watcher =
                         setInterval(
                             async () => {
-                                checks++;
-
-                                if (completed) {
-                                    clearInterval(
-                                        connectionWatcher
-                                    );
-
-                                    connectionWatcher =
-                                        null;
-
-                                    return;
-                                }
-
-                                const session =
-                                    getConnectedSession(
-                                        sessionId
-                                    );
-
-                                if (
-                                    session &&
-                                    session.connected
-                                ) {
-                                    completed =
-                                        true;
-
-                                    clearInterval(
-                                        connectionWatcher
-                                    );
-
-                                    connectionWatcher =
-                                        null;
-
-                                    const sessions =
-                                        getChatSessions(
+                                try {
+                                    const stillPending =
+                                        pendingPairings.get(
                                             chatId
                                         );
 
-                                    const alreadySaved =
-                                        sessions.some(
-                                            saved =>
-                                                saved.sessionId ===
-                                                sessionId
-                                        );
-
-                                    if (!alreadySaved) {
-                                        sessions.push({
-                                            whatsappNumber:
-                                                cleanNumber,
-
-                                            sessionId,
-
-                                            pairedAt:
-                                                Date.now()
-                                        });
+                                    if (
+                                        !stillPending ||
+                                        stillPending.completed
+                                    ) {
+                                        return;
                                     }
 
-                                    saveChatSessions(
-                                        chatId,
-                                        sessions
-                                    );
+                                    await markConnected();
 
-                                    pendingPairings.delete(
+                                } catch (error) {
+                                    console.error(
+                                        '🔥 [TELEGRAM] Pairing watcher error:',
+                                        error.message
+                                    );
+                                }
+                            },
+                            PAIRING_WATCH_INTERVAL
+                        );
+
+                    current.entryTimer =
+                        setTimeout(
+                            async () => {
+                                const stillPending =
+                                    pendingPairings.get(
                                         chatId
                                     );
 
-                                    await sendMessage(
-                                        chatId,
-                                        `✅ *PAIRING SUCCESSFUL!*\n\nWhatsApp: +${cleanNumber}\n\n👑 QUEEN VIDA is now connected and active.\n\nYou can link another number anytime with /pair.\n\nUse /status to view all linked accounts.`,
-                                        {
-                                            parse_mode:
-                                                'Markdown'
-                                        }
-                                    );
-
+                                if (
+                                    !stillPending ||
+                                    stillPending.completed
+                                ) {
                                     return;
                                 }
 
-                                if (
-                                    checks >= 36
-                                ) {
-                                    clearInterval(
-                                        connectionWatcher
-                                    );
-
-                                    connectionWatcher =
-                                        null;
-
-                                    if (
-                                        pendingPairings.has(
-                                            chatId
-                                        )
-                                    ) {
-                                        pendingPairings.delete(
-                                            chatId
-                                        );
-
-                                        cleanupStalePairingSession(
-                                            sessionId
-                                        );
-
-                                        await sendMessage(
-                                            chatId,
-                                            '⌛ Pairing expired.\n\nThe incomplete session has been cleaned automatically.\n\nUse /pair to try again.'
-                                        );
-                                    }
-                                }
+                                await abortPairing(
+                                    chatId,
+                                    sessionId,
+                                    '⌛ Pairing timed out.\n\nThe incomplete session has been cleaned automatically.\n\nUse /pair to try again.'
+                                );
                             },
-                            5000
+                            PAIRING_ENTRY_TIMEOUT
                         );
                 }
         });
+
+        const current =
+            pendingPairings.get(
+                chatId
+            );
+
+        if (!current) {
+            return;
+        }
+
+        /*
+         * IMPORTANT:
+         * This timer is now 4 minutes.
+         * It only handles failure to generate
+         * the code. It does NOT control the
+         * 10-minute code-entry period.
+         */
+        current.generationTimer =
+            setTimeout(
+                async () => {
+                    const stillPending =
+                        pendingPairings.get(
+                            chatId
+                        );
+
+                    if (
+                        !stillPending ||
+                        stillPending.completed ||
+                        stillPending.codeSent
+                    ) {
+                        return;
+                    }
+
+                    await abortPairing(
+                        chatId,
+                        sessionId,
+                        '⌛ No pairing code was generated within the allowed time.\n\nThe incomplete session has been cleaned automatically.\n\nUse /pair to try again.'
+                    );
+                },
+                PAIRING_CODE_TIMEOUT
+            );
+
     } catch (error) {
-        finishPairing();
-
-        cleanupStalePairingSession(
-            sessionId
-        );
-
-        await sendMessage(
+        await abortPairing(
             chatId,
-            `❌ Failed to start pairing.\n\n${error.message || 'Unknown error.'}\n\nThe incomplete session was cleaned. You can use /pair again.`
+            sessionId,
+            `❌ Failed to start pairing.\n\n${error.message || 'Unknown error.'}\n\nUse /pair to try again.`
         );
-
-        return;
     }
-
-    setTimeout(
-        async () => {
-            const pending =
-                pendingPairings.get(
-                    chatId
-                );
-
-            if (
-                !pending ||
-                completed
-            ) {
-                return;
-            }
-
-            if (!codeSent) {
-                finishPairing();
-
-                cleanupStalePairingSession(
-                    sessionId
-                );
-
-                await sendMessage(
-                    chatId,
-                    '⌛ No pairing code was generated.\n\nThe incomplete session was cleaned automatically.\n\nUse /pair to try again.'
-                );
-            }
-        },
-        45000
-    );
 }
 
 
@@ -915,10 +986,13 @@ async function downloadTelegramFile(
             {
                 responseType:
                     'arraybuffer',
+
                 timeout:
                     120000,
+
                 maxContentLength:
                     100 * 1024 * 1024,
+
                 maxBodyLength:
                     100 * 1024 * 1024
             }
@@ -931,7 +1005,7 @@ async function downloadTelegramFile(
 
 
 // ============================================================
-// GET WHATSAPP GROUPS
+// WHATSAPP GROUPS
 // ============================================================
 
 async function getWhatsAppGroups(
@@ -956,6 +1030,7 @@ async function getWhatsAppGroups(
         .map(
             ([jid, metadata]) => ({
                 jid,
+
                 subject:
                     metadata?.subject ||
                     'Unnamed Group'
@@ -971,7 +1046,7 @@ async function getWhatsAppGroups(
 
 
 // ============================================================
-// SHOW WHATSAPP ACCOUNT PICKER
+// GCSTATUS ACCOUNT PICKER
 // ============================================================
 
 async function showGcStatusAccountPicker(
@@ -1015,13 +1090,12 @@ async function showGcStatusAccountPicker(
 
     await sendMessage(
         chatId,
-        '📱 *SELECT WHATSAPP ACCOUNT*\n\nYou have multiple WhatsApp numbers linked.\n\nChoose the account whose groups you want to use for GCSTATUS.',
+        '📱 *SELECT WHATSAPP ACCOUNT*\n\nChoose the WhatsApp account whose groups you want to use for GCSTATUS.',
         {
             parse_mode:
                 'Markdown',
 
-            reply_markup:
-            {
+            reply_markup: {
                 inline_keyboard:
                     keyboard
             }
@@ -1031,7 +1105,7 @@ async function showGcStatusAccountPicker(
 
 
 // ============================================================
-// SHOW GROUPS FOR SELECTED ACCOUNT
+// GCSTATUS GROUP PICKER
 // ============================================================
 
 async function showGcStatusGroupsForSession(
@@ -1085,10 +1159,6 @@ async function showGcStatusGroupsForSession(
                 ]
             );
 
-        /*
-         * Save the selected WhatsApp account
-         * before the group is selected.
-         */
         pendingGcStatus.set(
             chatId,
             {
@@ -1116,13 +1186,36 @@ async function showGcStatusGroupsForSession(
                 parse_mode:
                     'Markdown',
 
-                reply_markup:
-                {
+                reply_markup: {
                     inline_keyboard:
                         keyboard
                 }
             }
         );
+
+        const pending =
+            pendingGcStatus.get(
+                chatId
+            );
+
+        if (pending) {
+            pending.expireTimer =
+                setTimeout(
+                    () => {
+                        if (
+                            pendingGcStatus.get(
+                                chatId
+                            ) === pending
+                        ) {
+                            pendingGcStatus.delete(
+                                chatId
+                            );
+                        }
+                    },
+                    GCSTATUS_TIMEOUT
+                );
+        }
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM GCSTATUS GROUP LIST ERROR]:',
@@ -1138,22 +1231,22 @@ async function showGcStatusGroupsForSession(
 
 
 // ============================================================
-// HANDLE ACCOUNT SELECTION
+// GCSTATUS ACCOUNT SELECTION
 // ============================================================
 
 async function handleGcStatusAccountSelection(
     callbackQuery
 ) {
-    const callbackId =
-        callbackQuery.id;
+    const chatId =
+        callbackQuery
+            .message
+            ?.chat
+            ?.id;
 
     const data =
         String(
             callbackQuery.data || ''
         );
-
-    const chatId =
-        callbackQuery.message?.chat?.id;
 
     if (
         !chatId ||
@@ -1162,7 +1255,7 @@ async function handleGcStatusAccountSelection(
         )
     ) {
         await answerCallbackQuery(
-            callbackId
+            callbackQuery.id
         );
 
         return;
@@ -1173,15 +1266,14 @@ async function handleGcStatusAccountSelection(
             'gcsacct:'.length
         );
 
-    const session =
-        getTelegramGcStatusSession(
+    if (
+        !getTelegramGcStatusSession(
             chatId,
             sessionId
-        );
-
-    if (!session) {
+        )
+    ) {
         await answerCallbackQuery(
-            callbackId,
+            callbackQuery.id,
             'WhatsApp account is no longer connected.'
         );
 
@@ -1189,7 +1281,7 @@ async function handleGcStatusAccountSelection(
     }
 
     await answerCallbackQuery(
-        callbackId,
+        callbackQuery.id,
         'Account selected.'
     );
 
@@ -1201,22 +1293,22 @@ async function handleGcStatusAccountSelection(
 
 
 // ============================================================
-// HANDLE GROUP SELECTION
+// GCSTATUS GROUP SELECTION
 // ============================================================
 
 async function handleGcStatusGroupSelection(
     callbackQuery
 ) {
-    const callbackId =
-        callbackQuery.id;
+    const chatId =
+        callbackQuery
+            .message
+            ?.chat
+            ?.id;
 
     const data =
         String(
             callbackQuery.data || ''
         );
-
-    const chatId =
-        callbackQuery.message?.chat?.id;
 
     if (
         !chatId ||
@@ -1225,7 +1317,7 @@ async function handleGcStatusGroupSelection(
         )
     ) {
         await answerCallbackQuery(
-            callbackId
+            callbackQuery.id
         );
 
         return;
@@ -1246,8 +1338,8 @@ async function handleGcStatusGroupSelection(
         !pending.sessionId
     ) {
         await answerCallbackQuery(
-            callbackId,
-            'GCSTATUS session expired.'
+            callbackQuery.id,
+            'GCSTATUS selection expired.'
         );
 
         return;
@@ -1265,7 +1357,7 @@ async function handleGcStatusGroupSelection(
         );
 
         await answerCallbackQuery(
-            callbackId,
+            callbackQuery.id,
             'WhatsApp account is not connected.'
         );
 
@@ -1292,23 +1384,25 @@ async function handleGcStatusGroupSelection(
 
         if (!selected) {
             await answerCallbackQuery(
-                callbackId,
+                callbackQuery.id,
                 'Group is no longer available.'
             );
 
             return;
         }
 
+        if (
+            pending.expireTimer
+        ) {
+            clearTimeout(
+                pending.expireTimer
+            );
+        }
+
         pendingGcStatus.set(
             chatId,
             {
                 ...pending,
-
-                sessionId:
-                    auth.sessionId,
-
-                accountNumber:
-                    auth.saved.whatsappNumber,
 
                 groupJid:
                     selected.jid,
@@ -1322,35 +1416,27 @@ async function handleGcStatusGroupSelection(
         );
 
         await answerCallbackQuery(
-            callbackId,
+            callbackQuery.id,
             'Group selected.'
         );
 
-        if (
-            callbackQuery.message?.message_id
-        ) {
-            await editMessageText(
-                chatId,
-                callbackQuery.message.message_id,
-                `✅ *Group selected:*\n${selected.subject}\n\n📱 WhatsApp: +${auth.saved.whatsappNumber}\n\nNow send me:\n\n📝 Text/link\n🖼️ Image\n🎥 Video\n\nFor media, you can include a caption.`,
-                {
-                    parse_mode:
-                        'Markdown'
-                }
-            );
-        } else {
-            await sendMessage(
-                chatId,
-                `✅ *Group selected:*\n${selected.subject}\n\n📱 WhatsApp: +${auth.saved.whatsappNumber}\n\nNow send me text, an image, or a video.`,
-                {
-                    parse_mode:
-                        'Markdown'
-                }
-            );
-        }
+        await editMessageText(
+            chatId,
+            callbackQuery
+                .message
+                .message_id,
+
+            `✅ *Group selected:*\n${selected.subject}\n\n📱 WhatsApp: +${auth.saved.whatsappNumber}\n\nNow send me:\n\n📝 Text/link\n🖼️ Image\n🎥 Video\n\nFor media, you can include a caption.`,
+
+            {
+                parse_mode:
+                    'Markdown'
+            }
+        );
+
     } catch (error) {
         await answerCallbackQuery(
-            callbackId,
+            callbackQuery.id,
             'Failed to select group.'
         );
 
@@ -1363,7 +1449,7 @@ async function handleGcStatusGroupSelection(
 
 
 // ============================================================
-// SEND TELEGRAM GCSTATUS
+// PROCESS TELEGRAM GCSTATUS
 // ============================================================
 
 async function processTelegramGcStatus(
@@ -1401,27 +1487,19 @@ async function processTelegramGcStatus(
         return true;
     }
 
-    const sock =
-        auth.sock;
-
     try {
         if (
-            typeof message.text ===
-            'string' &&
-            message.text.trim()
+            message.text?.trim()
         ) {
-            const text =
-                message.text.trim();
-
             await sendMessage(
                 chatId,
                 '⏳ Posting text to Group Status...'
             );
 
             await gcstatus.sendTelegramTextStatus(
-                sock,
+                auth.sock,
                 pending.groupJid,
-                text
+                message.text.trim()
             );
 
             pendingGcStatus.delete(
@@ -1464,7 +1542,7 @@ async function processTelegramGcStatus(
             );
 
             await gcstatus.sendTelegramImageStatus(
-                sock,
+                auth.sock,
                 pending.groupJid,
                 buffer,
                 caption
@@ -1482,7 +1560,9 @@ async function processTelegramGcStatus(
             return true;
         }
 
-        if (message.video?.file_id) {
+        if (
+            message.video?.file_id
+        ) {
             const buffer =
                 await downloadTelegramFile(
                     message.video.file_id
@@ -1500,7 +1580,7 @@ async function processTelegramGcStatus(
             );
 
             await gcstatus.sendTelegramVideoStatus(
-                sock,
+                auth.sock,
                 pending.groupJid,
                 buffer,
                 caption
@@ -1524,6 +1604,7 @@ async function processTelegramGcStatus(
         );
 
         return true;
+
     } catch (error) {
         console.error(
             '🔥 [TELEGRAM GCSTATUS ERROR]:',
@@ -1532,7 +1613,7 @@ async function processTelegramGcStatus(
 
         await sendMessage(
             chatId,
-            `❌ Group Status failed.\n\nError: ${error?.message || 'Unknown error'}\n\nYou can try sending it again.`
+            `❌ Group Status failed.\n\nError: ${error.message || 'Unknown error'}\n\nYou can try again.`
         );
 
         return true;
@@ -1548,7 +1629,9 @@ async function showAccounts(
     chatId
 ) {
     const sessions =
-        getChatSessions(chatId);
+        getChatSessions(
+            chatId
+        );
 
     if (!sessions.length) {
         await sendMessage(
@@ -1562,22 +1645,20 @@ async function showAccounts(
     let text =
         '📱 *YOUR LINKED WHATSAPP ACCOUNTS*\n\n';
 
-    for (
-        let i = 0;
-        i < sessions.length;
-        i++
-    ) {
-        const saved =
-            sessions[i];
+    sessions.forEach(
+        (
+            saved,
+            index
+        ) => {
+            const connected =
+                isConnected(
+                    saved.sessionId
+                );
 
-        const connected =
-            isConnected(
-                saved.sessionId
-            );
-
-        text +=
-            `${i + 1}. ${connected ? '🟢' : '🔴'} +${saved.whatsappNumber} — ${connected ? 'Connected' : 'Disconnected'}\n`;
-    }
+            text +=
+                `${index + 1}. ${connected ? '🟢' : '🔴'} +${saved.whatsappNumber} — ${connected ? 'Connected' : 'Disconnected'}\n`;
+        }
+    );
 
     text +=
         '\nUse /pair to link another number.\nUse /clear to remove an account.';
@@ -1594,14 +1675,16 @@ async function showAccounts(
 
 
 // ============================================================
-// SHOW CLEAR ACCOUNT PICKER
+// CLEAR PICKER
 // ============================================================
 
 async function showClearPicker(
     chatId
 ) {
     const sessions =
-        getChatSessions(chatId);
+        getChatSessions(
+            chatId
+        );
 
     if (!sessions.length) {
         await sendMessage(
@@ -1614,7 +1697,10 @@ async function showClearPicker(
 
     const keyboard =
         sessions.map(
-            (saved, index) => [
+            (
+                saved,
+                index
+            ) => [
                 {
                     text:
                         `${isConnected(saved.sessionId) ? '🟢' : '🔴'} +${saved.whatsappNumber}`,
@@ -1627,13 +1713,13 @@ async function showClearPicker(
 
     await sendMessage(
         chatId,
-        '🗑️ *CLEAR WHATSAPP SESSION*\n\nSelect the WhatsApp account you want to remove.\n\nThis will delete its saved WhatsApp login so the number can be paired again.',
+        '🗑️ *CLEAR WHATSAPP SESSION*\n\nSelect the WhatsApp account you want to remove.\n\nThis deletes its saved WhatsApp login so the number can be paired again.',
+
         {
             parse_mode:
                 'Markdown',
 
-            reply_markup:
-            {
+            reply_markup: {
                 inline_keyboard:
                     keyboard
             }
@@ -1643,22 +1729,22 @@ async function showClearPicker(
 
 
 // ============================================================
-// CLEAR SELECTED ACCOUNT
+// CLEAR SELECTED
 // ============================================================
 
 async function handleClearSelection(
     callbackQuery
 ) {
-    const callbackId =
-        callbackQuery.id;
+    const chatId =
+        callbackQuery
+            .message
+            ?.chat
+            ?.id;
 
     const data =
         String(
             callbackQuery.data || ''
         );
-
-    const chatId =
-        callbackQuery.message?.chat?.id;
 
     if (
         !chatId ||
@@ -1667,7 +1753,7 @@ async function handleClearSelection(
         )
     ) {
         await answerCallbackQuery(
-            callbackId
+            callbackQuery.id
         );
 
         return;
@@ -1680,27 +1766,21 @@ async function handleClearSelection(
             )
         );
 
-    if (
-        !Number.isInteger(index) ||
-        index < 0
-    ) {
-        await answerCallbackQuery(
-            callbackId,
-            'Invalid selection.'
-        );
-
-        return;
-    }
-
     const sessions =
-        getChatSessions(chatId);
+        getChatSessions(
+            chatId
+        );
 
     const selected =
         sessions[index];
 
-    if (!selected) {
+    if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        !selected
+    ) {
         await answerCallbackQuery(
-            callbackId,
+            callbackQuery.id,
             'Account not found.'
         );
 
@@ -1708,7 +1788,7 @@ async function handleClearSelection(
     }
 
     await answerCallbackQuery(
-        callbackId,
+        callbackQuery.id,
         'Clearing session...'
     );
 
@@ -1722,48 +1802,47 @@ async function handleClearSelection(
             selected.sessionId
         );
 
-    const remaining =
+    saveChatSessions(
+        chatId,
         sessions.filter(
             (_, i) =>
                 i !== index
-        );
-
-    saveChatSessions(
-        chatId,
-        remaining
+        )
     );
 
     pendingGcStatus.delete(
         chatId
     );
 
-    if (removed) {
-        await sendMessage(
-            chatId,
-            `✅ *Session cleared successfully.*\n\nWhatsApp: +${selected.whatsappNumber}\n\nThe number can now be paired again using /pair.`,
-            {
+    await sendMessage(
+        chatId,
+
+        removed
+            ? `✅ *Session cleared successfully.*\n\nWhatsApp: +${selected.whatsappNumber}\n\nThe number can now be paired again using /pair.`
+
+            : `⚠️ The Telegram link was removed for +${selected.whatsappNumber}, but the WhatsApp session could not be fully removed.`,
+
+        removed
+            ? {
                 parse_mode:
                     'Markdown'
             }
-        );
-    } else {
-        await sendMessage(
-            chatId,
-            `⚠️ The Telegram link was removed for +${selected.whatsappNumber}, but the WhatsApp session could not be fully removed.\n\nTry /pair again or restart the bot.`
-        );
-    }
+            : {}
+    );
 }
 
 
 // ============================================================
-// CLEAR ALL ACCOUNTS
+// CLEAR ALL
 // ============================================================
 
 async function clearAllSessions(
     chatId
 ) {
     const sessions =
-        getChatSessions(chatId);
+        getChatSessions(
+            chatId
+        );
 
     if (!sessions.length) {
         await sendMessage(
@@ -1784,12 +1863,11 @@ async function clearAllSessions(
     for (
         const saved of sessions
     ) {
-        const result =
+        if (
             await clearWhatsAppSession(
                 saved.sessionId
-            );
-
-        if (result) {
+            )
+        ) {
             cleared++;
         }
     }
@@ -1823,19 +1901,18 @@ async function handleUpdate(
     update,
     commandsMap
 ) {
-    // ========================================================
-    // CALLBACK QUERY
-    // ========================================================
-
-    if (update?.callback_query) {
-        const callbackData =
+    if (
+        update?.callback_query
+    ) {
+        const data =
             String(
-                update.callback_query.data ||
+                update.callback_query
+                    .data ||
                 ''
             );
 
         if (
-            callbackData.startsWith(
+            data.startsWith(
                 'tgclear:'
             )
         ) {
@@ -1847,7 +1924,7 @@ async function handleUpdate(
         }
 
         if (
-            callbackData.startsWith(
+            data.startsWith(
                 'gcsacct:'
             )
         ) {
@@ -1859,7 +1936,7 @@ async function handleUpdate(
         }
 
         if (
-            callbackData.startsWith(
+            data.startsWith(
                 'gcsgrp:'
             )
         ) {
@@ -1891,8 +1968,9 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // GCSTATUS STATE
+    // GCSTATUS
     // ========================================================
 
     if (
@@ -1920,19 +1998,24 @@ async function handleUpdate(
         }
     }
 
+
     const text =
         String(
             message.text || ''
         ).trim();
 
+
     // ========================================================
-    // /start
+    // START
     // ========================================================
 
-    if (text === '/start') {
+    if (
+        text === '/start'
+    ) {
         await sendMessage(
             chatId,
             `👑 *QUEEN VIDA-V3*\n\nWhatsApp Pairing Gateway\n\nCommands:\n/pair - Pair WhatsApp\n/status - Check all connections\n/clear - Clear a WhatsApp session\n/clearall - Clear all your sessions\n/gcstatus - Post to WhatsApp Group Status\n/cancel - Cancel pairing\n/help - Show help`,
+
             {
                 parse_mode:
                     'Markdown'
@@ -1942,14 +2025,18 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /help
+    // HELP
     // ========================================================
 
-    if (text === '/help') {
+    if (
+        text === '/help'
+    ) {
         await sendMessage(
             chatId,
-            `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nLink a new WhatsApp number. You can link multiple numbers to the same Telegram account.\n\n/status\nShow all linked WhatsApp accounts.\n\n/clear\nChoose one WhatsApp session to remove. The number can then be paired again.\n\n/clearall\nRemove all WhatsApp sessions linked to this Telegram account.\n\n/gcstatus\nChoose which linked WhatsApp account to use, then choose one of its groups and post text, image or video to Group Status.\n\n/cancel\nCancel a pending pairing or GCSTATUS selection.\n\n/help\nShow this help message.`,
+            `👑 *QUEEN VIDA-V3 HELP*\n\n/pair\nLink a new WhatsApp number. You can link multiple numbers.\n\n/status\nShow all linked WhatsApp accounts.\n\n/clear\nRemove one WhatsApp session.\n\n/clearall\nRemove all your WhatsApp sessions.\n\n/gcstatus\nChoose a linked WhatsApp account, then a group, and post text, image or video to Group Status.\n\n/cancel\nCancel pairing or GCSTATUS selection.`,
+
             {
                 parse_mode:
                     'Markdown'
@@ -1959,14 +2046,16 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /gcstatus
+    // GCSTATUS
     // ========================================================
 
     if (
         text === '/gcstatus' ||
-        text === '/gcstatus@' ||
-        text.startsWith('/gcstatus ')
+        text.startsWith(
+            '/gcstatus '
+        )
     ) {
         pendingGcStatus.delete(
             chatId
@@ -1979,12 +2068,19 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /pair
+    // PAIR
     // ========================================================
 
-    if (text === '/pair') {
-        if (pendingPairings.has(chatId)) {
+    if (
+        text === '/pair'
+    ) {
+        if (
+            pendingPairings.has(
+                chatId
+            )
+        ) {
             await sendMessage(
                 chatId,
                 '⏳ You already have a pairing request running.\n\nUse /cancel first if you want to cancel it.'
@@ -1992,6 +2088,11 @@ async function handleUpdate(
 
             return;
         }
+
+        const count =
+            getChatSessions(
+                chatId
+            ).length;
 
         pendingPairings.set(
             chatId,
@@ -2004,9 +2105,6 @@ async function handleUpdate(
             }
         );
 
-        const count =
-            getChatSessions(chatId).length;
-
         await sendMessage(
             chatId,
             `📱 Send the WhatsApp number you want to link with country code.\n\nExample:\n2348012345678\n\n${count ? `You currently have ${count} linked account${count === 1 ? '' : 's'}. You can add another one.` : ''}`
@@ -2015,11 +2113,14 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /status
+    // STATUS
     // ========================================================
 
-    if (text === '/status') {
+    if (
+        text === '/status'
+    ) {
         await showAccounts(
             chatId
         );
@@ -2027,11 +2128,14 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /clear
+    // CLEAR
     // ========================================================
 
-    if (text === '/clear') {
+    if (
+        text === '/clear'
+    ) {
         await showClearPicker(
             chatId
         );
@@ -2039,11 +2143,14 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /clearall
+    // CLEAR ALL
     // ========================================================
 
-    if (text === '/clearall') {
+    if (
+        text === '/clearall'
+    ) {
         await clearAllSessions(
             chatId
         );
@@ -2051,23 +2158,32 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
-    // /cancel
+    // CANCEL
     // ========================================================
 
-    if (text === '/cancel') {
+    if (
+        text === '/cancel'
+    ) {
         const pending =
             pendingPairings.get(
                 chatId
             );
 
         if (pending) {
+            clearPairingTimers(
+                pending
+            );
+
             pendingPairings.delete(
                 chatId
             );
 
-            if (pending.sessionId) {
-                cleanupStalePairingSession(
+            if (
+                pending.sessionId
+            ) {
+                await clearWhatsAppSession(
                     pending.sessionId
                 );
             }
@@ -2092,6 +2208,7 @@ async function handleUpdate(
         return;
     }
 
+
     // ========================================================
     // WAITING FOR PHONE NUMBER
     // ========================================================
@@ -2102,8 +2219,7 @@ async function handleUpdate(
         );
 
     if (
-        pending &&
-        pending.waitingForNumber
+        pending?.waitingForNumber
     ) {
         pendingPairings.delete(
             chatId
@@ -2117,6 +2233,7 @@ async function handleUpdate(
 
         return;
     }
+
 
     // ========================================================
     // UNKNOWN COMMAND
@@ -2175,6 +2292,7 @@ async function startTelegramGateway(
                         'getUpdates',
                         {
                             offset,
+
                             timeout:
                                 30,
 
@@ -2183,6 +2301,7 @@ async function startTelegramGateway(
                                 'callback_query'
                             ]
                         },
+
                         40000
                     );
 
@@ -2190,28 +2309,27 @@ async function startTelegramGateway(
                     const update of updates
                 ) {
                     offset =
-                        update.update_id + 1;
+                        update.update_id +
+                        1;
 
                     try {
                         await handleUpdate(
                             update,
                             commandsMap
                         );
-                    } catch (
-                        handlerError
-                    ) {
+
+                    } catch (error) {
                         console.error(
                             '🔥 [TELEGRAM] Update handler error:',
-                            handlerError
+                            error
                         );
                     }
                 }
-            } catch (
-                pollingError
-            ) {
+
+            } catch (error) {
                 console.error(
                     '🔥 [TELEGRAM] Polling error:',
-                    pollingError.message
+                    error.message
                 );
 
                 await new Promise(
@@ -2223,20 +2341,15 @@ async function startTelegramGateway(
                 );
             }
         }
-    } catch (
-        startupError
-    ) {
+
+    } catch (error) {
         console.error(
             '🔥 [TELEGRAM] Gateway startup failed:',
-            startupError.message
+            error.message
         );
     }
 }
 
-
-// ============================================================
-// EXPORT
-// ============================================================
 
 module.exports = {
     startTelegramGateway
